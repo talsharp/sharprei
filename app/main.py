@@ -1,0 +1,445 @@
+from datetime import date, datetime
+
+import markdown as md
+import pandas as pd
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+load_dotenv()
+
+from app.database import get_db, init_db
+from app.importer import (
+    FIELD_LABELS,
+    TARGET_FIELDS,
+    classify_run_type,
+    clean_zip,
+    guess_mapping,
+    parse_int,
+    parse_optional_float,
+    parse_optional_int,
+    read_table,
+    save_upload,
+)
+from app.insights import generate_insights
+from app.metrics import TIER_ORDER, get_zip_metrics
+from app.models import CampaignRun, Deal, ImportBatch, Neighborhood, RunType, ZipCode, ZipNeighborhood, ZipStatus
+
+app = FastAPI(title="Zip Code Performance")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
+
+STATUS_LABELS = {
+    "not_tried": "Not Tried",
+    "active": "Active",
+    "watchlist": "Watchlist",
+    "blacklist": "Blacklist",
+}
+templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
+templates.env.globals["ZipStatus"] = ZipStatus
+templates.env.globals["TIER_ORDER"] = TIER_ORDER
+
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
+
+
+SORT_FIELDS = {
+    "zip": lambda m: m.zip_code.zip_code,
+    "status": lambda m: m.zip_code.status,
+    "sms": lambda m: m.total_sms,
+    "reply_rate": lambda m: m.reply_rate,
+    "drip_rate": lambda m: m.drip_rate,
+    "warm_rate": lambda m: m.warm_rate,
+    "lead_rate": lambda m: m.lead_rate,
+    "leads": lambda m: m.total_leads,
+    "signed_agreements": lambda m: m.total_signed_agreements,
+    "deals": lambda m: m.deal_count,
+    "profit": lambda m: m.total_profit,
+    "score": lambda m: m.score,
+    "tier": lambda m: len(TIER_ORDER) - TIER_ORDER.index(m.tier) if m.tier in TIER_ORDER else 0,
+}
+
+
+@app.get("/")
+def zip_list(request: Request, status: str = "", sort: str = "score", dir: str = "desc", db: Session = Depends(get_db)):
+    metrics = get_zip_metrics(db)
+    if status:
+        metrics = [m for m in metrics if m.zip_code.status == status]
+    key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
+    metrics.sort(key=key_fn, reverse=(dir == "desc"))
+    return templates.TemplateResponse(
+        "zip_list.html",
+        {
+            "request": request,
+            "active": "list",
+            "metrics": metrics,
+            "status": status,
+            "sort": sort,
+            "dir": dir,
+        },
+    )
+
+
+@app.get("/zip/{zip_id}")
+def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
+    metrics_list = get_zip_metrics(db, zip_code_id=zip_id)
+    if not metrics_list:
+        return RedirectResponse("/", status_code=303)
+    metrics = metrics_list[0]
+    runs = (
+        db.query(CampaignRun)
+        .filter(CampaignRun.zip_code_id == zip_id)
+        .order_by(CampaignRun.run_date.desc())
+        .all()
+    )
+    all_neighborhoods = db.query(Neighborhood).order_by(Neighborhood.name).all()
+    return templates.TemplateResponse(
+        "zip_detail.html",
+        {
+            "request": request,
+            "active": "list",
+            "m": metrics,
+            "zc": metrics.zip_code,
+            "runs": runs,
+            "all_neighborhoods": all_neighborhoods,
+            "run_types": list(RunType),
+            "today": date.today().isoformat(),
+        },
+    )
+
+
+@app.post("/zip/{zip_id}/update")
+def zip_update(
+    zip_id: int,
+    status: str = Form(...),
+    notes: str = Form(""),
+    avg_house_value: str = Form(""),
+    tier_override: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    zc = db.get(ZipCode, zip_id)
+    zc.status = status
+    zc.notes = notes
+    zc.avg_house_value = float(avg_house_value) if avg_house_value.strip() else None
+    zc.tier_override = tier_override or None
+    db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/neighborhoods/add")
+def add_neighborhood(zip_id: int, name: str = Form(...), db: Session = Depends(get_db)):
+    name = name.strip()
+    if name:
+        neighborhood = db.query(Neighborhood).filter(Neighborhood.name == name).first()
+        if not neighborhood:
+            neighborhood = Neighborhood(name=name)
+            db.add(neighborhood)
+            db.flush()
+        exists = (
+            db.query(ZipNeighborhood)
+            .filter_by(zip_code_id=zip_id, neighborhood_id=neighborhood.id)
+            .first()
+        )
+        if not exists:
+            db.add(ZipNeighborhood(zip_code_id=zip_id, neighborhood_id=neighborhood.id))
+        db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/neighborhoods/{link_id}/remove")
+def remove_neighborhood(zip_id: int, link_id: int, db: Session = Depends(get_db)):
+    link = db.get(ZipNeighborhood, link_id)
+    if link and link.zip_code_id == zip_id:
+        db.delete(link)
+        db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/runs/new")
+def create_run(
+    zip_id: int,
+    run_date: str = Form(...),
+    run_type: str = Form(...),
+    sms_sent: int = Form(0),
+    replies: int = Form(0),
+    leads: int = Form(0),
+    warm: int = Form(0),
+    drip: int = Form(0),
+    signed_agreements: int = Form(0),
+    opt_out: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    run = CampaignRun(
+        zip_code_id=zip_id,
+        run_date=date.fromisoformat(run_date),
+        run_type=run_type,
+        sms_sent=sms_sent,
+        replies=replies,
+        leads=leads,
+        warm=warm,
+        drip=drip,
+        signed_agreements=signed_agreements,
+        opt_out=int(opt_out) if opt_out.strip() else None,
+    )
+    db.add(run)
+    zc = db.get(ZipCode, zip_id)
+    if zc.status == ZipStatus.not_tried:
+        zc.status = ZipStatus.active
+    db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/runs/{run_id}/update")
+def update_run(
+    zip_id: int,
+    run_id: int,
+    run_date: str = Form(...),
+    run_type: str = Form(...),
+    sms_sent: int = Form(0),
+    replies: int = Form(0),
+    leads: int = Form(0),
+    warm: int = Form(0),
+    drip: int = Form(0),
+    signed_agreements: int = Form(0),
+    opt_out: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    run = db.get(CampaignRun, run_id)
+    if run and run.zip_code_id == zip_id:
+        run.run_date = date.fromisoformat(run_date)
+        run.run_type = run_type
+        run.sms_sent = sms_sent
+        run.replies = replies
+        run.leads = leads
+        run.warm = warm
+        run.drip = drip
+        run.signed_agreements = signed_agreements
+        run.opt_out = int(opt_out) if opt_out.strip() else None
+        db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/runs/{run_id}/delete")
+def delete_run(zip_id: int, run_id: int, db: Session = Depends(get_db)):
+    run = db.get(CampaignRun, run_id)
+    if run and run.zip_code_id == zip_id:
+        db.delete(run)
+        db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/runs/{run_id}/deals/new")
+def create_deal(
+    zip_id: int,
+    run_id: int,
+    profit: float = Form(...),
+    closed_date: str = Form(...),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    deal = Deal(
+        campaign_run_id=run_id,
+        profit=profit,
+        closed_date=date.fromisoformat(closed_date),
+        notes=notes,
+    )
+    db.add(deal)
+    db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/new")
+def create_zip(zip_code: str = Form(...), db: Session = Depends(get_db)):
+    zip_code = zip_code.strip()
+    existing = db.query(ZipCode).filter(ZipCode.zip_code == zip_code).first()
+    if not existing and zip_code:
+        zc = ZipCode(zip_code=zip_code)
+        db.add(zc)
+        db.commit()
+        db.refresh(zc)
+        return RedirectResponse(f"/zip/{zc.id}", status_code=303)
+    if existing:
+        return RedirectResponse(f"/zip/{existing.id}", status_code=303)
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/import")
+def import_upload(request: Request):
+    return templates.TemplateResponse(
+        "import_upload.html", {"request": request, "active": "import", "error": None}
+    )
+
+
+@app.post("/import/preview")
+async def import_preview(request: Request, file: UploadFile = File(...)):
+    content = await file.read()
+    if not content:
+        return templates.TemplateResponse(
+            "import_upload.html",
+            {"request": request, "active": "import", "error": "The file is empty"},
+        )
+    token = save_upload(file.filename, content)
+    try:
+        df = read_table(token)
+    except Exception as exc:
+        return templates.TemplateResponse(
+            "import_upload.html",
+            {"request": request, "active": "import", "error": f"Could not read the file: {exc}"},
+        )
+    columns = list(df.columns)
+    mapping = guess_mapping(columns)
+    preview_rows = df.head(10).fillna("").to_dict(orient="records")
+    return templates.TemplateResponse(
+        "import_preview.html",
+        {
+            "request": request,
+            "active": "import",
+            "token": token,
+            "columns": columns,
+            "mapping": mapping,
+            "field_labels": FIELD_LABELS,
+            "preview_rows": preview_rows,
+            "row_count": len(df),
+        },
+    )
+
+
+@app.post("/import/commit")
+async def import_commit(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    token = form.get("token")
+    default_run_type = form.get("default_run_type", "initial")
+    field_map = {field: form.get(f"map_{field}") or None for field in TARGET_FIELDS}
+
+    if not field_map.get("zip_code"):
+        return templates.TemplateResponse(
+            "import_upload.html",
+            {"request": request, "active": "import", "error": "You must map the zip code column before importing"},
+        )
+
+    df = read_table(token).fillna("")
+
+    batch = ImportBatch(filename=token.split("_", 1)[-1], row_count=len(df), status="success")
+    db.add(batch)
+    db.flush()
+
+    imported = 0
+    failed = 0
+    new_zips = 0
+    errors = []
+    zip_cache = {}
+
+    for idx, row in df.iterrows():
+        try:
+            zip_code_val = clean_zip(row.get(field_map["zip_code"]))
+            if not zip_code_val:
+                raise ValueError("Missing zip code")
+
+            if zip_code_val not in zip_cache:
+                zc = db.query(ZipCode).filter(ZipCode.zip_code == zip_code_val).first()
+                if not zc:
+                    zc = ZipCode(zip_code=zip_code_val)
+                    db.add(zc)
+                    db.flush()
+                    new_zips += 1
+                zip_cache[zip_code_val] = zc
+            zc = zip_cache[zip_code_val]
+            zip_code_id = zc.id
+            if zc.status == ZipStatus.not_tried:
+                zc.status = ZipStatus.active
+
+            avg_house_value_col = field_map.get("avg_house_value")
+            if avg_house_value_col:
+                parsed_value = parse_optional_float(row.get(avg_house_value_col))
+                if parsed_value is not None:
+                    zc.avg_house_value = parsed_value
+
+            run_date_col = field_map.get("run_date")
+            run_date_val = row.get(run_date_col) if run_date_col else ""
+            parsed_date = pd.to_datetime(run_date_val, errors="coerce", dayfirst=False)
+            if pd.isna(parsed_date):
+                parsed_date = datetime.utcnow()
+            run_type_col = field_map.get("run_type")
+            run_type_val = classify_run_type(
+                row.get(run_type_col) if run_type_col else None, default_run_type
+            )
+
+            run = CampaignRun(
+                zip_code_id=zip_code_id,
+                run_date=parsed_date.date(),
+                run_type=run_type_val,
+                sms_sent=parse_int(row.get(field_map.get("sms_sent"))),
+                replies=parse_int(row.get(field_map.get("replies"))),
+                leads=parse_int(row.get(field_map.get("leads"))),
+                warm=parse_int(row.get(field_map.get("warm"))),
+                drip=parse_int(row.get(field_map.get("drip"))),
+                signed_agreements=parse_int(row.get(field_map.get("signed_agreements"))),
+                opt_out=parse_optional_int(row.get(field_map.get("opt_out"))) if field_map.get("opt_out") else None,
+                import_batch_id=batch.id,
+            )
+            db.add(run)
+            imported += 1
+        except Exception as exc:
+            failed += 1
+            if len(errors) < 20:
+                errors.append(f"Row {idx + 2}: {exc}")
+
+    batch.status = "success" if failed == 0 else ("failed" if imported == 0 else "partial")
+    db.commit()
+
+    return templates.TemplateResponse(
+        "import_result.html",
+        {
+            "request": request,
+            "active": "import",
+            "imported": imported,
+            "failed": failed,
+            "new_zips": new_zips,
+            "errors": errors,
+        },
+    )
+
+
+@app.get("/insights")
+def insights_page(request: Request, db: Session = Depends(get_db)):
+    metrics = get_zip_metrics(db)
+    return templates.TemplateResponse(
+        "insights.html",
+        {
+            "request": request,
+            "active": "insights",
+            "zip_count": len(metrics),
+            "result_html": None,
+            "error": None,
+        },
+    )
+
+
+@app.post("/insights/run")
+def insights_run(request: Request, db: Session = Depends(get_db)):
+    metrics = get_zip_metrics(db)
+    error = None
+    result_html = None
+    if not metrics:
+        error = "No data yet to analyze. Add zip codes and runs before running insights."
+    else:
+        try:
+            text = generate_insights(metrics)
+            result_html = md.markdown(text)
+        except Exception as exc:
+            error = str(exc)
+    return templates.TemplateResponse(
+        "insights.html",
+        {
+            "request": request,
+            "active": "insights",
+            "zip_count": len(metrics),
+            "result_html": result_html,
+            "error": error,
+        },
+    )

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Insights{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h3>Analyze Current State</h3>
+  <p class="muted">Runs an analysis on {{ zip_count }} zip codes with data, and returns recommendations: which to continue, which to stop, and which are worth trying.</p>
+  <form method="post" action="/insights/run">
+    <button type="submit">Analyze Current State</button>
+  </form>
+</div>
+
+{% if error %}
+<div class="card" style="border-color: var(--red);">
+  <strong style="color: var(--red);">Error:</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if result_html %}
+<div class="card insights-result">
+  {{ result_html | safe }}
+</div>
+{% endif %}
+
+{% endblock %}

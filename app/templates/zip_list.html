@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Zip Codes{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <form class="filters" method="get" action="/">
+    <select name="status" onchange="this.form.submit()">
+      <option value="" {{ "selected" if status == "" else "" }}>All Statuses</option>
+      {% for key, label in STATUS_LABELS.items() %}
+      <option value="{{ key }}" {{ "selected" if status == key else "" }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir }}">
+
+    <div class="columns-toggle">
+      <button type="button" class="secondary" onclick="document.getElementById('columns-panel').classList.toggle('open')">Columns</button>
+      <div class="columns-panel" id="columns-panel">
+        <label><input type="checkbox" data-col="neighborhood" checked> Neighborhood</label>
+        <label><input type="checkbox" data-col="status" checked> Status</label>
+        <label><input type="checkbox" data-col="tier" checked> Tier</label>
+        <label><input type="checkbox" data-col="sms" checked> SMS Sent</label>
+        <label><input type="checkbox" data-col="reply_rate" checked> % Replies</label>
+        <label><input type="checkbox" data-col="drip_rate" checked> % Drips</label>
+        <label><input type="checkbox" data-col="warm_rate" checked> % Warms</label>
+        <label><input type="checkbox" data-col="lead_rate" checked> % Leads</label>
+        <label><input type="checkbox" data-col="leads_number" checked> Leads Number</label>
+        <label><input type="checkbox" data-col="signed_agreements" checked> Signed Agreements</label>
+        <label><input type="checkbox" data-col="deals" checked> Closed Deals</label>
+        <label><input type="checkbox" data-col="profit" checked> Profit</label>
+        <label><input type="checkbox" data-col="score" checked> Score</label>
+      </div>
+    </div>
+  </form>
+
+  <form method="post" action="/zip/new" style="display:flex; gap:8px;">
+    <input type="text" name="zip_code" placeholder="Add new zip code (e.g. 15213)" required>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+{% macro sort_link(field, label) %}
+  {% set next_dir = 'asc' if (sort == field and dir == 'desc') else 'desc' %}
+  <a href="/?status={{ status }}&sort={{ field }}&dir={{ next_dir }}" style="color:inherit; text-decoration:none;">
+    {{ label }}{% if sort == field %} {{ '▼' if dir == 'desc' else '▲' }}{% endif %}
+  </a>
+{% endmacro %}
+
+
+<div style="overflow-x:auto;">
+<table id="zip-table">
+  <thead>
+    <tr>
+      <th>{{ sort_link('zip', 'Zip Code') }}</th>
+      <th data-col="neighborhood">Neighborhood</th>
+      <th data-col="status">{{ sort_link('status', 'Status') }}</th>
+      <th data-col="tier">{{ sort_link('tier', 'Tier') }}</th>
+      <th data-col="sms">{{ sort_link('sms', 'SMS Sent') }}</th>
+      <th data-col="reply_rate">{{ sort_link('reply_rate', '% Replies') }}</th>
+      <th data-col="drip_rate">{{ sort_link('drip_rate', '% Drips') }}</th>
+      <th data-col="warm_rate">{{ sort_link('warm_rate', '% Warms') }}</th>
+      <th data-col="lead_rate">{{ sort_link('lead_rate', '% Leads') }}</th>
+      <th data-col="leads_number">{{ sort_link('leads', 'Leads Number') }}</th>
+      <th data-col="signed_agreements">{{ sort_link('signed_agreements', 'Signed Agreements') }}</th>
+      <th data-col="deals">{{ sort_link('deals', 'Closed Deals') }}</th>
+      <th data-col="profit">{{ sort_link('profit', 'Profit') }}</th>
+      <th data-col="score">{{ sort_link('score', 'Score') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in metrics %}
+    <tr>
+      <td><a class="zip-link" href="/zip/{{ m.zip_code.id }}">{{ m.zip_code.zip_code }}</a></td>
+      <td data-col="neighborhood" class="muted">{{ m.zip_code.neighborhoods | map(attribute='name') | join(', ') or '—' }}</td>
+      <td data-col="status"><span class="badge badge-{{ m.zip_code.status }}">{{ STATUS_LABELS[m.zip_code.status] }}</span></td>
+      <td data-col="tier"><span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}" title="{{ (m.tier_reason + ' — manually overridden (computed: ' + m.computed_tier + ')') if m.zip_code.tier_override else m.tier_reason }}">{{ m.tier }}{{ " ✎" if m.zip_code.tier_override else "" }}</span></td>
+      <td data-col="sms">{{ m.total_sms }}</td>
+      <td data-col="reply_rate" title="{{ macros.pct_title(m.reply_rate, m.reply_vs_avg, m.avg_reply_rate) }}">{{ "%.2f"|format(m.reply_rate * 100) }}%</td>
+      <td data-col="drip_rate" title="{{ macros.pct_title(m.drip_rate, m.drip_vs_avg, m.avg_drip_rate) }}">{{ "%.2f"|format(m.drip_rate * 100) }}%</td>
+      <td data-col="warm_rate" title="{{ macros.pct_title(m.warm_rate, m.warm_vs_avg, m.avg_warm_rate) }}">{{ "%.2f"|format(m.warm_rate * 100) }}%</td>
+      <td data-col="lead_rate" title="{{ macros.pct_title(m.lead_rate, m.lead_vs_avg, m.avg_lead_rate) }}">{{ "%.2f"|format(m.lead_rate * 100) }}%</td>
+      <td data-col="leads_number">{{ m.total_leads }}</td>
+      <td data-col="signed_agreements">{{ m.total_signed_agreements }}</td>
+      <td data-col="deals">{{ m.deal_count }}</td>
+      <td data-col="profit">${{ "%.0f"|format(m.total_profit) }}</td>
+      <td data-col="score">{{ "%.0f"|format(m.score) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+(function() {
+  var STORAGE_KEY = 'zipListColumns';
+  var checkboxes = document.querySelectorAll('#columns-panel input[type=checkbox]');
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
+
+  function applyColumn(col, visible) {
+    document.querySelectorAll('[data-col="' + col + '"]').forEach(function(el) {
+      el.classList.toggle('hidden-col', !visible);
+    });
+  }
+
+  checkboxes.forEach(function(cb) {
+    var col = cb.dataset.col;
+    if (saved.hasOwnProperty(col)) {
+      cb.checked = saved[col];
+      applyColumn(col, saved[col]);
+    }
+    cb.addEventListener('change', function() {
+      saved[col] = cb.checked;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      applyColumn(col, cb.checked);
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    var panel = document.getElementById('columns-panel');
+    if (!panel.contains(e.target) && !e.target.closest('.columns-toggle')) {
+      panel.classList.remove('open');
+    }
+  });
+})();
+</script>
+
+{% endblock %}

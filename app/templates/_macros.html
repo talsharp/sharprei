@@ -1,0 +1,1 @@
+{% macro pct_title(value, vs_avg, avg) %}{% if avg is not none %}{{ "%.2f%% — %s (avg %.2f%%)"|format(value*100, vs_avg, avg*100) }}{% else %}{{ "%.2f%%"|format(value*100) }} — no average available yet{% endif %}{% endmacro %}

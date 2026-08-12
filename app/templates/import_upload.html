@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Import File{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h3>Import Run File (Excel / CSV)</h3>
+  <p class="muted">Upload the weekly Excel/CSV file from Launch Control. In the next step you'll be able to verify the column mapping before saving.</p>
+  <form method="post" action="/import/preview" enctype="multipart/form-data">
+    <div class="form-row">
+      <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+    </div>
+    <button type="submit">Continue to Preview</button>
+  </form>
+</div>
+
+{% if error %}
+<div class="card" style="border-color: var(--red);">
+  <strong style="color: var(--red);">Error:</strong> {{ error }}
+</div>
+{% endif %}
+
+{% endblock %}
