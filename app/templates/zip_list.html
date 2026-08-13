@@ -14,6 +14,9 @@
     <input type="hidden" name="sort" value="{{ sort }}">
     <input type="hidden" name="dir" value="{{ dir }}">
 
+    <input type="text" id="zip-search-input" placeholder="Search zip code..." style="width:160px;">
+    <button type="button" id="zip-search-btn" class="secondary">Search</button>
+
     <div class="columns-toggle">
       <button type="button" class="secondary" onclick="document.getElementById('columns-panel').classList.toggle('open')">Columns</button>
       <div class="columns-panel" id="columns-panel">
@@ -48,7 +51,7 @@
 {% endmacro %}
 
 
-<div style="overflow-x:auto;">
+<div class="table-scroll-y">
 <table id="zip-table">
   <thead>
     <tr>
@@ -90,6 +93,24 @@
     <tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
     {% endfor %}
   </tbody>
+  <tfoot>
+    <tr>
+      <td>Totals / Averages</td>
+      <td data-col="neighborhood"></td>
+      <td data-col="status"></td>
+      <td data-col="tier"></td>
+      <td data-col="sms">0</td>
+      <td data-col="reply_rate">0.00%</td>
+      <td data-col="drip_rate">0.00%</td>
+      <td data-col="warm_rate">0.00%</td>
+      <td data-col="lead_rate">0.00%</td>
+      <td data-col="leads_number">0</td>
+      <td data-col="signed_agreements">0</td>
+      <td data-col="deals">0</td>
+      <td data-col="profit">$0</td>
+      <td data-col="score"></td>
+    </tr>
+  </tfoot>
 </table>
 </div>
 
@@ -125,6 +146,65 @@
       panel.classList.remove('open');
     }
   });
+})();
+
+(function() {
+  var SUM_COLS = ['sms', 'leads_number', 'signed_agreements', 'deals', 'profit'];
+  var AVG_COLS = ['reply_rate', 'drip_rate', 'warm_rate', 'lead_rate'];
+
+  function visibleDataRows() {
+    return Array.from(document.querySelectorAll('#zip-table tbody tr')).filter(function(tr) {
+      return !tr.classList.contains('hidden-row') && tr.querySelector('[data-col="sms"]');
+    });
+  }
+
+  function recomputeFooter() {
+    var rows = visibleDataRows();
+
+    SUM_COLS.forEach(function(col) {
+      var total = 0;
+      rows.forEach(function(tr) {
+        var cell = tr.querySelector('[data-col="' + col + '"]');
+        if (cell) total += parseFloat(cell.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+      });
+      var footerCell = document.querySelector('#zip-table tfoot [data-col="' + col + '"]');
+      if (footerCell) footerCell.textContent = (col === 'profit' ? '$' : '') + total.toFixed(0);
+    });
+
+    AVG_COLS.forEach(function(col) {
+      var vals = [];
+      rows.forEach(function(tr) {
+        var cell = tr.querySelector('[data-col="' + col + '"]');
+        if (cell) vals.push(parseFloat(cell.textContent.replace(/[^0-9.\-]/g, '')) || 0);
+      });
+      var avg = vals.length ? (vals.reduce(function(a, b) { return a + b; }, 0) / vals.length) : 0;
+      var footerCell = document.querySelector('#zip-table tfoot [data-col="' + col + '"]');
+      if (footerCell) footerCell.textContent = avg.toFixed(2) + '%';
+    });
+  }
+
+  function applySearch() {
+    var q = (document.getElementById('zip-search-input').value || '').trim().toLowerCase();
+    document.querySelectorAll('#zip-table tbody tr').forEach(function(tr) {
+      var zipCell = tr.querySelector('td:first-child');
+      if (!zipCell || !tr.querySelector('[data-col="sms"]')) return;
+      var zip = zipCell.textContent.trim().toLowerCase();
+      tr.classList.toggle('hidden-row', !!q && zip.indexOf(q) === -1);
+    });
+    recomputeFooter();
+  }
+
+  var searchInput = document.getElementById('zip-search-input');
+  var searchBtn = document.getElementById('zip-search-btn');
+  if (searchInput) {
+    searchInput.addEventListener('input', applySearch);
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); applySearch(); }
+    });
+  }
+  if (searchBtn) searchBtn.addEventListener('click', applySearch);
+
+  recomputeFooter();
 })();
 </script>
 

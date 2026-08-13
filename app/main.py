@@ -28,7 +28,7 @@ from app.insights import generate_insights
 from app.metrics import TIER_ORDER, get_zip_metrics
 from app.models import CampaignRun, Deal, ImportBatch, Neighborhood, RunType, ZipCode, ZipNeighborhood, ZipStatus
 
-app = FastAPI(title="Zip Code Performance")
+app = FastAPI(title="AAA Houses - SMS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 

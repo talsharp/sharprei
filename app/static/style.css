@@ -50,7 +50,6 @@ table {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 th, td {
@@ -61,6 +60,22 @@ th, td {
 }
 
 th.hidden-col, td.hidden-col { display: none; }
+
+.table-scroll-y { max-height: 70vh; overflow: auto; border-radius: 8px; }
+#zip-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  box-shadow: 0 1px 0 var(--border);
+}
+#zip-table tfoot td {
+  font-weight: 600;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  background: #1c2029;
+}
+tr.hidden-row { display: none; }
 
 .columns-toggle { position: relative; display: inline-block; }
 .columns-panel {
