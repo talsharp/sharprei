@@ -5,3 +5,5 @@ data.db
 uploads/
 .env
 .claude/
+.DS_Store
+~$*.xlsx

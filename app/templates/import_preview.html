@@ -20,12 +20,18 @@
       </div>
       {% endfor %}
     </div>
-    <div class="form-row">
-      <label>Default run type (if the column isn't mapped)</label>
-      <select name="default_run_type">
-        <option value="initial">Initial Run</option>
-        <option value="follow_up">Follow-up</option>
-      </select>
+    <div class="grid-2">
+      <div class="form-row">
+        <label>Default run type (if the column isn't mapped)</label>
+        <select name="default_run_type">
+          <option value="initial">Initial Run</option>
+          <option value="follow_up">Follow-up</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Default date (used for every row, since this file has no date column)</label>
+        <input type="date" name="default_date" value="{{ today }}">
+      </div>
     </div>
     <button type="submit">Import {{ row_count }} Rows</button>
     <a href="/import" class="btn secondary">Cancel</a>

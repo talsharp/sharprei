@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 
 import markdown as md
 import pandas as pd
@@ -24,6 +24,7 @@ from app.importer import (
     read_table,
     save_upload,
 )
+from app.followups import get_follow_up_summaries
 from app.insights import generate_insights
 from app.metrics import TIER_ORDER, get_zip_metrics
 from app.models import CampaignRun, Deal, ImportBatch, Neighborhood, RunType, ZipCode, ZipNeighborhood, ZipStatus
@@ -72,12 +73,14 @@ def zip_list(request: Request, status: str = "", sort: str = "score", dir: str =
         metrics = [m for m in metrics if m.zip_code.status == status]
     key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
     metrics.sort(key=key_fn, reverse=(dir == "desc"))
+    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
     return templates.TemplateResponse(
         "zip_list.html",
         {
             "request": request,
             "active": "list",
             "metrics": metrics,
+            "follow_ups": follow_ups,
             "status": status,
             "sort": sort,
             "dir": dir,
@@ -305,6 +308,7 @@ async def import_preview(request: Request, file: UploadFile = File(...)):
             "field_labels": FIELD_LABELS,
             "preview_rows": preview_rows,
             "row_count": len(df),
+            "today": date.today().isoformat(),
         },
     )
 
@@ -314,6 +318,11 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     token = form.get("token")
     default_run_type = form.get("default_run_type", "initial")
+    default_date_val = form.get("default_date", "")
+    try:
+        default_date = date.fromisoformat(default_date_val) if default_date_val else date.today()
+    except ValueError:
+        default_date = date.today()
     field_map = {field: form.get(f"map_{field}") or None for field in TARGET_FIELDS}
 
     if not field_map.get("zip_code"):
@@ -362,8 +371,7 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
             run_date_col = field_map.get("run_date")
             run_date_val = row.get(run_date_col) if run_date_col else ""
             parsed_date = pd.to_datetime(run_date_val, errors="coerce", dayfirst=False)
-            if pd.isna(parsed_date):
-                parsed_date = datetime.utcnow()
+            run_date_final = parsed_date.date() if not pd.isna(parsed_date) else default_date
             run_type_col = field_map.get("run_type")
             run_type_val = classify_run_type(
                 row.get(run_type_col) if run_type_col else None, default_run_type
@@ -371,7 +379,7 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
 
             run = CampaignRun(
                 zip_code_id=zip_code_id,
-                run_date=parsed_date.date(),
+                run_date=run_date_final,
                 run_type=run_type_val,
                 sms_sent=parse_int(row.get(field_map.get("sms_sent"))),
                 replies=parse_int(row.get(field_map.get("replies"))),
