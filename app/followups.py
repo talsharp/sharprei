@@ -1,11 +1,12 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.metrics import _label_ratio, _ratio_to_average
 from app.models import CampaignRun, Deal, RunType
 
 
@@ -16,6 +17,14 @@ class FollowUpRound:
     days_since_initial: Optional[int]
     deal_count: int = 0
     total_profit: float = 0.0
+    avg_reply_rate: Optional[float] = None
+    avg_lead_rate: Optional[float] = None
+    avg_warm_rate: Optional[float] = None
+    avg_drip_rate: Optional[float] = None
+    reply_vs_avg: str = "n/a"
+    lead_vs_avg: str = "n/a"
+    warm_vs_avg: str = "n/a"
+    drip_vs_avg: str = "n/a"
 
     @property
     def reply_rate(self) -> float:
@@ -45,6 +54,14 @@ class FollowUpSummary:
     total_signed_agreements: int = 0
     deal_count: int = 0
     total_profit: float = 0.0
+    avg_reply_rate: Optional[float] = None
+    avg_lead_rate: Optional[float] = None
+    avg_warm_rate: Optional[float] = None
+    avg_drip_rate: Optional[float] = None
+    reply_vs_avg: str = "n/a"
+    lead_vs_avg: str = "n/a"
+    warm_vs_avg: str = "n/a"
+    drip_vs_avg: str = "n/a"
 
     @property
     def reply_rate(self) -> float:
@@ -63,11 +80,25 @@ class FollowUpSummary:
         return self.total_drip / self.total_replies if self.total_replies else 0.0
 
 
+def _apply_vs_average(items, rate_props=("reply_rate", "lead_rate", "warm_rate", "drip_rate")) -> None:
+    """Set avg_<rate> and <rate>_vs_avg on every item, comparing each item's rate
+    to the average of that same rate across all items in the given group."""
+    items = list(items)
+    if not items:
+        return
+    for prop in rate_props:
+        avg_value = sum(getattr(it, prop) for it in items) / len(items)
+        avg_attr = "avg_" + prop
+        vs_avg_attr = prop.replace("_rate", "_vs_avg")
+        for it in items:
+            setattr(it, avg_attr, avg_value)
+            setattr(it, vs_avg_attr, _label_ratio(_ratio_to_average(getattr(it, prop), avg_value)))
+
+
 def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) -> Dict[int, FollowUpSummary]:
-    query = db.query(CampaignRun).filter(CampaignRun.run_type == RunType.follow_up)
-    if zip_ids is not None:
-        query = query.filter(CampaignRun.zip_code_id.in_(zip_ids))
-    followup_runs = query.all()
+    """Always computed over ALL zip codes with follow-up data (so averages are
+    meaningful), then filtered down to `zip_ids` at the very end if given."""
+    followup_runs = db.query(CampaignRun).filter(CampaignRun.run_type == RunType.follow_up).all()
     followup_run_ids = [r.id for r in followup_runs]
 
     deals_by_run: Dict[int, List[Deal]] = defaultdict(list)
@@ -79,10 +110,7 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
     # Reference date per zip: the earliest INITIAL run, so "days since initial"
     # is anchored to the initial send even if the run rows arrive out of order.
     initial_dates_by_zip: Dict[int, date] = {}
-    initial_query = db.query(CampaignRun).filter(CampaignRun.run_type == RunType.initial)
-    if zip_ids is not None:
-        initial_query = initial_query.filter(CampaignRun.zip_code_id.in_(zip_ids))
-    for run in initial_query.all():
+    for run in db.query(CampaignRun).filter(CampaignRun.run_type == RunType.initial).all():
         current = initial_dates_by_zip.get(run.zip_code_id)
         if current is None or run.run_date < current:
             initial_dates_by_zip[run.zip_code_id] = run.run_date
@@ -121,4 +149,40 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
 
         result[zip_id] = summary
 
+    # Compare each round to the average for that SAME round number across zips
+    # (round 1 vs round 1, round 2 vs round 2, ...), not against other rounds.
+    rounds_by_number: Dict[int, List[FollowUpRound]] = defaultdict(list)
+    for summary in result.values():
+        for rnd in summary.rounds:
+            rounds_by_number[rnd.round_number].append(rnd)
+    for rounds in rounds_by_number.values():
+        _apply_vs_average(rounds)
+
+    # Compare each zip's all-rounds-combined total to other zips' totals.
+    _apply_vs_average(result.values())
+
+    if zip_ids is not None:
+        result = {zid: s for zid, s in result.items() if zid in set(zip_ids)}
+
     return result
+
+
+def get_rounds_overview(
+    db: Session,
+) -> Tuple[List[int], Dict[int, List[FollowUpRound]], List[FollowUpSummary]]:
+    summaries = get_follow_up_summaries(db)
+
+    rounds_by_number: Dict[int, List[FollowUpRound]] = defaultdict(list)
+    for summary in summaries.values():
+        for rnd in summary.rounds:
+            rounds_by_number[rnd.round_number].append(rnd)
+    for rounds in rounds_by_number.values():
+        rounds.sort(key=lambda r: r.run.zip_code.zip_code)
+    round_numbers = sorted(rounds_by_number.keys())
+
+    summaries_sorted = sorted(
+        summaries.values(),
+        key=lambda s: s.rounds[0].run.zip_code.zip_code if s.rounds else "",
+    )
+
+    return round_numbers, dict(rounds_by_number), summaries_sorted

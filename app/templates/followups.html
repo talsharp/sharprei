@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Follow-ups{% endblock %}
+{% block content %}
+
+<h2 style="margin-top:0;">Follow-ups Overview</h2>
+<p class="muted">Each section below is one follow-up round only, across every zip code that's had it. Percentages are compared to the average for that same round (hover a % to see below/above avg). The last section combines all rounds per zip.</p>
+
+{% if not round_numbers %}
+<div class="card">
+  <p class="muted">No follow-up runs recorded yet. Add or import follow-up data from a zip code's detail page.</p>
+</div>
+{% endif %}
+
+{% for num in round_numbers %}
+<div class="card">
+  <h3>Follow-up {{ num }}</h3>
+  <div style="overflow-x:auto;">
+  <table class="sticky-table">
+    <thead>
+      <tr>
+        <th>Zip Code</th>
+        <th>Date</th>
+        <th>Days since initial</th>
+        <th>SMS</th>
+        <th>Replies</th>
+        <th>% Replies</th>
+        <th>% Leads</th>
+        <th>% Warm</th>
+        <th>% Drip</th>
+        <th>Leads</th>
+        <th>Warm</th>
+        <th>Drip</th>
+        <th>Signed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rnd in rounds_by_number[num] %}
+      <tr>
+        <td><a class="zip-link" href="/zip/{{ rnd.run.zip_code_id }}">{{ rnd.run.zip_code.zip_code }}</a></td>
+        <td>{{ rnd.run.run_date }}</td>
+        <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "—" }}</td>
+        <td>{{ rnd.run.sms_sent }}</td>
+        <td>{{ rnd.run.replies }}</td>
+        <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate * 100) }}%</td>
+        <td>{{ rnd.run.leads }}</td>
+        <td>{{ rnd.run.warm }}</td>
+        <td>{{ rnd.run.drip }}</td>
+        <td>{{ rnd.run.signed_agreements }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endfor %}
+
+{% if round_numbers %}
+<div class="card">
+  <h3>All Follow-ups Combined</h3>
+  <p class="muted">Every follow-up round rolled up into one number per zip code. Percentages are compared to the average across zips' combined totals.</p>
+  <div style="overflow-x:auto;">
+  <table class="sticky-table">
+    <thead>
+      <tr>
+        <th>Zip Code</th>
+        <th>Rounds</th>
+        <th>SMS</th>
+        <th>Replies</th>
+        <th>% Replies</th>
+        <th>% Leads</th>
+        <th>% Warm</th>
+        <th>% Drip</th>
+        <th>Leads</th>
+        <th>Warm</th>
+        <th>Drip</th>
+        <th>Signed</th>
+        <th>Deals</th>
+        <th>Profit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in summaries %}
+      <tr>
+        <td><a class="zip-link" href="/zip/{{ s.rounds[0].run.zip_code_id }}">{{ s.rounds[0].run.zip_code.zip_code }}</a></td>
+        <td>{{ s.rounds|length }}</td>
+        <td>{{ s.total_sms }}</td>
+        <td>{{ s.total_replies }}</td>
+        <td title="{{ macros.pct_title(s.reply_rate, s.reply_vs_avg, s.avg_reply_rate) }}">{{ "%.2f"|format(s.reply_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(s.lead_rate, s.lead_vs_avg, s.avg_lead_rate) }}">{{ "%.2f"|format(s.lead_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(s.warm_rate, s.warm_vs_avg, s.avg_warm_rate) }}">{{ "%.2f"|format(s.warm_rate * 100) }}%</td>
+        <td title="{{ macros.pct_title(s.drip_rate, s.drip_vs_avg, s.avg_drip_rate) }}">{{ "%.2f"|format(s.drip_rate * 100) }}%</td>
+        <td>{{ s.total_leads }}</td>
+        <td>{{ s.total_warm }}</td>
+        <td>{{ s.total_drip }}</td>
+        <td>{{ s.total_signed_agreements }}</td>
+        <td>{{ s.deal_count }}</td>
+        <td>${{ "%.0f"|format(s.total_profit) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

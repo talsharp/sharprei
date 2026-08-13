@@ -24,7 +24,7 @@ from app.importer import (
     read_table,
     save_upload,
 )
-from app.followups import get_follow_up_summaries
+from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.insights import generate_insights
 from app.metrics import TIER_ORDER, get_zip_metrics
 from app.models import CampaignRun, Deal, ImportBatch, Neighborhood, RunType, ZipCode, ZipNeighborhood, ZipStatus
@@ -84,6 +84,21 @@ def zip_list(request: Request, status: str = "", sort: str = "score", dir: str =
             "status": status,
             "sort": sort,
             "dir": dir,
+        },
+    )
+
+
+@app.get("/followups")
+def followups_page(request: Request, db: Session = Depends(get_db)):
+    round_numbers, rounds_by_number, summaries = get_rounds_overview(db)
+    return templates.TemplateResponse(
+        "followups.html",
+        {
+            "request": request,
+            "active": "followups",
+            "round_numbers": round_numbers,
+            "rounds_by_number": rounds_by_number,
+            "summaries": summaries,
         },
     )
 

@@ -65,7 +65,7 @@ th.hidden-col, td.hidden-col { display: none; }
    position:sticky (it makes the browser treat this box as its own scroll
    container, confining "sticky" to it instead of the page). If the table
    needs horizontal scroll, the whole page scrolls sideways instead. */
-#zip-table thead th {
+#zip-table thead th, .sticky-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
