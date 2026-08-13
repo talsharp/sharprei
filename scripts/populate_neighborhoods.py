@@ -14,16 +14,28 @@ Sources (Allegheny County / City of Pittsburgh GIS, via WPRDC):
   into official neighborhoods the way Pittsburgh is.
 
 For each zip code, every area (neighborhood or municipality) that covers at
-least MIN_OVERLAP_RATIO of the zip's land area is linked. The single area
-with the LARGEST overlap is marked as the zip's primary/main neighborhood;
-the rest are secondary.
+least MIN_OVERLAP_RATIO of the zip's land area is linked. The primary/main
+neighborhood is chosen as follows:
+  1. If the zip's official USPS place name (e.g. "VERONA" for 15147) matches
+     one of the linked areas, that one wins - even if a neighboring, larger
+     municipality covers more raw land area. Small boroughs are frequently
+     the zip's actual identity while a much bigger township dominates the
+     polygon by area (confirmed pattern: 15147/Verona vs Penn Hills,
+     15210/Mount Oliver vs Carrick, and 12 more found the same way).
+  2. Otherwise, the area with the largest overlap wins.
+USPS names that don't match any linked area at all (unincorporated
+communities like "Gibsonia" or "Wexford", which have no boundary of their
+own in the source data) fall back to rule 2 - there's no better GIS-backed
+option for those.
 
 Idempotent and safe to re-run: only touches links this script itself
 created (overlap_ratio IS NOT NULL) - any neighborhood you add manually via
 the app (which leaves overlap_ratio unset) is left alone.
 """
 
+import csv
 import json
+import re
 from pathlib import Path
 
 from shapely.geometry import shape
@@ -34,6 +46,18 @@ from app.models import Neighborhood, ZipCode, ZipNeighborhood
 
 REFERENCE_DIR = Path(__file__).resolve().parent.parent / "data" / "reference"
 MIN_OVERLAP_RATIO = 0.02  # ignore slivers under 2% of the zip's area
+
+
+def normalize_name(name: str) -> str:
+    name = name.upper()
+    name = name.replace("MOUNT ", "MT ").replace("MT. ", "MT ")
+    name = re.sub(r"[^A-Z0-9 ]", "", name)
+    return re.sub(r"\s+", " ", name).strip()
+
+
+def load_usps_names():
+    with open(REFERENCE_DIR / "allegheny_zip_boundaries.csv") as f:
+        return {row["zip"]: row["name"].strip() for row in csv.DictReader(f)}
 
 
 def load_zip_polygons():
@@ -65,6 +89,7 @@ def load_municipality_polygons():
 def main():
     init_db()
     zips = load_zip_polygons()
+    usps_names = load_usps_names()
     neighborhoods = load_neighborhood_polygons()
     municipalities = load_municipality_polygons()
 
@@ -115,13 +140,17 @@ def main():
             zips_with_no_match.append(zip_code)
             continue
 
-        for i, (name, ratio) in enumerate(matches):
+        usps_name = usps_names.get(zip_code)
+        norm_usps = normalize_name(usps_name) if usps_name and usps_name != "PITTSBURGH" else None
+        primary_name = next((name for name, _ in matches if normalize_name(name) == norm_usps), matches[0][0])
+
+        for name, ratio in matches:
             neighborhood = get_or_create_neighborhood(name)
             db.add(
                 ZipNeighborhood(
                     zip_code_id=zc.id,
                     neighborhood_id=neighborhood.id,
-                    is_primary=(i == 0),
+                    is_primary=(name == primary_name),
                     overlap_ratio=ratio,
                 )
             )
