@@ -79,7 +79,13 @@
     {% set fu = follow_ups.get(m.zip_code.id) %}
     <tr>
       <td><a class="zip-link" href="/zip/{{ m.zip_code.id }}">{{ m.zip_code.zip_code }}</a></td>
-      <td data-col="neighborhood" class="muted">{{ m.zip_code.neighborhoods | map(attribute='name') | join(', ') or '—' }}</td>
+      <td data-col="neighborhood" class="muted">
+        {% set main_link = m.zip_code.primary_neighborhood_link %}
+        {% set others = m.zip_code.secondary_neighborhood_links %}
+        {% if main_link %}
+        <span title="{{ 'Also includes: ' + (others | map(attribute='neighborhood.name') | join(', ')) if others else 'Only neighborhood found for this zip' }}">{{ main_link.neighborhood.name }}{{ " +%d"|format(others|length) if others else "" }}</span>
+        {% else %}—{% endif %}
+      </td>
       <td data-col="status"><span class="badge badge-{{ m.zip_code.status }}">{{ STATUS_LABELS[m.zip_code.status] }}</span></td>
       <td data-col="tier"><span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}" title="{{ (m.tier_reason + ' — manually overridden (computed: ' + m.computed_tier + ')') if m.zip_code.tier_override else m.tier_reason }}">{{ m.tier }}{{ " ✎" if m.zip_code.tier_override else "" }}</span></td>
       <td data-col="followups">

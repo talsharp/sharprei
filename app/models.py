@@ -73,6 +73,14 @@ class ZipCode(Base):
     def neighborhoods(self):
         return [link.neighborhood for link in self.neighborhood_links]
 
+    @property
+    def primary_neighborhood_link(self):
+        return next((link for link in self.neighborhood_links if link.is_primary), None)
+
+    @property
+    def secondary_neighborhood_links(self):
+        return [link for link in self.neighborhood_links if not link.is_primary]
+
 
 class ZipNeighborhood(Base):
     __tablename__ = "zip_neighborhoods"
@@ -81,6 +89,8 @@ class ZipNeighborhood(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     zip_code_id: Mapped[int] = mapped_column(ForeignKey("zip_codes.id"))
     neighborhood_id: Mapped[int] = mapped_column(ForeignKey("neighborhoods.id"))
+    is_primary: Mapped[bool] = mapped_column(default=False)
+    overlap_ratio: Mapped[Optional[float]] = mapped_column(nullable=True)
 
     zip_code: Mapped[ZipCode] = relationship(back_populates="neighborhood_links")
     neighborhood: Mapped[Neighborhood] = relationship(back_populates="zip_links")

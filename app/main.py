@@ -179,7 +179,24 @@ def add_neighborhood(zip_id: int, name: str = Form(...), db: Session = Depends(g
             .first()
         )
         if not exists:
-            db.add(ZipNeighborhood(zip_code_id=zip_id, neighborhood_id=neighborhood.id))
+            has_any = db.query(ZipNeighborhood).filter_by(zip_code_id=zip_id).first() is not None
+            db.add(
+                ZipNeighborhood(
+                    zip_code_id=zip_id,
+                    neighborhood_id=neighborhood.id,
+                    is_primary=not has_any,
+                )
+            )
+        db.commit()
+    return RedirectResponse(f"/zip/{zip_id}", status_code=303)
+
+
+@app.post("/zip/{zip_id}/neighborhoods/{link_id}/set-main")
+def set_main_neighborhood(zip_id: int, link_id: int, db: Session = Depends(get_db)):
+    link = db.get(ZipNeighborhood, link_id)
+    if link and link.zip_code_id == zip_id:
+        db.query(ZipNeighborhood).filter(ZipNeighborhood.zip_code_id == zip_id).update({"is_primary": False})
+        link.is_primary = True
         db.commit()
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)
 
@@ -188,7 +205,18 @@ def add_neighborhood(zip_id: int, name: str = Form(...), db: Session = Depends(g
 def remove_neighborhood(zip_id: int, link_id: int, db: Session = Depends(get_db)):
     link = db.get(ZipNeighborhood, link_id)
     if link and link.zip_code_id == zip_id:
+        was_primary = link.is_primary
         db.delete(link)
+        db.flush()
+        if was_primary:
+            next_link = (
+                db.query(ZipNeighborhood)
+                .filter(ZipNeighborhood.zip_code_id == zip_id)
+                .order_by(ZipNeighborhood.overlap_ratio.desc())
+                .first()
+            )
+            if next_link:
+                next_link.is_primary = True
         db.commit()
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)
 

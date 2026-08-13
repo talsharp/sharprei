@@ -41,11 +41,21 @@
     </form>
 
     <h3 style="margin-top:20px;">Neighborhoods</h3>
-    <div class="pill-list" style="margin-bottom:10px;">
-      {% for link in zc.neighborhood_links %}
-      <form method="post" action="/zip/{{ zc.id }}/neighborhoods/{{ link.id }}/remove" style="display:inline;">
-        <button type="submit" class="btn secondary" style="padding:4px 10px; font-size:12px;">{{ link.neighborhood.name }} ✕</button>
-      </form>
+    <p class="muted" style="margin-top:-8px; font-size:13px;">Main neighborhood is set from GIS land-area overlap by default - click "Set as main" on any other one to correct it.</p>
+    <div class="pill-list" style="margin-bottom:10px; align-items:center;">
+      {% for link in zc.neighborhood_links | sort(attribute='is_primary', reverse=true) %}
+      <span class="btn secondary" style="padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:6px; {{ 'border-color: var(--accent);' if link.is_primary else '' }}">
+        {% if link.is_primary %}<strong>{{ link.neighborhood.name }}</strong> (main){% else %}{{ link.neighborhood.name }}{% endif %}
+        {% if link.overlap_ratio is not none %}<span class="muted">{{ "%.0f"|format(link.overlap_ratio * 100) }}%</span>{% endif %}
+        {% if not link.is_primary %}
+        <form method="post" action="/zip/{{ zc.id }}/neighborhoods/{{ link.id }}/set-main" style="display:inline;">
+          <button type="submit" style="padding:2px 6px; font-size:11px;">Set as main</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/zip/{{ zc.id }}/neighborhoods/{{ link.id }}/remove" style="display:inline;">
+          <button type="submit" class="danger" style="padding:2px 6px; font-size:11px;">✕</button>
+        </form>
+      </span>
       {% else %}
       <span class="muted">No neighborhoods linked</span>
       {% endfor %}
