@@ -4,7 +4,7 @@
 {% block content %}
 
 <div class="top-actions">
-  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}">{{ m.tier }}{{ " ✎ manual" if zc.tier_override else "" }}</span></h2>
+  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}">{{ m.tier }}{{ " ✎ manual" if zc.tier_override else "" }}</span> <span class="muted" style="font-size:14px;">{{ zc.region_override or zc.region or "" }}{{ " (manual)" if zc.region_override else "" }}</span></h2>
   <a class="btn secondary" href="/">Back to list</a>
 </div>
 
@@ -30,6 +30,15 @@
           <option value="">Auto (computed: {{ m.computed_tier }})</option>
           {% for t in TIER_ORDER %}
           <option value="{{ t }}" {{ "selected" if zc.tier_override == t else "" }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Region Override (leave on Auto to use the computed region)</label>
+        <select name="region_override">
+          <option value="">Auto (computed: {{ zc.region or "—" }})</option>
+          {% for r in all_regions %}
+          <option value="{{ r }}" {{ "selected" if zc.region_override == r else "" }}>{{ r }}</option>
           {% endfor %}
         </select>
       </div>

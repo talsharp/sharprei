@@ -74,17 +74,17 @@ SORT_FIELDS = {
     "profit": lambda m: m.total_profit,
     "score": lambda m: m.score,
     "tier": lambda m: len(TIER_ORDER) - TIER_ORDER.index(m.tier) if m.tier in TIER_ORDER else 0,
+    "region": lambda m: (m.zip_code.region_override or m.zip_code.region or ""),
 }
 
 
 @app.get("/")
-def zip_list(request: Request, status: str = "", sort: str = "score", dir: str = "desc", db: Session = Depends(get_db)):
+def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Session = Depends(get_db)):
     metrics = get_zip_metrics(db)
-    if status:
-        metrics = [m for m in metrics if m.zip_code.status == status]
     key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
     metrics.sort(key=key_fn, reverse=(dir == "desc"))
     follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
+    regions = sorted({m.zip_code.region_override or m.zip_code.region for m in metrics if (m.zip_code.region_override or m.zip_code.region)})
     return templates.TemplateResponse(
         "zip_list.html",
         {
@@ -92,7 +92,7 @@ def zip_list(request: Request, status: str = "", sort: str = "score", dir: str =
             "active": "list",
             "metrics": metrics,
             "follow_ups": follow_ups,
-            "status": status,
+            "regions": regions,
             "sort": sort,
             "dir": dir,
         },
@@ -130,6 +130,7 @@ def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
     )
     all_neighborhoods = db.query(Neighborhood).order_by(Neighborhood.name).all()
     follow_up = get_follow_up_summaries(db, [zip_id]).get(zip_id)
+    all_regions = sorted({n.region for n in all_neighborhoods if n.region})
     return templates.TemplateResponse(
         "zip_detail.html",
         {
@@ -140,6 +141,7 @@ def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
             "runs": runs,
             "follow_up": follow_up,
             "all_neighborhoods": all_neighborhoods,
+            "all_regions": all_regions,
             "run_types": list(RunType),
             "today": date.today().isoformat(),
         },
@@ -153,6 +155,7 @@ def zip_update(
     notes: str = Form(""),
     avg_house_value: str = Form(""),
     tier_override: str = Form(""),
+    region_override: str = Form(""),
     db: Session = Depends(get_db),
 ):
     zc = db.get(ZipCode, zip_id)
@@ -160,6 +163,7 @@ def zip_update(
     zc.notes = notes
     zc.avg_house_value = float(avg_house_value) if avg_house_value.strip() else None
     zc.tier_override = tier_override or None
+    zc.region_override = region_override or None
     db.commit()
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)
 

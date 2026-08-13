@@ -4,15 +4,32 @@
 {% block content %}
 
 <div class="top-actions">
-  <form class="filters" method="get" action="/">
-    <select name="status" onchange="this.form.submit()">
-      <option value="" {{ "selected" if status == "" else "" }}>All Statuses</option>
-      {% for key, label in STATUS_LABELS.items() %}
-      <option value="{{ key }}" {{ "selected" if status == key else "" }}>{{ label }}</option>
-      {% endfor %}
-    </select>
-    <input type="hidden" name="sort" value="{{ sort }}">
-    <input type="hidden" name="dir" value="{{ dir }}">
+  <div class="filters" style="flex-wrap:wrap;">
+    <div class="columns-toggle">
+      <button type="button" class="secondary" id="status-filter-btn">Status <span id="status-filter-count" class="muted"></span></button>
+      <div class="columns-panel" id="status-filter-panel">
+        {% for key, label in STATUS_LABELS.items() %}
+        <label><input type="checkbox" class="status-filter-cb" value="{{ key }}" checked> {{ label }}</label>
+        {% endfor %}
+        <div style="display:flex; gap:6px; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+          <button type="button" class="secondary" id="status-filter-all" style="font-size:12px; padding:4px 8px;">All</button>
+          <button type="button" class="secondary" id="status-filter-none" style="font-size:12px; padding:4px 8px;">None</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns-toggle">
+      <button type="button" class="secondary" id="region-filter-btn">Region <span id="region-filter-count" class="muted"></span></button>
+      <div class="columns-panel" id="region-filter-panel">
+        {% for r in regions %}
+        <label><input type="checkbox" class="region-filter-cb" value="{{ r }}" checked> {{ r }}</label>
+        {% endfor %}
+        <div style="display:flex; gap:6px; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+          <button type="button" class="secondary" id="region-filter-all" style="font-size:12px; padding:4px 8px;">All</button>
+          <button type="button" class="secondary" id="region-filter-none" style="font-size:12px; padding:4px 8px;">None</button>
+        </div>
+      </div>
+    </div>
 
     <input type="text" id="zip-search-input" placeholder="Search zip code..." style="width:160px;">
     <button type="button" id="zip-search-btn" class="secondary">Search</button>
@@ -20,6 +37,7 @@
     <div class="columns-toggle">
       <button type="button" class="secondary" onclick="document.getElementById('columns-panel').classList.toggle('open')">Columns</button>
       <div class="columns-panel" id="columns-panel">
+        <label><input type="checkbox" data-col="region" checked> Region</label>
         <label><input type="checkbox" data-col="neighborhood" checked> Neighborhood</label>
         <label><input type="checkbox" data-col="status" checked> Status</label>
         <label><input type="checkbox" data-col="tier" checked> Tier</label>
@@ -36,7 +54,7 @@
         <label><input type="checkbox" data-col="score" checked> Score</label>
       </div>
     </div>
-  </form>
+  </div>
 
   <form method="post" action="/zip/new" style="display:flex; gap:8px;">
     <input type="text" name="zip_code" placeholder="Add new zip code (e.g. 15213)" required>
@@ -46,7 +64,7 @@
 
 {% macro sort_link(field, label) %}
   {% set next_dir = 'asc' if (sort == field and dir == 'desc') else 'desc' %}
-  <a href="/?status={{ status }}&sort={{ field }}&dir={{ next_dir }}" style="color:inherit; text-decoration:none;">
+  <a href="/?sort={{ field }}&dir={{ next_dir }}" style="color:inherit; text-decoration:none;">
     {{ label }}{% if sort == field %} {{ '▼' if dir == 'desc' else '▲' }}{% endif %}
   </a>
 {% endmacro %}
@@ -58,6 +76,7 @@
   <thead>
     <tr>
       <th>{{ sort_link('zip', 'Zip Code') }}</th>
+      <th data-col="region">{{ sort_link('region', 'Region') }}</th>
       <th data-col="neighborhood">Neighborhood</th>
       <th data-col="status">{{ sort_link('status', 'Status') }}</th>
       <th data-col="tier">{{ sort_link('tier', 'Tier') }}</th>
@@ -77,8 +96,10 @@
   <tbody>
     {% for m in metrics %}
     {% set fu = follow_ups.get(m.zip_code.id) %}
-    <tr>
+    {% set effective_region = m.zip_code.region_override or m.zip_code.region %}
+    <tr data-status="{{ m.zip_code.status }}" data-region="{{ effective_region or '' }}">
       <td><a class="zip-link" href="/zip/{{ m.zip_code.id }}">{{ m.zip_code.zip_code }}</a></td>
+      <td data-col="region" class="muted" title="{{ 'Manually overridden (computed: ' + m.zip_code.region + ')' if m.zip_code.region_override else '' }}">{{ effective_region or '—' }}{{ " ✎" if m.zip_code.region_override else "" }}</td>
       <td data-col="neighborhood" class="muted">
         {% set main_link = m.zip_code.primary_neighborhood_link %}
         {% set others = m.zip_code.secondary_neighborhood_links %}
@@ -108,7 +129,7 @@
     </tr>
     {% if fu and fu.rounds %}
     <tr class="followup-detail-row" id="fu-{{ m.zip_code.id }}" style="display:none;">
-      <td colspan="15" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
+      <td colspan="16" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
         <table style="width:auto; min-width:900px; background:transparent; border:1px solid var(--border);">
           <thead>
             <tr>
@@ -164,12 +185,13 @@
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="15" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
+    <tr><td colspan="16" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
     <tr>
       <td>Totals / Averages</td>
+      <td data-col="region"></td>
       <td data-col="neighborhood"></td>
       <td data-col="status"></td>
       <td data-col="tier"></td>
@@ -258,13 +280,76 @@
     });
   }
 
-  function applySearch() {
+  function checkedValues(selector) {
+    return Array.from(document.querySelectorAll(selector)).filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+  }
+
+  function setupFilterGroup(opts) {
+    var STORAGE_KEY = opts.storageKey;
+    var checkboxes = document.querySelectorAll(opts.checkboxSelector);
+    var countEl = document.getElementById(opts.countId);
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) {}
+    if (Array.isArray(saved)) {
+      checkboxes.forEach(function(cb) { cb.checked = saved.indexOf(cb.value) !== -1; });
+    }
+    function updateCount() {
+      var total = checkboxes.length;
+      var checked = Array.from(checkboxes).filter(function(cb) { return cb.checked; }).length;
+      if (countEl) countEl.textContent = (checked === total) ? '' : '(' + checked + '/' + total + ')';
+    }
+    checkboxes.forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+        updateCount();
+        applyFilters();
+      });
+    });
+    document.getElementById(opts.allId).addEventListener('click', function() {
+      checkboxes.forEach(function(cb) { cb.checked = true; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+      updateCount();
+      applyFilters();
+    });
+    document.getElementById(opts.noneId).addEventListener('click', function() {
+      checkboxes.forEach(function(cb) { cb.checked = false; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+      updateCount();
+      applyFilters();
+    });
+    updateCount();
+  }
+
+  setupFilterGroup({ storageKey: 'zipStatusFilter', checkboxSelector: '.status-filter-cb', countId: 'status-filter-count', allId: 'status-filter-all', noneId: 'status-filter-none' });
+  setupFilterGroup({ storageKey: 'zipRegionFilter', checkboxSelector: '.region-filter-cb', countId: 'region-filter-count', allId: 'region-filter-all', noneId: 'region-filter-none' });
+
+  ['status-filter-btn', 'region-filter-btn'].forEach(function(btnId) {
+    var panelId = btnId.replace('-btn', '-panel');
+    document.getElementById(btnId).addEventListener('click', function() {
+      document.getElementById(panelId).classList.toggle('open');
+    });
+  });
+  document.addEventListener('click', function(e) {
+    ['status-filter-panel', 'region-filter-panel'].forEach(function(panelId) {
+      var panel = document.getElementById(panelId);
+      if (!panel.contains(e.target) && !e.target.closest('.columns-toggle')) {
+        panel.classList.remove('open');
+      }
+    });
+  });
+
+  function applyFilters() {
     var q = (document.getElementById('zip-search-input').value || '').trim().toLowerCase();
+    var allowedStatuses = checkedValues('.status-filter-cb');
+    var allowedRegions = checkedValues('.region-filter-cb');
     document.querySelectorAll('#zip-table tbody tr').forEach(function(tr) {
       var zipCell = tr.querySelector('td:first-child');
       if (!zipCell || !tr.querySelector('[data-col="sms"]')) return;
       var zip = zipCell.textContent.trim().toLowerCase();
-      var hide = !!q && zip.indexOf(q) === -1;
+      var matchesSearch = !q || zip.indexOf(q) !== -1;
+      var matchesStatus = allowedStatuses.indexOf(tr.dataset.status) !== -1;
+      var matchesRegion = allowedRegions.indexOf(tr.dataset.region) !== -1;
+      var hide = !(matchesSearch && matchesStatus && matchesRegion);
       tr.classList.toggle('hidden-row', hide);
       var detailRow = tr.nextElementSibling;
       if (detailRow && detailRow.classList.contains('followup-detail-row')) {
@@ -277,14 +362,14 @@
   var searchInput = document.getElementById('zip-search-input');
   var searchBtn = document.getElementById('zip-search-btn');
   if (searchInput) {
-    searchInput.addEventListener('input', applySearch);
+    searchInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); applySearch(); }
+      if (e.key === 'Enter') { e.preventDefault(); applyFilters(); }
     });
   }
-  if (searchBtn) searchBtn.addEventListener('click', applySearch);
+  if (searchBtn) searchBtn.addEventListener('click', applyFilters);
 
-  recomputeFooter();
+  applyFilters();
 })();
 
 (function() {

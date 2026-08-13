@@ -39,6 +39,7 @@ class Neighborhood(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
+    region: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
     zip_links: Mapped[list["ZipNeighborhood"]] = relationship(
         back_populates="neighborhood", cascade="all, delete-orphan"
@@ -55,6 +56,8 @@ class ZipCode(Base):
         String(20), default=ZipStatus.not_tried
     )
     avg_house_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    region_override: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     tier_override: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
