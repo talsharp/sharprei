@@ -72,7 +72,7 @@ th.hidden-col, td.hidden-col { display: none; }
   background: var(--panel);
   box-shadow: 0 1px 0 var(--border);
 }
-#zip-table tfoot td {
+#zip-table tfoot td, .sticky-table tfoot td {
   font-weight: 600;
   border-top: 2px solid var(--border);
   border-bottom: none;

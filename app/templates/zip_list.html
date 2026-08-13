@@ -125,8 +125,8 @@
             {% for rnd in fu.rounds %}
             <tr>
               <td>Follow-up {{ rnd.round_number }}</td>
-              <td>{{ rnd.run.run_date }}</td>
-              <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "—" }}</td>
+              <td>{{ rnd.run.run_date if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+              <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
               <td>{{ rnd.run.sms_sent }}</td>
               <td>{{ rnd.run.replies }}</td>
               <td>{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>

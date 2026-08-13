@@ -3,8 +3,32 @@
 {% block title %}Follow-ups{% endblock %}
 {% block content %}
 
-<h2 style="margin-top:0;">Follow-ups Overview</h2>
-<p class="muted">Each section below is one follow-up round only, across every zip code that's had it. Percentages are compared to the average for that same round (hover a % to see below/above avg). The last section combines all rounds per zip.</p>
+<div class="top-actions">
+  <div>
+    <h2 style="margin:0;">Follow-ups Overview</h2>
+    <p class="muted" style="margin-bottom:0;">Each section is one follow-up round only, across every zip code that's had it. Percentages are compared to the average for that same round (hover a % to see below/above avg). The last section combines all rounds per zip.</p>
+  </div>
+  <div class="columns-toggle">
+    <button type="button" class="secondary" onclick="document.getElementById('fu-columns-panel').classList.toggle('open')">Columns</button>
+    <div class="columns-panel" id="fu-columns-panel">
+      <label><input type="checkbox" data-col="date" checked> Date</label>
+      <label><input type="checkbox" data-col="days_since" checked> Days since initial</label>
+      <label><input type="checkbox" data-col="sms" checked> SMS</label>
+      <label><input type="checkbox" data-col="replies" checked> Replies</label>
+      <label><input type="checkbox" data-col="reply_rate" checked> % Replies</label>
+      <label><input type="checkbox" data-col="lead_rate" checked> % Leads</label>
+      <label><input type="checkbox" data-col="warm_rate" checked> % Warm</label>
+      <label><input type="checkbox" data-col="drip_rate" checked> % Drip</label>
+      <label><input type="checkbox" data-col="leads" checked> Leads</label>
+      <label><input type="checkbox" data-col="warm" checked> Warm</label>
+      <label><input type="checkbox" data-col="drip" checked> Drip</label>
+      <label><input type="checkbox" data-col="signed" checked> Signed</label>
+      <label><input type="checkbox" data-col="rounds" checked> Rounds (combined table)</label>
+      <label><input type="checkbox" data-col="deals" checked> Deals (combined table)</label>
+      <label><input type="checkbox" data-col="profit" checked> Profit (combined table)</label>
+    </div>
+  </div>
+</div>
 
 {% if not round_numbers %}
 <div class="card">
@@ -13,6 +37,7 @@
 {% endif %}
 
 {% for num in round_numbers %}
+{% set rs = round_summaries[num] %}
 <div class="card">
   <h3>Follow-up {{ num }}</h3>
   <div style="overflow-x:auto;">
@@ -20,39 +45,56 @@
     <thead>
       <tr>
         <th>Zip Code</th>
-        <th>Date</th>
-        <th>Days since initial</th>
-        <th>SMS</th>
-        <th>Replies</th>
-        <th>% Replies</th>
-        <th>% Leads</th>
-        <th>% Warm</th>
-        <th>% Drip</th>
-        <th>Leads</th>
-        <th>Warm</th>
-        <th>Drip</th>
-        <th>Signed</th>
+        <th data-col="date">Date</th>
+        <th data-col="days_since">Days since initial</th>
+        <th data-col="sms">SMS</th>
+        <th data-col="replies">Replies</th>
+        <th data-col="reply_rate">% Replies</th>
+        <th data-col="lead_rate">% Leads</th>
+        <th data-col="warm_rate">% Warm</th>
+        <th data-col="drip_rate">% Drip</th>
+        <th data-col="leads">Leads</th>
+        <th data-col="warm">Warm</th>
+        <th data-col="drip">Drip</th>
+        <th data-col="signed">Signed</th>
       </tr>
     </thead>
     <tbody>
       {% for rnd in rounds_by_number[num] %}
       <tr>
         <td><a class="zip-link" href="/zip/{{ rnd.run.zip_code_id }}">{{ rnd.run.zip_code.zip_code }}</a></td>
-        <td>{{ rnd.run.run_date }}</td>
-        <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "—" }}</td>
-        <td>{{ rnd.run.sms_sent }}</td>
-        <td>{{ rnd.run.replies }}</td>
-        <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate * 100) }}%</td>
-        <td>{{ rnd.run.leads }}</td>
-        <td>{{ rnd.run.warm }}</td>
-        <td>{{ rnd.run.drip }}</td>
-        <td>{{ rnd.run.signed_agreements }}</td>
+        <td data-col="date">{{ rnd.run.run_date if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+        <td data-col="days_since">{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
+        <td data-col="sms">{{ rnd.run.sms_sent }}</td>
+        <td data-col="replies">{{ rnd.run.replies }}</td>
+        <td data-col="reply_rate" title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate * 100) }}%</td>
+        <td data-col="lead_rate" title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate * 100) }}%</td>
+        <td data-col="warm_rate" title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate * 100) }}%</td>
+        <td data-col="drip_rate" title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate * 100) }}%</td>
+        <td data-col="leads">{{ rnd.run.leads }}</td>
+        <td data-col="warm">{{ rnd.run.warm }}</td>
+        <td data-col="drip">{{ rnd.run.drip }}</td>
+        <td data-col="signed">{{ rnd.run.signed_agreements }}</td>
       </tr>
       {% endfor %}
     </tbody>
+    <tfoot>
+      <tr>
+        <td>Summary ({{ rs.zip_count }} zips)</td>
+        <td data-col="date"></td>
+        <td data-col="days_since"></td>
+        <td data-col="sms">{{ rs.total_sms }}</td>
+        <td data-col="replies">{{ rs.total_replies }}</td>
+        <td data-col="reply_rate">{{ "%.2f"|format(rs.avg_reply_rate * 100) }}%</td>
+        <td data-col="lead_rate">{{ "%.2f"|format(rs.avg_lead_rate * 100) }}%</td>
+        <td data-col="warm_rate">{{ "%.2f"|format(rs.avg_warm_rate * 100) }}%</td>
+        <td data-col="drip_rate">{{ "%.2f"|format(rs.avg_drip_rate * 100) }}%</td>
+        <td data-col="leads">{{ rs.total_leads }}</td>
+        <td data-col="warm">{{ rs.total_warm }}</td>
+        <td data-col="drip">{{ rs.total_drip }}</td>
+        <td data-col="signed">{{ rs.total_signed_agreements }}</td>
+      </tr>
+    </tfoot>
   </table>
   </div>
 </div>
@@ -67,44 +109,97 @@
     <thead>
       <tr>
         <th>Zip Code</th>
-        <th>Rounds</th>
-        <th>SMS</th>
-        <th>Replies</th>
-        <th>% Replies</th>
-        <th>% Leads</th>
-        <th>% Warm</th>
-        <th>% Drip</th>
-        <th>Leads</th>
-        <th>Warm</th>
-        <th>Drip</th>
-        <th>Signed</th>
-        <th>Deals</th>
-        <th>Profit</th>
+        <th data-col="rounds">Rounds</th>
+        <th data-col="sms">SMS</th>
+        <th data-col="replies">Replies</th>
+        <th data-col="reply_rate">% Replies</th>
+        <th data-col="lead_rate">% Leads</th>
+        <th data-col="warm_rate">% Warm</th>
+        <th data-col="drip_rate">% Drip</th>
+        <th data-col="leads">Leads</th>
+        <th data-col="warm">Warm</th>
+        <th data-col="drip">Drip</th>
+        <th data-col="signed">Signed</th>
+        <th data-col="deals">Deals</th>
+        <th data-col="profit">Profit</th>
       </tr>
     </thead>
     <tbody>
       {% for s in summaries %}
       <tr>
         <td><a class="zip-link" href="/zip/{{ s.rounds[0].run.zip_code_id }}">{{ s.rounds[0].run.zip_code.zip_code }}</a></td>
-        <td>{{ s.rounds|length }}</td>
-        <td>{{ s.total_sms }}</td>
-        <td>{{ s.total_replies }}</td>
-        <td title="{{ macros.pct_title(s.reply_rate, s.reply_vs_avg, s.avg_reply_rate) }}">{{ "%.2f"|format(s.reply_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(s.lead_rate, s.lead_vs_avg, s.avg_lead_rate) }}">{{ "%.2f"|format(s.lead_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(s.warm_rate, s.warm_vs_avg, s.avg_warm_rate) }}">{{ "%.2f"|format(s.warm_rate * 100) }}%</td>
-        <td title="{{ macros.pct_title(s.drip_rate, s.drip_vs_avg, s.avg_drip_rate) }}">{{ "%.2f"|format(s.drip_rate * 100) }}%</td>
-        <td>{{ s.total_leads }}</td>
-        <td>{{ s.total_warm }}</td>
-        <td>{{ s.total_drip }}</td>
-        <td>{{ s.total_signed_agreements }}</td>
-        <td>{{ s.deal_count }}</td>
-        <td>${{ "%.0f"|format(s.total_profit) }}</td>
+        <td data-col="rounds">{{ s.rounds|length }}</td>
+        <td data-col="sms">{{ s.total_sms }}</td>
+        <td data-col="replies">{{ s.total_replies }}</td>
+        <td data-col="reply_rate" title="{{ macros.pct_title(s.reply_rate, s.reply_vs_avg, s.avg_reply_rate) }}">{{ "%.2f"|format(s.reply_rate * 100) }}%</td>
+        <td data-col="lead_rate" title="{{ macros.pct_title(s.lead_rate, s.lead_vs_avg, s.avg_lead_rate) }}">{{ "%.2f"|format(s.lead_rate * 100) }}%</td>
+        <td data-col="warm_rate" title="{{ macros.pct_title(s.warm_rate, s.warm_vs_avg, s.avg_warm_rate) }}">{{ "%.2f"|format(s.warm_rate * 100) }}%</td>
+        <td data-col="drip_rate" title="{{ macros.pct_title(s.drip_rate, s.drip_vs_avg, s.avg_drip_rate) }}">{{ "%.2f"|format(s.drip_rate * 100) }}%</td>
+        <td data-col="leads">{{ s.total_leads }}</td>
+        <td data-col="warm">{{ s.total_warm }}</td>
+        <td data-col="drip">{{ s.total_drip }}</td>
+        <td data-col="signed">{{ s.total_signed_agreements }}</td>
+        <td data-col="deals">{{ s.deal_count }}</td>
+        <td data-col="profit">${{ "%.0f"|format(s.total_profit) }}</td>
       </tr>
       {% endfor %}
     </tbody>
+    <tfoot>
+      <tr>
+        <td>Summary ({{ combined_summary.zip_count }} zips)</td>
+        <td data-col="rounds"></td>
+        <td data-col="sms">{{ combined_summary.total_sms }}</td>
+        <td data-col="replies">{{ combined_summary.total_replies }}</td>
+        <td data-col="reply_rate">{{ "%.2f"|format(combined_summary.avg_reply_rate * 100) }}%</td>
+        <td data-col="lead_rate">{{ "%.2f"|format(combined_summary.avg_lead_rate * 100) }}%</td>
+        <td data-col="warm_rate">{{ "%.2f"|format(combined_summary.avg_warm_rate * 100) }}%</td>
+        <td data-col="drip_rate">{{ "%.2f"|format(combined_summary.avg_drip_rate * 100) }}%</td>
+        <td data-col="leads">{{ combined_summary.total_leads }}</td>
+        <td data-col="warm">{{ combined_summary.total_warm }}</td>
+        <td data-col="drip">{{ combined_summary.total_drip }}</td>
+        <td data-col="signed">{{ combined_summary.total_signed_agreements }}</td>
+        <td data-col="deals">{{ combined_summary.deal_count }}</td>
+        <td data-col="profit">${{ "%.0f"|format(combined_summary.total_profit) }}</td>
+      </tr>
+    </tfoot>
   </table>
   </div>
 </div>
 {% endif %}
+
+<script>
+(function() {
+  var STORAGE_KEY = 'followupColumns';
+  var checkboxes = document.querySelectorAll('#fu-columns-panel input[type=checkbox]');
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
+
+  function applyColumn(col, visible) {
+    document.querySelectorAll('[data-col="' + col + '"]').forEach(function(el) {
+      el.classList.toggle('hidden-col', !visible);
+    });
+  }
+
+  checkboxes.forEach(function(cb) {
+    var col = cb.dataset.col;
+    if (saved.hasOwnProperty(col)) {
+      cb.checked = saved[col];
+      applyColumn(col, saved[col]);
+    }
+    cb.addEventListener('change', function() {
+      saved[col] = cb.checked;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      applyColumn(col, cb.checked);
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    var panel = document.getElementById('fu-columns-panel');
+    if (!panel.contains(e.target) && !e.target.closest('.columns-toggle')) {
+      panel.classList.remove('open');
+    }
+  });
+})();
+</script>
 
 {% endblock %}

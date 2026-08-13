@@ -27,7 +27,17 @@ from app.importer import (
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.insights import generate_insights
 from app.metrics import TIER_ORDER, get_zip_metrics
-from app.models import CampaignRun, Deal, ImportBatch, Neighborhood, RunType, ZipCode, ZipNeighborhood, ZipStatus
+from app.models import (
+    UNSET_DATE,
+    CampaignRun,
+    Deal,
+    ImportBatch,
+    Neighborhood,
+    RunType,
+    ZipCode,
+    ZipNeighborhood,
+    ZipStatus,
+)
 
 app = FastAPI(title="AAA Houses - SMS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -42,6 +52,7 @@ STATUS_LABELS = {
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["ZipStatus"] = ZipStatus
 templates.env.globals["TIER_ORDER"] = TIER_ORDER
+templates.env.globals["UNSET_DATE"] = UNSET_DATE
 
 
 @app.on_event("startup")
@@ -90,7 +101,7 @@ def zip_list(request: Request, status: str = "", sort: str = "score", dir: str =
 
 @app.get("/followups")
 def followups_page(request: Request, db: Session = Depends(get_db)):
-    round_numbers, rounds_by_number, summaries = get_rounds_overview(db)
+    round_numbers, rounds_by_number, round_summaries, summaries, combined_summary = get_rounds_overview(db)
     return templates.TemplateResponse(
         "followups.html",
         {
@@ -98,7 +109,9 @@ def followups_page(request: Request, db: Session = Depends(get_db)):
             "active": "followups",
             "round_numbers": round_numbers,
             "rounds_by_number": rounds_by_number,
+            "round_summaries": round_summaries,
             "summaries": summaries,
+            "combined_summary": combined_summary,
         },
     )
 
@@ -183,7 +196,7 @@ def remove_neighborhood(zip_id: int, link_id: int, db: Session = Depends(get_db)
 @app.post("/zip/{zip_id}/runs/new")
 def create_run(
     zip_id: int,
-    run_date: str = Form(...),
+    run_date: str = Form(""),
     run_type: str = Form(...),
     sms_sent: int = Form(0),
     replies: int = Form(0),
@@ -196,7 +209,7 @@ def create_run(
 ):
     run = CampaignRun(
         zip_code_id=zip_id,
-        run_date=date.fromisoformat(run_date),
+        run_date=date.fromisoformat(run_date) if run_date else UNSET_DATE,
         run_type=run_type,
         sms_sent=sms_sent,
         replies=replies,
@@ -218,7 +231,7 @@ def create_run(
 def update_run(
     zip_id: int,
     run_id: int,
-    run_date: str = Form(...),
+    run_date: str = Form(""),
     run_type: str = Form(...),
     sms_sent: int = Form(0),
     replies: int = Form(0),
@@ -231,7 +244,7 @@ def update_run(
 ):
     run = db.get(CampaignRun, run_id)
     if run and run.zip_code_id == zip_id:
-        run.run_date = date.fromisoformat(run_date)
+        run.run_date = date.fromisoformat(run_date) if run_date else UNSET_DATE
         run.run_type = run_type
         run.sms_sent = sms_sent
         run.replies = replies
@@ -337,9 +350,9 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
     default_run_type = form.get("default_run_type", "initial")
     default_date_val = form.get("default_date", "")
     try:
-        default_date = date.fromisoformat(default_date_val) if default_date_val else date.today()
+        default_date = date.fromisoformat(default_date_val) if default_date_val else UNSET_DATE
     except ValueError:
-        default_date = date.today()
+        default_date = UNSET_DATE
     field_map = {field: form.get(f"map_{field}") or None for field in TARGET_FIELDS}
 
     if not field_map.get("zip_code"):

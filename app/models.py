@@ -28,6 +28,12 @@ class RunType(str, enum.Enum):
     follow_up = "follow_up"
 
 
+# Sentinel used for CampaignRun.run_date when the real date is not known (e.g.
+# a bulk import with no date column and no default date given). Never treat
+# this as a real date - always display "--" and exclude it from date math.
+UNSET_DATE = date(1900, 1, 1)
+
+
 class Neighborhood(Base):
     __tablename__ = "neighborhoods"
 

@@ -3,11 +3,15 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.metrics import _label_ratio, _ratio_to_average
-from app.models import CampaignRun, Deal, RunType
+from app.models import UNSET_DATE, CampaignRun, Deal, RunType
+
+
+def _real_date(d: date) -> Optional[date]:
+    return d if d != UNSET_DATE else None
 
 
 @dataclass
@@ -80,6 +84,25 @@ class FollowUpSummary:
         return self.total_drip / self.total_replies if self.total_replies else 0.0
 
 
+@dataclass
+class GroupSummary:
+    """Sum + average across a group of zip codes, for a footer/summary row."""
+
+    zip_count: int = 0
+    total_sms: int = 0
+    total_replies: int = 0
+    total_leads: int = 0
+    total_warm: int = 0
+    total_drip: int = 0
+    total_signed_agreements: int = 0
+    deal_count: int = 0
+    total_profit: float = 0.0
+    avg_reply_rate: float = 0.0
+    avg_lead_rate: float = 0.0
+    avg_warm_rate: float = 0.0
+    avg_drip_rate: float = 0.0
+
+
 def _apply_vs_average(items, rate_props=("reply_rate", "lead_rate", "warm_rate", "drip_rate")) -> None:
     """Set avg_<rate> and <rate>_vs_avg on every item, comparing each item's rate
     to the average of that same rate across all items in the given group."""
@@ -95,6 +118,44 @@ def _apply_vs_average(items, rate_props=("reply_rate", "lead_rate", "warm_rate",
             setattr(it, vs_avg_attr, _label_ratio(_ratio_to_average(getattr(it, prop), avg_value)))
 
 
+def _round_group_summary(rounds: List[FollowUpRound]) -> GroupSummary:
+    gs = GroupSummary(zip_count=len(rounds))
+    for rnd in rounds:
+        gs.total_sms += rnd.run.sms_sent
+        gs.total_replies += rnd.run.replies
+        gs.total_leads += rnd.run.leads
+        gs.total_warm += rnd.run.warm
+        gs.total_drip += rnd.run.drip
+        gs.total_signed_agreements += rnd.run.signed_agreements
+        gs.deal_count += rnd.deal_count
+        gs.total_profit += rnd.total_profit
+    if rounds:
+        gs.avg_reply_rate = sum(r.reply_rate for r in rounds) / len(rounds)
+        gs.avg_lead_rate = sum(r.lead_rate for r in rounds) / len(rounds)
+        gs.avg_warm_rate = sum(r.warm_rate for r in rounds) / len(rounds)
+        gs.avg_drip_rate = sum(r.drip_rate for r in rounds) / len(rounds)
+    return gs
+
+
+def _summary_group_summary(summaries: List[FollowUpSummary]) -> GroupSummary:
+    gs = GroupSummary(zip_count=len(summaries))
+    for s in summaries:
+        gs.total_sms += s.total_sms
+        gs.total_replies += s.total_replies
+        gs.total_leads += s.total_leads
+        gs.total_warm += s.total_warm
+        gs.total_drip += s.total_drip
+        gs.total_signed_agreements += s.total_signed_agreements
+        gs.deal_count += s.deal_count
+        gs.total_profit += s.total_profit
+    if summaries:
+        gs.avg_reply_rate = sum(s.reply_rate for s in summaries) / len(summaries)
+        gs.avg_lead_rate = sum(s.lead_rate for s in summaries) / len(summaries)
+        gs.avg_warm_rate = sum(s.warm_rate for s in summaries) / len(summaries)
+        gs.avg_drip_rate = sum(s.drip_rate for s in summaries) / len(summaries)
+    return gs
+
+
 def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) -> Dict[int, FollowUpSummary]:
     """Always computed over ALL zip codes with follow-up data (so averages are
     meaningful), then filtered down to `zip_ids` at the very end if given."""
@@ -107,13 +168,16 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
         for deal in db.execute(deal_stmt).scalars().all():
             deals_by_run[deal.campaign_run_id].append(deal)
 
-    # Reference date per zip: the earliest INITIAL run, so "days since initial"
-    # is anchored to the initial send even if the run rows arrive out of order.
+    # Reference date per zip: the earliest INITIAL run with a real (non-placeholder)
+    # date. If none exists, "days since initial" can't be computed - shown as "--".
     initial_dates_by_zip: Dict[int, date] = {}
     for run in db.query(CampaignRun).filter(CampaignRun.run_type == RunType.initial).all():
+        real = _real_date(run.run_date)
+        if real is None:
+            continue
         current = initial_dates_by_zip.get(run.zip_code_id)
-        if current is None or run.run_date < current:
-            initial_dates_by_zip[run.zip_code_id] = run.run_date
+        if current is None or real < current:
+            initial_dates_by_zip[run.zip_code_id] = real
 
     runs_by_zip = defaultdict(list)
     for run in followup_runs:
@@ -121,12 +185,19 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
 
     result: Dict[int, FollowUpSummary] = {}
     for zip_id, runs in runs_by_zip.items():
-        reference_date = initial_dates_by_zip.get(zip_id) or min(r.run_date for r in runs)
-        runs.sort(key=lambda r: r.run_date)
+        reference_date = initial_dates_by_zip.get(zip_id)
+        # Tie-break same/unset dates by id, so round order stays stable and sane
+        # even when none of the runs have a real date yet.
+        runs.sort(key=lambda r: (r.run_date, r.id))
 
         summary = FollowUpSummary()
         for i, run in enumerate(runs, start=1):
-            days_since = (run.run_date - reference_date).days if reference_date else None
+            run_real_date = _real_date(run.run_date)
+            days_since = (
+                (run_real_date - reference_date).days
+                if (reference_date is not None and run_real_date is not None)
+                else None
+            )
             round_deals = deals_by_run.get(run.id, [])
             round_profit = sum(float(d.profit) for d in round_deals)
             summary.rounds.append(
@@ -167,9 +238,13 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
     return result
 
 
-def get_rounds_overview(
-    db: Session,
-) -> Tuple[List[int], Dict[int, List[FollowUpRound]], List[FollowUpSummary]]:
+def get_rounds_overview(db: Session) -> Tuple[
+    List[int],
+    Dict[int, List[FollowUpRound]],
+    Dict[int, GroupSummary],
+    List[FollowUpSummary],
+    GroupSummary,
+]:
     summaries = get_follow_up_summaries(db)
 
     rounds_by_number: Dict[int, List[FollowUpRound]] = defaultdict(list)
@@ -180,9 +255,12 @@ def get_rounds_overview(
         rounds.sort(key=lambda r: r.run.zip_code.zip_code)
     round_numbers = sorted(rounds_by_number.keys())
 
+    round_summaries = {num: _round_group_summary(rounds_by_number[num]) for num in round_numbers}
+
     summaries_sorted = sorted(
         summaries.values(),
         key=lambda s: s.rounds[0].run.zip_code.zip_code if s.rounds else "",
     )
+    combined_summary = _summary_group_summary(summaries_sorted)
 
-    return round_numbers, dict(rounds_by_number), summaries_sorted
+    return round_numbers, dict(rounds_by_number), round_summaries, summaries_sorted, combined_summary

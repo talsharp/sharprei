@@ -29,8 +29,8 @@
         </select>
       </div>
       <div class="form-row">
-        <label>Default date (used for every row, since this file has no date column)</label>
-        <input type="date" name="default_date" value="{{ today }}">
+        <label>Default date (used for rows without a mapped date column - leave blank if you don't know it, it'll show as "--" until you fix it)</label>
+        <input type="date" name="default_date" value="">
       </div>
     </div>
     <button type="submit">Import {{ row_count }} Rows</button>
