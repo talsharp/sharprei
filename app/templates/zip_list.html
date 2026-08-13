@@ -51,6 +51,7 @@
   </a>
 {% endmacro %}
 
+<p class="muted" style="margin-bottom:8px; font-size:13px;">All columns and the Tier reflect <strong>initial sends only</strong>. Click a zip's Follow-ups count to see follow-up results separately.</p>
 
 <div class="table-scroll-y">
 <table id="zip-table">
@@ -102,7 +103,7 @@
     {% if fu and fu.rounds %}
     <tr class="followup-detail-row" id="fu-{{ m.zip_code.id }}" style="display:none;">
       <td colspan="15" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
-        <table style="width:auto; min-width:640px; background:transparent; border:1px solid var(--border);">
+        <table style="width:auto; min-width:900px; background:transparent; border:1px solid var(--border);">
           <thead>
             <tr>
               <th style="font-size:12px;">Round</th>
@@ -110,9 +111,14 @@
               <th style="font-size:12px;">Days since initial</th>
               <th style="font-size:12px;">SMS</th>
               <th style="font-size:12px;">Replies</th>
+              <th style="font-size:12px;">% Replies</th>
+              <th style="font-size:12px;">% Leads</th>
+              <th style="font-size:12px;">% Warm</th>
+              <th style="font-size:12px;">% Drip</th>
               <th style="font-size:12px;">Leads</th>
               <th style="font-size:12px;">Warm</th>
               <th style="font-size:12px;">Drip</th>
+              <th style="font-size:12px;">Signed</th>
             </tr>
           </thead>
           <tbody>
@@ -123,18 +129,28 @@
               <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "—" }}</td>
               <td>{{ rnd.run.sms_sent }}</td>
               <td>{{ rnd.run.replies }}</td>
+              <td>{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
               <td>{{ rnd.run.leads }}</td>
               <td>{{ rnd.run.warm }}</td>
               <td>{{ rnd.run.drip }}</td>
+              <td>{{ rnd.run.signed_agreements }}</td>
             </tr>
             {% endfor %}
             <tr style="font-weight:600; border-top:1px solid var(--border);">
               <td colspan="3">Total follow-ups</td>
               <td>{{ fu.total_sms }}</td>
               <td>{{ fu.total_replies }}</td>
+              <td>{{ "%.2f"|format(fu.reply_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(fu.lead_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(fu.warm_rate*100) }}%</td>
+              <td>{{ "%.2f"|format(fu.drip_rate*100) }}%</td>
               <td>{{ fu.total_leads }}</td>
               <td>{{ fu.total_warm }}</td>
               <td>{{ fu.total_drip }}</td>
+              <td>{{ fu.total_signed_agreements }}</td>
             </tr>
           </tbody>
         </table>

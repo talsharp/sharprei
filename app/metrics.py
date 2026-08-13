@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import CampaignRun, Deal, ZipCode
+from app.models import CampaignRun, Deal, RunType, ZipCode
 
 # Minimum SMS volume before a zip code is eligible for a tier - below this,
 # lead/reply rates are too noisy on a small sample to grade reliably.
@@ -172,6 +172,10 @@ def _assign_tiers(results: List[ZipMetrics]) -> None:
 
 
 def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipMetrics]:
+    """Metrics here reflect INITIAL sends only - follow-up performance is tracked
+    separately (see app.followups) and is never blended into these numbers,
+    including the tier, so a zip's grade always reflects its proven initial-send
+    performance regardless of how much follow-up activity it's had since."""
     run_agg = (
         select(
             CampaignRun.zip_code_id.label("zip_code_id"),
@@ -184,6 +188,7 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
             func.sum(CampaignRun.opt_out).label("total_opt_out"),
             func.count(CampaignRun.id).label("run_count"),
         )
+        .where(CampaignRun.run_type == RunType.initial)
         .group_by(CampaignRun.zip_code_id)
         .subquery()
     )
@@ -195,6 +200,7 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
             func.sum(Deal.profit).label("total_profit"),
         )
         .join(Deal, Deal.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.run_type == RunType.initial)
         .group_by(CampaignRun.zip_code_id)
         .subquery()
     )

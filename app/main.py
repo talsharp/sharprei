@@ -101,6 +101,7 @@ def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
         .all()
     )
     all_neighborhoods = db.query(Neighborhood).order_by(Neighborhood.name).all()
+    follow_up = get_follow_up_summaries(db, [zip_id]).get(zip_id)
     return templates.TemplateResponse(
         "zip_detail.html",
         {
@@ -109,6 +110,7 @@ def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
             "m": metrics,
             "zc": metrics.zip_code,
             "runs": runs,
+            "follow_up": follow_up,
             "all_neighborhoods": all_neighborhoods,
             "run_types": list(RunType),
             "today": date.today().isoformat(),

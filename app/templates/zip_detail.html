@@ -62,7 +62,8 @@
   </div>
 
   <div class="card">
-    <h3>Cumulative Performance Summary</h3>
+    <h3>Initial Send Performance</h3>
+    <p class="muted" style="margin-top:-8px;">Initial sends only - follow-up results are tracked separately below.</p>
     <div class="stat-row" style="margin-bottom:16px;">
       <div class="stat"><div class="value">{{ m.total_sms }}</div><div class="label">SMS Sent</div></div>
       <div class="stat"><div class="value">{{ m.total_replies }}</div><div class="label">Replies</div></div>
@@ -86,6 +87,81 @@
       <div class="stat"><div class="value">{{ "%.2f%%"|format(m.optout_rate*100) if m.optout_rate is not none else "—" }}</div><div class="label">% Opt-out</div></div>
     </div>
   </div>
+</div>
+
+<div class="card">
+  <h3>Follow-up Performance</h3>
+  <p class="muted" style="margin-top:-8px;">Kept separate from initial send performance and from the tier - shown here so you can judge follow-ups on their own results.</p>
+  {% if follow_up and follow_up.rounds %}
+  <div class="stat-row" style="margin-bottom:16px;">
+    <div class="stat"><div class="value">{{ follow_up.rounds|length }}</div><div class="label">Follow-up Rounds</div></div>
+    <div class="stat"><div class="value">{{ follow_up.total_sms }}</div><div class="label">SMS Sent</div></div>
+    <div class="stat"><div class="value">{{ follow_up.total_replies }}</div><div class="label">Replies</div></div>
+  </div>
+  <div class="stat-row" style="margin-bottom:16px;">
+    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.reply_rate*100) }}%</div><div class="label">% Replies</div></div>
+    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.lead_rate*100) }}%</div><div class="label">% Leads</div></div>
+    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.warm_rate*100) }}%</div><div class="label">% Warm</div></div>
+    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.drip_rate*100) }}%</div><div class="label">% Drip</div></div>
+  </div>
+  <div class="stat-row" style="margin-bottom:16px;">
+    <div class="stat"><div class="value">{{ follow_up.total_leads }}</div><div class="label">Leads Number</div></div>
+    <div class="stat"><div class="value">{{ follow_up.total_warm }}</div><div class="label">Warm Leads</div></div>
+    <div class="stat"><div class="value">{{ follow_up.total_drip }}</div><div class="label">Drips</div></div>
+    <div class="stat"><div class="value">{{ follow_up.total_signed_agreements }}</div><div class="label">Signed Agreements</div></div>
+  </div>
+  <div class="stat-row" style="margin-bottom:20px;">
+    <div class="stat"><div class="value">{{ follow_up.deal_count }}</div><div class="label">Closed Deals</div></div>
+    <div class="stat"><div class="value">${{ "%.0f"|format(follow_up.total_profit) }}</div><div class="label">Total Profit</div></div>
+  </div>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Round</th><th>Date</th><th>Days since initial</th><th>SMS</th><th>Replies</th>
+        <th>% Replies</th><th>% Leads</th><th>% Warm</th><th>% Drip</th>
+        <th>Leads</th><th>Warm</th><th>Drip</th><th>Signed</th><th>Deals</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rnd in follow_up.rounds %}
+      <tr>
+        <td>Follow-up {{ rnd.round_number }}</td>
+        <td>{{ rnd.run.run_date }}</td>
+        <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "—" }}</td>
+        <td>{{ rnd.run.sms_sent }}</td>
+        <td>{{ rnd.run.replies }}</td>
+        <td>{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
+        <td>{{ rnd.run.leads }}</td>
+        <td>{{ rnd.run.warm }}</td>
+        <td>{{ rnd.run.drip }}</td>
+        <td>{{ rnd.run.signed_agreements }}</td>
+        <td>{{ rnd.deal_count }}</td>
+      </tr>
+      {% endfor %}
+      <tr style="font-weight:600; border-top:2px solid var(--border);">
+        <td colspan="3">Total follow-ups</td>
+        <td>{{ follow_up.total_sms }}</td>
+        <td>{{ follow_up.total_replies }}</td>
+        <td>{{ "%.2f"|format(follow_up.reply_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(follow_up.lead_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(follow_up.warm_rate*100) }}%</td>
+        <td>{{ "%.2f"|format(follow_up.drip_rate*100) }}%</td>
+        <td>{{ follow_up.total_leads }}</td>
+        <td>{{ follow_up.total_warm }}</td>
+        <td>{{ follow_up.total_drip }}</td>
+        <td>{{ follow_up.total_signed_agreements }}</td>
+        <td>{{ follow_up.deal_count }}</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">No follow-up runs yet for this zip code.</p>
+  {% endif %}
 </div>
 
 <div class="card">
