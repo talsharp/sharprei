@@ -63,7 +63,7 @@
       {% for rnd in rounds_by_number[num] %}
       <tr>
         <td><a class="zip-link" href="/zip/{{ rnd.run.zip_code_id }}">{{ rnd.run.zip_code.zip_code }}</a></td>
-        <td data-col="date">{{ rnd.run.run_date if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+        <td data-col="date">{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
         <td data-col="days_since">{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
         <td data-col="sms">{{ rnd.run.sms_sent }}</td>
         <td data-col="replies">{{ rnd.run.replies }}</td>

@@ -43,6 +43,16 @@ app = FastAPI(title="AAA Houses - SMS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
+
+def parse_month(value: str) -> date:
+    """Parse a <input type=month> value ("YYYY-MM") into a date on the 1st of
+    that month. Run dates are captured at month granularity only - see
+    UNSET_DATE for the "not known at all" case."""
+    if not value:
+        return UNSET_DATE
+    year, month = value.split("-")
+    return date(int(year), int(month), 1)
+
 STATUS_LABELS = {
     "not_tried": "Not Tried",
     "active": "Active",
@@ -243,7 +253,7 @@ def create_run(
 ):
     run = CampaignRun(
         zip_code_id=zip_id,
-        run_date=date.fromisoformat(run_date) if run_date else UNSET_DATE,
+        run_date=parse_month(run_date),
         run_type=run_type,
         sms_sent=sms_sent,
         replies=replies,
@@ -281,7 +291,7 @@ def update_run(
 ):
     run = db.get(CampaignRun, run_id)
     if run and run.zip_code_id == zip_id:
-        run.run_date = date.fromisoformat(run_date) if run_date else UNSET_DATE
+        run.run_date = parse_month(run_date)
         run.run_type = run_type
         run.sms_sent = sms_sent
         run.replies = replies
@@ -387,7 +397,7 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
     default_run_type = form.get("default_run_type", "initial")
     default_date_val = form.get("default_date", "")
     try:
-        default_date = date.fromisoformat(default_date_val) if default_date_val else UNSET_DATE
+        default_date = parse_month(default_date_val)
     except ValueError:
         default_date = UNSET_DATE
     field_map = {field: form.get(f"map_{field}") or None for field in TARGET_FIELDS}

@@ -154,7 +154,7 @@
       {% for rnd in follow_up.rounds %}
       <tr>
         <td>Follow-up {{ rnd.round_number }}</td>
-        <td>{{ rnd.run.run_date if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+        <td>{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
         <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
         <td>{{ rnd.run.sms_sent }}</td>
         <td>{{ rnd.run.replies }}</td>
@@ -195,7 +195,7 @@
   <h3>Add New Run</h3>
   <form method="post" action="/zip/{{ zc.id }}/runs/new">
     <div class="grid-2">
-      <div class="form-row"><label>Date</label><input type="date" name="run_date" value="{{ today }}"></div>
+      <div class="form-row"><label>Month</label><input type="month" name="run_date" value="{{ today[:7] }}"></div>
       <div class="form-row">
         <label>Run Type</label>
         <select name="run_type">
@@ -233,7 +233,7 @@
     <tbody>
       {% for run in runs %}
       <tr>
-        <td><input type="date" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date }}" placeholder="--" form="run-edit-{{ run.id }}" style="width:130px;"></td>
+        <td><input type="month" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date.strftime('%Y-%m') }}" placeholder="--" form="run-edit-{{ run.id }}" style="width:130px;"></td>
         <td>
           <select name="run_type" form="run-edit-{{ run.id }}">
             <option value="initial" {{ "selected" if run.run_type == "initial" else "" }}>Initial</option>
