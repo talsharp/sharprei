@@ -54,10 +54,10 @@ def parse_month(value: str) -> date:
     return date(int(year), int(month), 1)
 
 STATUS_LABELS = {
-    "not_tried": "Not Tried",
-    "active": "Active",
+    "not_tried": "Need to Run",
+    "active": "Used",
     "watchlist": "Watchlist",
-    "blacklist": "Blacklist",
+    "blacklist": "Blacklisted",
 }
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["ZipStatus"] = ZipStatus
