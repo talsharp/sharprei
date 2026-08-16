@@ -152,6 +152,7 @@ def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
 def zip_update(
     zip_id: int,
     status: str = Form(...),
+    follow_up_status: str = Form(...),
     notes: str = Form(""),
     avg_house_value: str = Form(""),
     tier_override: str = Form(""),
@@ -160,6 +161,7 @@ def zip_update(
 ):
     zc = db.get(ZipCode, zip_id)
     zc.status = status
+    zc.follow_up_status = follow_up_status
     zc.notes = notes
     zc.avg_house_value = float(avg_house_value) if avg_house_value.strip() else None
     zc.tier_override = tier_override or None
@@ -253,7 +255,10 @@ def create_run(
     )
     db.add(run)
     zc = db.get(ZipCode, zip_id)
-    if zc.status == ZipStatus.not_tried:
+    if run_type == RunType.follow_up:
+        if zc.follow_up_status == ZipStatus.not_tried:
+            zc.follow_up_status = ZipStatus.active
+    elif zc.status == ZipStatus.not_tried:
         zc.status = ZipStatus.active
     db.commit()
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)

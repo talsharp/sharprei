@@ -4,7 +4,7 @@
 {% block content %}
 
 <div class="top-actions">
-  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}">{{ m.tier }}{{ " ✎ manual" if zc.tier_override else "" }}</span> <span class="muted" style="font-size:14px;">{{ zc.region_override or zc.region or "" }}{{ " (manual)" if zc.region_override else "" }}</span></h2>
+  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}" title="Initial send status">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-{{ zc.follow_up_status }}" title="Follow-up status">FU: {{ STATUS_LABELS[zc.follow_up_status] }}</span> <span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}">{{ m.tier }}{{ " ✎ manual" if zc.tier_override else "" }}</span> <span class="muted" style="font-size:14px;">{{ zc.region_override or zc.region or "" }}{{ " (manual)" if zc.region_override else "" }}</span></h2>
   <a class="btn secondary" href="/">Back to list</a>
 </div>
 
@@ -17,6 +17,14 @@
         <select name="status">
           {% for key, label in STATUS_LABELS.items() %}
           <option value="{{ key }}" {{ "selected" if zc.status == key else "" }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Follow-up Status (separate from Status above)</label>
+        <select name="follow_up_status">
+          {% for key, label in STATUS_LABELS.items() %}
+          <option value="{{ key }}" {{ "selected" if zc.follow_up_status == key else "" }}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
