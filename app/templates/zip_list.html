@@ -156,10 +156,10 @@
               <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
               <td>{{ rnd.run.sms_sent }}</td>
               <td>{{ rnd.run.replies }}</td>
-              <td>{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
               <td>{{ rnd.run.leads }}</td>
               <td>{{ rnd.run.warm }}</td>
               <td>{{ rnd.run.drip }}</td>
@@ -170,10 +170,10 @@
               <td colspan="3">Total follow-ups</td>
               <td>{{ fu.total_sms }}</td>
               <td>{{ fu.total_replies }}</td>
-              <td>{{ "%.2f"|format(fu.reply_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(fu.lead_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(fu.warm_rate*100) }}%</td>
-              <td>{{ "%.2f"|format(fu.drip_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.reply_rate, fu.reply_vs_avg, fu.avg_reply_rate) }}">{{ "%.2f"|format(fu.reply_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.lead_rate, fu.lead_vs_avg, fu.avg_lead_rate) }}">{{ "%.2f"|format(fu.lead_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.warm_rate, fu.warm_vs_avg, fu.avg_warm_rate) }}">{{ "%.2f"|format(fu.warm_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.drip_rate, fu.drip_vs_avg, fu.avg_drip_rate) }}">{{ "%.2f"|format(fu.drip_rate*100) }}%</td>
               <td>{{ fu.total_leads }}</td>
               <td>{{ fu.total_warm }}</td>
               <td>{{ fu.total_drip }}</td>

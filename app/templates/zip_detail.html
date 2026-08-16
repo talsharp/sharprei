@@ -118,10 +118,10 @@
     <div class="stat"><div class="value">{{ follow_up.total_replies }}</div><div class="label">Replies</div></div>
   </div>
   <div class="stat-row" style="margin-bottom:16px;">
-    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.reply_rate*100) }}%</div><div class="label">% Replies</div></div>
-    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.lead_rate*100) }}%</div><div class="label">% Leads</div></div>
-    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.warm_rate*100) }}%</div><div class="label">% Warm</div></div>
-    <div class="stat"><div class="value">{{ "%.2f"|format(follow_up.drip_rate*100) }}%</div><div class="label">% Drip</div></div>
+    <div class="stat" title="{{ macros.pct_title(follow_up.reply_rate, follow_up.reply_vs_avg, follow_up.avg_reply_rate) }}"><div class="value">{{ "%.2f"|format(follow_up.reply_rate*100) }}%</div><div class="label">% Replies</div></div>
+    <div class="stat" title="{{ macros.pct_title(follow_up.lead_rate, follow_up.lead_vs_avg, follow_up.avg_lead_rate) }}"><div class="value">{{ "%.2f"|format(follow_up.lead_rate*100) }}%</div><div class="label">% Leads</div></div>
+    <div class="stat" title="{{ macros.pct_title(follow_up.warm_rate, follow_up.warm_vs_avg, follow_up.avg_warm_rate) }}"><div class="value">{{ "%.2f"|format(follow_up.warm_rate*100) }}%</div><div class="label">% Warm</div></div>
+    <div class="stat" title="{{ macros.pct_title(follow_up.drip_rate, follow_up.drip_vs_avg, follow_up.avg_drip_rate) }}"><div class="value">{{ "%.2f"|format(follow_up.drip_rate*100) }}%</div><div class="label">% Drip</div></div>
   </div>
   <div class="stat-row" style="margin-bottom:16px;">
     <div class="stat"><div class="value">{{ follow_up.total_leads }}</div><div class="label">Leads Number</div></div>
@@ -150,10 +150,10 @@
         <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
         <td>{{ rnd.run.sms_sent }}</td>
         <td>{{ rnd.run.replies }}</td>
-        <td>{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
         <td>{{ rnd.run.leads }}</td>
         <td>{{ rnd.run.warm }}</td>
         <td>{{ rnd.run.drip }}</td>
@@ -165,10 +165,10 @@
         <td colspan="3">Total follow-ups</td>
         <td>{{ follow_up.total_sms }}</td>
         <td>{{ follow_up.total_replies }}</td>
-        <td>{{ "%.2f"|format(follow_up.reply_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(follow_up.lead_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(follow_up.warm_rate*100) }}%</td>
-        <td>{{ "%.2f"|format(follow_up.drip_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(follow_up.reply_rate, follow_up.reply_vs_avg, follow_up.avg_reply_rate) }}">{{ "%.2f"|format(follow_up.reply_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(follow_up.lead_rate, follow_up.lead_vs_avg, follow_up.avg_lead_rate) }}">{{ "%.2f"|format(follow_up.lead_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(follow_up.warm_rate, follow_up.warm_vs_avg, follow_up.avg_warm_rate) }}">{{ "%.2f"|format(follow_up.warm_rate*100) }}%</td>
+        <td title="{{ macros.pct_title(follow_up.drip_rate, follow_up.drip_vs_avg, follow_up.avg_drip_rate) }}">{{ "%.2f"|format(follow_up.drip_rate*100) }}%</td>
         <td>{{ follow_up.total_leads }}</td>
         <td>{{ follow_up.total_warm }}</td>
         <td>{{ follow_up.total_drip }}</td>
