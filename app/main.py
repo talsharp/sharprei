@@ -112,6 +112,8 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
 @app.get("/followups")
 def followups_page(request: Request, db: Session = Depends(get_db)):
     round_numbers, rounds_by_number, round_summaries, summaries, combined_summary = get_rounds_overview(db)
+    all_zips = db.query(ZipCode).all()
+    regions = sorted({z.region_override or z.region for z in all_zips if (z.region_override or z.region)})
     return templates.TemplateResponse(
         "followups.html",
         {
@@ -122,6 +124,7 @@ def followups_page(request: Request, db: Session = Depends(get_db)):
             "round_summaries": round_summaries,
             "summaries": summaries,
             "combined_summary": combined_summary,
+            "regions": regions,
         },
     )
 
