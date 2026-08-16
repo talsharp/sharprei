@@ -19,7 +19,6 @@ from app.importer import (
     clean_zip,
     guess_mapping,
     parse_int,
-    parse_optional_float,
     parse_optional_int,
     read_table,
     save_upload,
@@ -85,7 +84,6 @@ SORT_FIELDS = {
     "score": lambda m: m.score,
     "tier": lambda m: len(TIER_ORDER) - TIER_ORDER.index(m.tier) if m.tier in TIER_ORDER else 0,
     "region": lambda m: (m.zip_code.region_override or m.zip_code.region or ""),
-    "house_value": lambda m: (m.zip_code.avg_house_value or 0),
 }
 
 
@@ -168,7 +166,6 @@ def zip_update(
     status: str = Form(...),
     follow_up_status: str = Form(...),
     notes: str = Form(""),
-    avg_house_value: str = Form(""),
     tier_override: str = Form(""),
     region_override: str = Form(""),
     db: Session = Depends(get_db),
@@ -177,7 +174,6 @@ def zip_update(
     zc.status = status
     zc.follow_up_status = follow_up_status
     zc.notes = notes
-    zc.avg_house_value = float(avg_house_value) if avg_house_value.strip() else None
     zc.tier_override = tier_override or None
     zc.region_override = region_override or None
     db.commit()
@@ -442,12 +438,6 @@ async def import_commit(request: Request, db: Session = Depends(get_db)):
             zip_code_id = zc.id
             if zc.status == ZipStatus.not_tried:
                 zc.status = ZipStatus.active
-
-            avg_house_value_col = field_map.get("avg_house_value")
-            if avg_house_value_col:
-                parsed_value = parse_optional_float(row.get(avg_house_value_col))
-                if parsed_value is not None:
-                    zc.avg_house_value = parsed_value
 
             run_date_col = field_map.get("run_date")
             run_date_val = row.get(run_date_col) if run_date_col else ""

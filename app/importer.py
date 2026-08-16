@@ -19,13 +19,6 @@ TARGET_FIELDS = {
     "drip": ["drip", "drips", "follow up", "follow-up", "דריפ"],
     "signed_agreements": ["signed agreements", "signed agreement", "agreements signed", "contracts signed"],
     "opt_out": ["opt_out", "opt-out", "optout", "opt out", "dnc", "הסרה"],
-    "avg_house_value": [
-        "average house value",
-        "avg house value",
-        "avg_house_value",
-        "house value",
-        "שווי בית ממוצע",
-    ],
 }
 
 FIELD_LABELS = {
@@ -39,11 +32,7 @@ FIELD_LABELS = {
     "drip": "Drip",
     "signed_agreements": "Signed Agreements",
     "opt_out": "Opt-out",
-    "avg_house_value": "Average House Value (zip-level field)",
 }
-
-# Fields that belong to the zip code itself, not the run - handled separately during import
-ZIP_LEVEL_FIELDS = {"avg_house_value"}
 
 
 def _norm(s: str) -> str:
@@ -100,16 +89,6 @@ def parse_optional_int(value) -> Optional[int]:
     if not text or text.lower() == "nan":
         return None
     return parse_int(text)
-
-
-def parse_optional_float(value) -> Optional[float]:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text or text.lower() == "nan":
-        return None
-    text = re.sub(r"[^\d.\-]", "", text)
-    return float(text) if text else None
 
 
 def classify_run_type(value, default: str) -> str:

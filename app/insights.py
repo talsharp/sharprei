@@ -9,13 +9,12 @@ MODEL = "claude-sonnet-5"
 
 def build_data_summary(metrics_list: list[ZipMetrics]) -> str:
     lines = [
-        "Zip | Neighborhoods | Status | Avg House Value | Runs | SMS | %Replies | %Leads | %Warm | %Drip | Deals | Total Profit | Score | Tier"
+        "Zip | Neighborhoods | Status | Runs | SMS | %Replies | %Leads | %Warm | %Drip | Deals | Total Profit | Score | Tier"
     ]
     for m in metrics_list:
         neighborhoods = ", ".join(n.name for n in m.zip_code.neighborhoods) or "—"
-        house_value = f"${m.zip_code.avg_house_value:,.0f}" if m.zip_code.avg_house_value else "—"
         lines.append(
-            f"{m.zip_code.zip_code} | {neighborhoods} | {m.zip_code.status} | {house_value} | "
+            f"{m.zip_code.zip_code} | {neighborhoods} | {m.zip_code.status} | "
             f"{m.run_count} | {m.total_sms} | {m.reply_rate*100:.1f}% | {m.lead_rate*100:.1f}% | "
             f"{m.warm_rate*100:.1f}% | {m.drip_rate*100:.1f}% | {m.deal_count} | "
             f"${m.total_profit:.0f} | {m.score:.0f} | {m.tier}"

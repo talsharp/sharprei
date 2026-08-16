@@ -58,7 +58,6 @@ class ZipCode(Base):
     follow_up_status: Mapped[ZipStatus] = mapped_column(
         String(20), default=ZipStatus.not_tried
     )
-    avg_house_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     region: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     region_override: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     tier_override: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

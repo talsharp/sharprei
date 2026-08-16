@@ -29,10 +29,6 @@
         </select>
       </div>
       <div class="form-row">
-        <label>Average House Value ($)</label>
-        <input type="number" step="1000" name="avg_house_value" value="{{ zc.avg_house_value if zc.avg_house_value is not none else '' }}">
-      </div>
-      <div class="form-row">
         <label>Tier Override (leave on Auto to use the computed tier)</label>
         <select name="tier_override">
           <option value="">Auto (computed: {{ m.computed_tier }})</option>
