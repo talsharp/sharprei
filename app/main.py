@@ -85,6 +85,7 @@ SORT_FIELDS = {
     "score": lambda m: m.score,
     "tier": lambda m: len(TIER_ORDER) - TIER_ORDER.index(m.tier) if m.tier in TIER_ORDER else 0,
     "region": lambda m: (m.zip_code.region_override or m.zip_code.region or ""),
+    "house_value": lambda m: (m.zip_code.avg_house_value or 0),
 }
 
 

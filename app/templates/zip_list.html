@@ -52,6 +52,7 @@
       <div class="columns-panel" id="columns-panel">
         <label><input type="checkbox" data-col="region" checked> Region</label>
         <label><input type="checkbox" data-col="neighborhood" checked> Neighborhood</label>
+        <label><input type="checkbox" data-col="house_value" checked> House Value</label>
         <label><input type="checkbox" data-col="status" checked> Status</label>
         <label><input type="checkbox" data-col="fustatus" checked> Follow-up Status</label>
         <label><input type="checkbox" data-col="tier" checked> Tier</label>
@@ -92,6 +93,7 @@
       <th>{{ sort_link('zip', 'Zip Code') }}</th>
       <th data-col="region">{{ sort_link('region', 'Region') }}</th>
       <th data-col="neighborhood">Neighborhood</th>
+      <th data-col="house_value">{{ sort_link('house_value', 'House Value') }}</th>
       <th data-col="status">{{ sort_link('status', 'Status') }}</th>
       <th data-col="fustatus">Follow-up Status</th>
       <th data-col="tier">{{ sort_link('tier', 'Tier') }}</th>
@@ -122,6 +124,7 @@
         <span title="{{ 'Also includes: ' + (others | map(attribute='neighborhood.name') | join(', ')) if others else 'Only neighborhood found for this zip' }}">{{ main_link.neighborhood.name }}{{ " +%d"|format(others|length) if others else "" }}</span>
         {% else %}—{% endif %}
       </td>
+      <td data-col="house_value">{{ "${:,.0f}".format(m.zip_code.avg_house_value) if m.zip_code.avg_house_value is not none else "—" }}</td>
       <td data-col="status"><span class="badge badge-{{ m.zip_code.status }}">{{ STATUS_LABELS[m.zip_code.status] }}</span></td>
       <td data-col="fustatus"><span class="badge badge-{{ m.zip_code.follow_up_status }}">{{ STATUS_LABELS[m.zip_code.follow_up_status] }}</span></td>
       <td data-col="tier"><span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}" title="{{ (m.tier_reason + ' — manually overridden (computed: ' + m.computed_tier + ')') if m.zip_code.tier_override else m.tier_reason }}">{{ m.tier }}{{ " ✎" if m.zip_code.tier_override else "" }}</span></td>
@@ -145,7 +148,7 @@
     </tr>
     {% if fu and fu.rounds %}
     <tr class="followup-detail-row" id="fu-{{ m.zip_code.id }}" style="display:none;">
-      <td colspan="17" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
+      <td colspan="18" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
         <table style="width:auto; min-width:900px; background:transparent; border:1px solid var(--border);">
           <thead>
             <tr>
@@ -201,7 +204,7 @@
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="17" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
+    <tr><td colspan="18" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -209,6 +212,7 @@
       <td>Totals / Averages</td>
       <td data-col="region"></td>
       <td data-col="neighborhood"></td>
+      <td data-col="house_value"></td>
       <td data-col="status"></td>
       <td data-col="fustatus"></td>
       <td data-col="tier"></td>
@@ -295,6 +299,20 @@
       var footerCell = document.querySelector('#zip-table tfoot [data-col="' + col + '"]');
       if (footerCell) footerCell.textContent = avg.toFixed(2) + '%';
     });
+
+    var houseValues = [];
+    rows.forEach(function(tr) {
+      var cell = tr.querySelector('[data-col="house_value"]');
+      if (cell && cell.textContent.trim() !== '—') {
+        houseValues.push(parseFloat(cell.textContent.replace(/[^0-9.\-]/g, '')) || 0);
+      }
+    });
+    var houseValueFooterCell = document.querySelector('#zip-table tfoot [data-col="house_value"]');
+    if (houseValueFooterCell) {
+      houseValueFooterCell.textContent = houseValues.length
+        ? '$' + Math.round(houseValues.reduce(function(a, b) { return a + b; }, 0) / houseValues.length).toLocaleString()
+        : '—';
+    }
   }
 
   function checkedValues(selector) {
