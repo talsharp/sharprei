@@ -1,0 +1,64 @@
+{% macro money(v) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v) }}{% endif %}{% endmacro %}
+
+{% macro renovation_row(r, prop) %}
+<div class="reno-item" id="reno-{{ r.id }}">
+  <div class="reno-view" id="reno-view-{{ r.id }}">
+    <button type="button" class="reno-toggle" onclick="var el=document.getElementById('reno-detail-{{ r.id }}'); var open = el.style.display !== 'none'; el.style.display = open ? 'none' : 'block'; this.textContent = open ? '▸' : '▾';">▸</button>
+    <span class="reno-summary"><strong>{{ r.description }}</strong> — {{ money(r.cost) }}{% if r.contractor %} — {{ r.contractor }}{% endif %}</span>
+    <span class="reno-actions">
+      <button type="button" class="secondary" style="padding:3px 10px; font-size:12px;" onclick="document.getElementById('reno-view-{{ r.id }}').style.display='none'; document.getElementById('reno-edit-{{ r.id }}').style.display='block';">Edit</button>
+      <button type="button" class="danger" style="padding:3px 10px; font-size:12px;"
+        hx-post="/rentals/{{ prop.id }}/renovations/{{ r.id }}/delete"
+        hx-target="#reno-{{ r.id }}" hx-swap="outerHTML"
+        hx-confirm="Delete this expense?">Delete</button>
+    </span>
+    <div class="reno-detail" id="reno-detail-{{ r.id }}" style="display:none;">
+      <p class="muted" style="margin:6px 0 0 26px; font-size:13px;">{{ r.notes or "No notes" }}</p>
+      {% if r.file_path %}
+      <a class="btn secondary" style="margin:6px 0 0 26px; padding:3px 10px; font-size:12px; display:inline-block;" href="/rentals/{{ prop.id }}/renovations/{{ r.id }}/file">{{ r.file_original_name or "Download" }}</a>
+      {% endif %}
+    </div>
+  </div>
+  <form id="reno-edit-{{ r.id }}" class="reno-edit-form" style="display:none;"
+    hx-post="/rentals/{{ prop.id }}/renovations/{{ r.id }}/update"
+    hx-target="#reno-{{ r.id }}" hx-swap="outerHTML" hx-encoding="multipart/form-data">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; padding-top:10px;">
+      <div class="form-row" style="margin-bottom:0;"><label>Description</label><input type="text" name="description" value="{{ r.description }}" required></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Cost ($)</label><input type="number" step="any" name="cost" value="{{ r.cost }}" style="width:110px;"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Contractor</label><input type="text" name="contractor" value="{{ r.contractor or '' }}"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="{{ r.notes or '' }}"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Replace File (optional)</label><input type="file" name="file"></div>
+      <button type="submit">Save</button>
+      <button type="button" class="secondary" onclick="document.getElementById('reno-edit-{{ r.id }}').style.display='none'; document.getElementById('reno-view-{{ r.id }}').style.display='block';">Cancel</button>
+    </div>
+  </form>
+</div>
+{% endmacro %}
+
+{% macro month_row(m, prop) %}
+<tr id="month-{{ m.id }}" class="month-row" title="{{ m.notes or '' }}">
+  <td>{{ m.month.strftime('%B %Y') }}</td>
+  <td><span class="month-view">{{ money(m.income) }}</span><input class="month-edit" type="number" step="any" name="income" form="month-form-{{ m.id }}" value="{{ m.income }}" style="width:80px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.utilities) }}</span><input class="month-edit" type="number" step="any" name="utilities" form="month-form-{{ m.id }}" value="{{ m.utilities }}" style="width:75px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.insurance) }}</span><input class="month-edit" type="number" step="any" name="insurance" form="month-form-{{ m.id }}" value="{{ m.insurance }}" style="width:75px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.repairs) }}</span><input class="month-edit" type="number" step="any" name="repairs" form="month-form-{{ m.id }}" value="{{ m.repairs }}" style="width:75px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.management_fees) }}</span><input class="month-edit" type="number" step="any" name="management_fees" form="month-form-{{ m.id }}" value="{{ m.management_fees }}" style="width:75px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.property_tax) }}</span><input class="month-edit" type="number" step="any" name="property_tax" form="month-form-{{ m.id }}" value="{{ m.property_tax }}" style="width:75px; display:none;"></td>
+  <td><span class="month-view">{{ money(m.other) }}</span><input class="month-edit" type="number" step="any" name="other" form="month-form-{{ m.id }}" value="{{ m.other }}" style="width:75px; display:none;"></td>
+  <td>{{ money(m.total_expenses) }}</td>
+  <td style="color: {{ 'var(--green)' if m.net_cash_flow >= 0 else 'var(--red)' }};">{{ money(m.net_cash_flow) }}</td>
+  <td class="month-edit" style="display:none;"><input type="text" name="notes" form="month-form-{{ m.id }}" value="{{ m.notes or '' }}" placeholder="note" style="width:110px;"></td>
+  <td class="month-actions">
+    <span class="month-view">
+      <button type="button" class="secondary" style="font-size:12px;" onclick="toggleMonthEdit('{{ m.id }}', true)">Edit</button>
+    </span>
+    <span class="month-edit" style="display:none; gap:6px;">
+      <button type="submit" form="month-form-{{ m.id }}" style="font-size:12px;">Save</button>
+      <button type="button" class="secondary" style="font-size:12px;" onclick="toggleMonthEdit('{{ m.id }}', false)">Cancel</button>
+    </span>
+  </td>
+</tr>
+<form id="month-form-{{ m.id }}"
+  hx-post="/rentals/{{ prop.id }}/months/{{ m.id }}/update"
+  hx-target="#month-{{ m.id }}" hx-swap="outerHTML"></form>
+{% endmacro %}

@@ -563,6 +563,10 @@ def create_property(address: str = Form(...), db: Session = Depends(get_db)):
     return RedirectResponse("/rentals", status_code=303)
 
 
+def _is_htmx(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
+
+
 @app.get("/rentals/{property_id}")
 def property_detail(request: Request, property_id: int, db: Session = Depends(get_db)):
     prop = db.get(Property, property_id)
@@ -570,10 +574,9 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
         return RedirectResponse("/rentals", status_code=303)
     months = sorted(prop.monthly_expenses, key=lambda m: m.month, reverse=True)
     renovations = sorted(
-        prop.renovation_expenses, key=lambda r: r.expense_date or date.min, reverse=True
+        prop.renovation_expenses, key=lambda r: r.created_at, reverse=True
     )
     py = get_property_yield(prop)
-    all_zips = db.query(ZipCode).order_by(ZipCode.zip_code).all()
     return templates.TemplateResponse(
         "property_detail.html",
         {
@@ -583,7 +586,6 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
             "months": months,
             "renovations": renovations,
             "py": py,
-            "all_zips": all_zips,
             "today": date.today().isoformat(),
             "this_month": date.today().replace(day=1).strftime("%Y-%m"),
         },
@@ -594,25 +596,29 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
 def update_property(
     property_id: int,
     address: str = Form(...),
-    zip_code_id: str = Form(""),
     purchase_price: str = Form("0"),
     closing_costs: str = Form("0"),
     purchase_date: str = Form(""),
     max_arv: str = Form(""),
     estimated_value: str = Form(""),
     rent_price: str = Form(""),
+    tenant_move_in_date: str = Form(""),
+    account_balance: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
     prop = db.get(Property, property_id)
     prop.address = address.strip()
-    prop.zip_code_id = int(zip_code_id) if zip_code_id.strip() else None
     prop.purchase_price = float(purchase_price) if purchase_price.strip() else 0
     prop.closing_costs = float(closing_costs) if closing_costs.strip() else 0
     prop.purchase_date = date.fromisoformat(purchase_date) if purchase_date.strip() else None
     prop.max_arv = float(max_arv) if max_arv.strip() else None
     prop.estimated_value = float(estimated_value) if estimated_value.strip() else None
     prop.rent_price = float(rent_price) if rent_price.strip() else None
+    prop.tenant_move_in_date = (
+        date.fromisoformat(tenant_move_in_date) if tenant_move_in_date.strip() else None
+    )
+    prop.account_balance = float(account_balance) if account_balance.strip() else None
     prop.notes = notes
     db.commit()
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
@@ -623,7 +629,7 @@ async def add_renovation_expense(property_id: int, request: Request, db: Session
     form = await request.form()
     description = (form.get("description") or "").strip()
     cost = form.get("cost") or "0"
-    expense_date = form.get("expense_date") or ""
+    contractor = (form.get("contractor") or "").strip()
     notes = form.get("notes") or ""
     upload = form.get("file")
 
@@ -635,27 +641,69 @@ async def add_renovation_expense(property_id: int, request: Request, db: Session
             file_path = save_renovation_file(upload.filename, content)
             file_original_name = upload.filename
 
+    expense = None
     if description:
         expense = RenovationExpense(
             property_id=property_id,
             description=description,
             cost=float(cost) if cost.strip() else 0,
-            expense_date=date.fromisoformat(expense_date) if expense_date.strip() else None,
+            contractor=contractor or None,
             notes=notes,
             file_path=file_path,
             file_original_name=file_original_name,
         )
         db.add(expense)
         db.commit()
+        db.refresh(expense)
+
+    if _is_htmx(request) and expense:
+        prop = db.get(Property, property_id)
+        return templates.TemplateResponse(
+            "_reno_row_only.html", {"request": request, "r": expense, "prop": prop}
+        )
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/renovations/{expense_id}/update")
+async def update_renovation_expense(
+    property_id: int, expense_id: int, request: Request, db: Session = Depends(get_db)
+):
+    form = await request.form()
+    expense = db.get(RenovationExpense, expense_id)
+    if expense and expense.property_id == property_id:
+        expense.description = (form.get("description") or expense.description).strip()
+        cost = form.get("cost")
+        if cost and cost.strip():
+            expense.cost = float(cost)
+        expense.contractor = (form.get("contractor") or "").strip() or None
+        expense.notes = form.get("notes") or ""
+
+        upload = form.get("file")
+        if upload is not None and getattr(upload, "filename", None):
+            content = await upload.read()
+            if content:
+                expense.file_path = save_renovation_file(upload.filename, content)
+                expense.file_original_name = upload.filename
+        db.commit()
+
+    if _is_htmx(request) and expense:
+        prop = db.get(Property, property_id)
+        return templates.TemplateResponse(
+            "_reno_row_only.html", {"request": request, "r": expense, "prop": prop}
+        )
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
 @app.post("/rentals/{property_id}/renovations/{expense_id}/delete")
-def delete_renovation_expense(property_id: int, expense_id: int, db: Session = Depends(get_db)):
+def delete_renovation_expense(
+    property_id: int, expense_id: int, request: Request, db: Session = Depends(get_db)
+):
     expense = db.get(RenovationExpense, expense_id)
     if expense and expense.property_id == property_id:
         db.delete(expense)
         db.commit()
+    if _is_htmx(request):
+        return ""
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
@@ -673,6 +721,7 @@ def download_renovation_file(property_id: int, expense_id: int, db: Session = De
 @app.post("/rentals/{property_id}/months/new")
 def add_monthly_expense(
     property_id: int,
+    request: Request,
     month: str = Form(...),
     income: str = Form(""),
     utilities: str = Form("0"),
@@ -686,30 +735,35 @@ def add_monthly_expense(
 ):
     prop = db.get(Property, property_id)
     month_date = parse_month(month)
-    if month_date == UNSET_DATE:
-        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
-    existing = (
-        db.query(MonthlyExpense)
-        .filter(MonthlyExpense.property_id == property_id, MonthlyExpense.month == month_date)
-        .first()
-    )
-    if existing:
-        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
-    income_val = float(income) if income.strip() else (float(prop.rent_price) if prop.rent_price else 0)
-    entry = MonthlyExpense(
-        property_id=property_id,
-        month=month_date,
-        income=income_val,
-        utilities=float(utilities) if utilities.strip() else 0,
-        insurance=float(insurance) if insurance.strip() else 0,
-        repairs=float(repairs) if repairs.strip() else 0,
-        management_fees=float(management_fees) if management_fees.strip() else 0,
-        property_tax=float(property_tax) if property_tax.strip() else 0,
-        other=float(other) if other.strip() else 0,
-        notes=notes,
-    )
-    db.add(entry)
-    db.commit()
+    entry = None
+    if month_date != UNSET_DATE:
+        existing = (
+            db.query(MonthlyExpense)
+            .filter(MonthlyExpense.property_id == property_id, MonthlyExpense.month == month_date)
+            .first()
+        )
+        if not existing:
+            income_val = float(income) if income.strip() else (float(prop.rent_price) if prop.rent_price else 0)
+            entry = MonthlyExpense(
+                property_id=property_id,
+                month=month_date,
+                income=income_val,
+                utilities=float(utilities) if utilities.strip() else 0,
+                insurance=float(insurance) if insurance.strip() else 0,
+                repairs=float(repairs) if repairs.strip() else 0,
+                management_fees=float(management_fees) if management_fees.strip() else 0,
+                property_tax=float(property_tax) if property_tax.strip() else 0,
+                other=float(other) if other.strip() else 0,
+                notes=notes,
+            )
+            db.add(entry)
+            db.commit()
+            db.refresh(entry)
+
+    if _is_htmx(request) and entry:
+        return templates.TemplateResponse(
+            "_month_row_only.html", {"request": request, "m": entry, "prop": prop}
+        )
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
@@ -717,6 +771,7 @@ def add_monthly_expense(
 def update_monthly_expense(
     property_id: int,
     month_id: int,
+    request: Request,
     income: str = Form("0"),
     utilities: str = Form("0"),
     insurance: str = Form("0"),
@@ -738,13 +793,23 @@ def update_monthly_expense(
         entry.other = float(other) if other.strip() else 0
         entry.notes = notes
         db.commit()
+
+    if _is_htmx(request) and entry:
+        prop = db.get(Property, property_id)
+        return templates.TemplateResponse(
+            "_month_row_only.html", {"request": request, "m": entry, "prop": prop}
+        )
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
 @app.post("/rentals/{property_id}/months/{month_id}/delete")
-def delete_monthly_expense(property_id: int, month_id: int, db: Session = Depends(get_db)):
+def delete_monthly_expense(
+    property_id: int, month_id: int, request: Request, db: Session = Depends(get_db)
+):
     entry = db.get(MonthlyExpense, month_id)
     if entry and entry.property_id == property_id:
         db.delete(entry)
         db.commit()
+    if _is_htmx(request):
+        return ""
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)

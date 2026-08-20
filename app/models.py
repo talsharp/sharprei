@@ -156,20 +156,20 @@ class Property(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     address: Mapped[str] = mapped_column(String(255))
-    zip_code_id: Mapped[Optional[int]] = mapped_column(ForeignKey("zip_codes.id"), nullable=True)
     purchase_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     closing_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     purchase_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     max_arv: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     estimated_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     rent_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    tenant_move_in_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    account_balance: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    zip_code: Mapped[Optional[ZipCode]] = relationship()
     renovation_expenses: Mapped[list["RenovationExpense"]] = relationship(
         back_populates="property_ref", cascade="all, delete-orphan"
     )
@@ -193,6 +193,12 @@ class Property(Base):
     def is_occupied(self) -> bool:
         return self.rent_price is not None and float(self.rent_price) > 0
 
+    @property
+    def estimated_profit(self) -> Optional[float]:
+        if self.estimated_value is None:
+            return None
+        return float(self.estimated_value) - self.total_invested
+
 
 class RenovationExpense(Base):
     __tablename__ = "renovation_expenses"
@@ -202,6 +208,7 @@ class RenovationExpense(Base):
     description: Mapped[str] = mapped_column(String(255))
     cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     expense_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    contractor: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     file_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     file_original_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

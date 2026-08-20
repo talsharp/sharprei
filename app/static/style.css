@@ -188,3 +188,16 @@ button.danger, .btn.danger { background: var(--red); }
 .insights-result h1:first-child, .insights-result h2:first-child, .insights-result h3:first-child { margin-top: 0; }
 .insights-result ul { padding-inline-start: 20px; }
 .insights-result li { margin-bottom: 6px; }
+
+.reno-item { border-bottom: 1px solid var(--border); padding: 10px 0; }
+.reno-item:last-child { border-bottom: none; }
+.reno-view { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.reno-toggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; }
+.reno-summary { flex: 1; min-width: 200px; }
+.reno-actions { display: flex; gap: 6px; margin-inline-start: auto; }
+
+.summary-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+.summary-tile { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+.summary-tile .value { font-size: 24px; font-weight: 700; }
+.summary-tile .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.summary-tile.accent { border-color: var(--accent); background: rgba(79,140,255,0.08); }

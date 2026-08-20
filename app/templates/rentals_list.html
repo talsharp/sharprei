@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_rentals_macros.html" as rm %}
 {% block title %}Rentals{% endblock %}
 {% block content %}
 
@@ -13,28 +14,29 @@
   </form>
 </div>
 
-<div class="grid-2" style="margin-bottom:20px;">
-  <div class="card">
-    <h3>Portfolio Totals</h3>
-    <div class="stat-row" style="margin-bottom:16px;">
-      <div class="stat"><div class="value">{{ summary.property_count }}</div><div class="label">Properties</div></div>
-      <div class="stat"><div class="value">{{ summary.occupied_count }}</div><div class="label">Occupied</div></div>
-      <div class="stat"><div class="value">{{ summary.yield_display }}</div><div class="label">Portfolio Yield</div></div>
+<div class="card" style="margin-bottom:20px;">
+  <h3>Portfolio Summary</h3>
+  <div class="summary-hero">
+    <div class="summary-tile accent">
+      <div class="value">{{ summary.yield_display }}</div>
+      <div class="label">Portfolio Yield</div>
     </div>
-    <div class="stat-row">
-      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
-      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_renovation_costs) }}</div><div class="label">Total Renovation Costs</div></div>
-      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_invested) }}</div><div class="label">Total Invested</div></div>
+    <div class="summary-tile">
+      <div class="value">{{ rm.money(summary.total_invested) }}</div>
+      <div class="label">Total Invested</div>
+    </div>
+    <div class="summary-tile">
+      <div class="value">{{ summary.occupied_count }} / {{ summary.property_count }}</div>
+      <div class="label">Occupied Properties</div>
     </div>
   </div>
-  <div class="card">
-    <h3>Value</h3>
-    <div class="stat-row">
-      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_max_arv) }}</div><div class="label">Total Max ARV ({{ summary.properties_with_arv }} priced)</div></div>
-      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_estimated_value) }}</div><div class="label">Total Estimated Value ({{ summary.properties_with_estimated_value }} priced)</div></div>
-    </div>
-    <p class="muted" style="font-size:12px; margin-top:16px; margin-bottom:0;">Portfolio Yield is dollar-weighted: sum of each property's annualized net cash flow ÷ sum of Total Invested (across properties with at least one month recorded) - not a plain average of percentages.</p>
+  <div class="stat-row">
+    <div class="stat"><div class="value">{{ rm.money(summary.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
+    <div class="stat"><div class="value">{{ rm.money(summary.total_renovation_costs) }}</div><div class="label">Renovation &amp; Other</div></div>
+    <div class="stat"><div class="value">{{ rm.money(summary.total_max_arv) }}</div><div class="label">Total Max ARV ({{ summary.properties_with_arv }} priced)</div></div>
+    <div class="stat"><div class="value">{{ rm.money(summary.total_estimated_value) }}</div><div class="label">Total Estimated Value ({{ summary.properties_with_estimated_value }} priced)</div></div>
   </div>
+  <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Portfolio Yield is dollar-weighted: sum of each property's annualized net cash flow ÷ sum of Total Invested (across properties with at least one month recorded) - not a plain average of percentages.</p>
 </div>
 
 <div style="overflow-x:auto;">
@@ -42,12 +44,12 @@
   <thead>
     <tr>
       <th>Address</th>
-      <th>Zip / Region</th>
       <th>Purchase Price</th>
       <th>Renovation</th>
       <th>Total Invested</th>
       <th>Max ARV</th>
       <th>Estimated Value</th>
+      <th>Est. Profit</th>
       <th>Occupancy</th>
       <th>Yield</th>
     </tr>
@@ -57,13 +59,13 @@
     {% set py = property_yields[p.id] %}
     <tr>
       <td><a class="zip-link" href="/rentals/{{ p.id }}">{{ p.address }}</a></td>
-      <td class="muted">{% if p.zip_code %}{{ p.zip_code.zip_code }} ({{ p.zip_code.region_override or p.zip_code.region or "—" }}){% else %}—{% endif %}</td>
-      <td>${{ "%.0f"|format(p.total_purchase_price) }}</td>
-      <td>${{ "%.0f"|format(p.total_renovation_costs) }}</td>
-      <td>${{ "%.0f"|format(p.total_invested) }}</td>
-      <td>{{ ("$" ~ "%.0f"|format(p.max_arv)) if p.max_arv is not none else "—" }}</td>
-      <td>{{ ("$" ~ "%.0f"|format(p.estimated_value)) if p.estimated_value is not none else "—" }}</td>
-      <td>{% if p.is_occupied %}<span class="badge badge-active">${{ "%.0f"|format(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
+      <td>{{ rm.money(p.total_purchase_price) }}</td>
+      <td>{{ rm.money(p.total_renovation_costs) }}</td>
+      <td>{{ rm.money(p.total_invested) }}</td>
+      <td>{{ rm.money(p.max_arv) }}</td>
+      <td>{{ rm.money(p.estimated_value) }}</td>
+      <td style="color: {{ 'var(--green)' if p.estimated_profit and p.estimated_profit >= 0 else 'var(--red)' if p.estimated_profit else 'var(--text)' }};">{{ rm.money(p.estimated_profit) }}</td>
+      <td>{% if p.is_occupied %}<span class="badge badge-active">{{ rm.money(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
       <td>{{ py.display }}</td>
     </tr>
     {% else %}
@@ -73,12 +75,12 @@
   <tfoot>
     <tr>
       <td>Totals</td>
+      <td>{{ rm.money(summary.total_purchase_price) }}</td>
+      <td>{{ rm.money(summary.total_renovation_costs) }}</td>
+      <td>{{ rm.money(summary.total_invested) }}</td>
+      <td>{{ rm.money(summary.total_max_arv) }}</td>
+      <td>{{ rm.money(summary.total_estimated_value) }}</td>
       <td></td>
-      <td>${{ "%.0f"|format(summary.total_purchase_price) }}</td>
-      <td>${{ "%.0f"|format(summary.total_renovation_costs) }}</td>
-      <td>${{ "%.0f"|format(summary.total_invested) }}</td>
-      <td>${{ "%.0f"|format(summary.total_max_arv) }}</td>
-      <td>${{ "%.0f"|format(summary.total_estimated_value) }}</td>
       <td>{{ summary.occupied_count }} / {{ summary.property_count }}</td>
       <td>{{ summary.yield_display }}</td>
     </tr>
