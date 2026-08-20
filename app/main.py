@@ -619,6 +619,20 @@ def property_report(request: Request, property_id: int, db: Session = Depends(ge
         }
         for o in prop.owners
     ]
+    note_categories = [
+        ("utilities_note", "Utilities"),
+        ("insurance_note", "Insurance"),
+        ("repairs_note", "Repairs"),
+        ("management_fees_note", "Mgmt Fees"),
+        ("property_tax_note", "Prop. Tax"),
+        ("other_note", "Other"),
+    ]
+    month_notes = []
+    for m in months:
+        for field, label in note_categories:
+            note = getattr(m, field)
+            if note:
+                month_notes.append({"month": m.month.strftime("%b %Y"), "category": label, "note": note})
     return templates.TemplateResponse(
         "property_report.html",
         {
@@ -629,6 +643,7 @@ def property_report(request: Request, property_id: int, db: Session = Depends(ge
             "py": py,
             "cumulative_net_cash_flow": cumulative_net_cash_flow,
             "owner_shares": owner_shares,
+            "month_notes": month_notes,
             "generated_at": datetime.now().strftime("%B %d, %Y"),
         },
     )

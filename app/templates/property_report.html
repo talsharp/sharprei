@@ -115,6 +115,11 @@
   .detail-grid .k { color: var(--muted); }
   .detail-grid .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
 
+  .notes-list { margin-top: 14px; font-size: 12px; }
+  .note-entry { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .note-entry strong { display: block; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  .note-entry span { white-space: pre-line; }
+
   footer.report-footer {
     margin-top: 40px;
     padding-top: 16px;
@@ -256,12 +261,12 @@
         <tr>
           <td>{{ m.month.strftime('%b %Y') }}</td>
           <td class="num">{{ rm.money(m.income) }}</td>
-          <td class="num">{{ rm.money(m.utilities) }}</td>
-          <td class="num">{{ rm.money(m.insurance) }}</td>
-          <td class="num">{{ rm.money(m.repairs) }}</td>
-          <td class="num">{{ rm.money(m.management_fees) }}</td>
-          <td class="num">{{ rm.money(m.property_tax) }}</td>
-          <td class="num">{{ rm.money(m.other) }}</td>
+          <td class="num" title="{{ m.utilities_note or '' }}">{{ rm.money(m.utilities) }}{{ "*" if m.utilities_note else "" }}</td>
+          <td class="num" title="{{ m.insurance_note or '' }}">{{ rm.money(m.insurance) }}{{ "*" if m.insurance_note else "" }}</td>
+          <td class="num" title="{{ m.repairs_note or '' }}">{{ rm.money(m.repairs) }}{{ "*" if m.repairs_note else "" }}</td>
+          <td class="num" title="{{ m.management_fees_note or '' }}">{{ rm.money(m.management_fees) }}{{ "*" if m.management_fees_note else "" }}</td>
+          <td class="num" title="{{ m.property_tax_note or '' }}">{{ rm.money(m.property_tax) }}{{ "*" if m.property_tax_note else "" }}</td>
+          <td class="num" title="{{ m.other_note or '' }}">{{ rm.money(m.other) }}{{ "*" if m.other_note else "" }}</td>
           <td class="num">{{ rm.money(m.total_expenses) }}</td>
           <td class="num {{ 'profit-up' if m.net_cash_flow >= 0 else 'profit-down' }}">{{ rm.money(m.net_cash_flow) }}</td>
         </tr>
@@ -277,6 +282,13 @@
         </tr>
       </tfoot>
     </table>
+    {% if month_notes %}
+    <div class="notes-list">
+      {% for n in month_notes %}
+      <div class="note-entry"><strong>{{ n.month }} — {{ n.category }}*</strong><span>{{ n.note }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </section>
   {% endif %}
 
