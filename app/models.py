@@ -176,6 +176,13 @@ class Property(Base):
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(
         back_populates="property_ref", cascade="all, delete-orphan"
     )
+    owners: Mapped[list["PropertyOwner"]] = relationship(
+        back_populates="property_ref", cascade="all, delete-orphan", order_by="PropertyOwner.id"
+    )
+
+    @property
+    def total_owner_percentage(self) -> float:
+        return sum(float(o.percentage) for o in self.owners)
 
     @property
     def total_purchase_price(self) -> float:
@@ -217,6 +224,17 @@ class RenovationExpense(Base):
     property_ref: Mapped[Property] = relationship(back_populates="renovation_expenses")
 
 
+class PropertyOwner(Base):
+    __tablename__ = "property_owners"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"))
+    name: Mapped[str] = mapped_column(String(150))
+    percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+
+    property_ref: Mapped[Property] = relationship(back_populates="owners")
+
+
 class MonthlyExpense(Base):
     __tablename__ = "monthly_expenses"
     __table_args__ = (UniqueConstraint("property_id", "month"),)
@@ -226,17 +244,17 @@ class MonthlyExpense(Base):
     month: Mapped[date] = mapped_column(Date)
     income: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     utilities: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    utilities_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    utilities_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     insurance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    insurance_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    insurance_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     repairs: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    repairs_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    repairs_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     management_fees: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    management_fees_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    management_fees_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     property_tax: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    property_tax_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    property_tax_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     other: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    other_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    other_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

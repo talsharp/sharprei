@@ -194,8 +194,8 @@ button.danger, .btn.danger { background: var(--red); }
 tr.editing .row-view { display: none; }
 .row-edit { display: none; }
 tr.editing .row-edit { display: inline-block; }
-.row-edit-inline { display: none; align-items: center; gap: 4px; }
-tr.editing .row-edit-inline { display: inline-flex; }
+.row-edit-block { display: none; }
+tr.editing .row-edit-block { display: block; }
 .row-edit-actions { display: none; gap: 6px; }
 tr.editing .row-edit-actions { display: inline-flex; }
 .month-actions, .reno-actions-cell { white-space: nowrap; }
@@ -206,7 +206,7 @@ tr.editing .row-edit-actions { display: inline-flex; }
   font-size: 13px; line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0;
 }
 .note-btn:hover { border-color: var(--accent); color: var(--text); }
-.note-input { width: 80px; font-size: 11px; padding: 4px 6px; }
+.note-input { width: 130px; font-size: 11px; padding: 4px 6px; margin-top: 4px; resize: vertical; font-family: inherit; }
 
 .summary-grid { display: flex; flex-direction: column; gap: 10px; }
 .summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }

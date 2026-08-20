@@ -5,7 +5,10 @@
 
 <div class="top-actions">
   <h2 style="margin:0;">{{ prop.address }} {% if prop.is_occupied %}<span class="badge badge-active">{{ rm.money(prop.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</h2>
-  <a class="btn secondary" href="/rentals">Back to portfolio</a>
+  <div style="display:flex; gap:8px;">
+    <a class="btn secondary" href="/rentals/{{ prop.id }}/report" target="_blank">Export Report</a>
+    <a class="btn secondary" href="/rentals">Back to portfolio</a>
+  </div>
 </div>
 
 <div class="grid-2">
@@ -90,7 +93,7 @@
       <div class="summary-row">
         <div class="summary-tile">
           <div class="value">{{ rm.money(py.total_expenses) }}</div>
-          <div class="label">All-Time Expenses</div>
+          <div class="label">Operational Costs</div>
         </div>
         <div class="summary-tile">
           <div class="value">{{ rm.money(py.total_income) }}</div>
@@ -108,6 +111,33 @@
     </div>
     <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost.</p>
   </div>
+</div>
+
+<div class="card">
+  <h3>Owners</h3>
+  <p class="muted" style="margin-top:-8px; font-size:13px;">Ownership split, shown on the investor report.</p>
+  <div class="pill-list" style="margin-bottom:10px; align-items:center;">
+    {% for o in prop.owners %}
+    <span class="btn secondary" style="padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+      {{ o.name }} <strong>{{ "%.0f"|format(o.percentage) }}%</strong>
+      <form method="post" action="/rentals/{{ prop.id }}/owners/{{ o.id }}/delete" style="display:inline;">
+        <button type="submit" class="danger" style="padding:2px 6px; font-size:11px;">✕</button>
+      </form>
+    </span>
+    {% else %}
+    <span class="muted">No owners added yet</span>
+    {% endfor %}
+  </div>
+  {% if prop.owners %}
+  <p class="muted" style="font-size:12px; margin-bottom:10px; {{ 'color: var(--red);' if prop.total_owner_percentage != 100 else '' }}">
+    Total allocated: {{ "%.0f"|format(prop.total_owner_percentage) }}%{% if prop.total_owner_percentage != 100 %} (doesn't add up to 100%){% endif %}
+  </p>
+  {% endif %}
+  <form method="post" action="/rentals/{{ prop.id }}/owners/new" style="display:flex; gap:8px; align-items:flex-end;">
+    <div class="form-row" style="margin-bottom:0;"><label>Name</label><input type="text" name="name" placeholder="e.g. Tal Perry" required></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Percentage (%)</label><input type="number" step="any" name="percentage" value="0" style="width:90px;"></div>
+    <button type="submit">Add Owner</button>
+  </form>
 </div>
 
 <div class="card">
@@ -178,10 +208,11 @@ function toggleRowEdit(prefix, id) {
   document.getElementById(prefix + '-' + id).classList.toggle('editing');
 }
 function toggleNoteInput(btn) {
-  var input = btn.nextElementSibling;
+  var input = btn.closest('.row-edit-block').querySelector('.note-input');
   var open = input.style.display !== 'none';
-  input.style.display = open ? 'none' : 'inline-block';
+  input.style.display = open ? 'none' : 'block';
   btn.textContent = open ? '+' : '−';
+  if (!open) input.focus();
 }
 </script>
 

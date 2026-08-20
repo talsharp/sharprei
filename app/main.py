@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import markdown as md
@@ -36,6 +36,7 @@ from app.models import (
     MonthlyExpense,
     Neighborhood,
     Property,
+    PropertyOwner,
     RenovationExpense,
     RunType,
     ZipCode,
@@ -600,6 +601,39 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
     )
 
 
+@app.get("/rentals/{property_id}/report")
+def property_report(request: Request, property_id: int, db: Session = Depends(get_db)):
+    prop = db.get(Property, property_id)
+    if not prop:
+        return RedirectResponse("/rentals", status_code=303)
+    months = sorted(prop.monthly_expenses, key=lambda m: m.month)
+    renovations = sorted(prop.renovation_expenses, key=lambda r: r.created_at)
+    py = get_property_yield(prop)
+    cumulative_net_cash_flow = py.total_income - py.total_expenses
+    owner_shares = [
+        {
+            "name": o.name,
+            "percentage": float(o.percentage),
+            "profit_share": (prop.estimated_profit * float(o.percentage) / 100) if prop.estimated_profit is not None else None,
+            "cash_flow_share": cumulative_net_cash_flow * float(o.percentage) / 100,
+        }
+        for o in prop.owners
+    ]
+    return templates.TemplateResponse(
+        "property_report.html",
+        {
+            "request": request,
+            "prop": prop,
+            "months": months,
+            "renovations": renovations,
+            "py": py,
+            "cumulative_net_cash_flow": cumulative_net_cash_flow,
+            "owner_shares": owner_shares,
+            "generated_at": datetime.now().strftime("%B %d, %Y"),
+        },
+    )
+
+
 @app.post("/rentals/{property_id}/update")
 def update_property(
     property_id: int,
@@ -629,6 +663,34 @@ def update_property(
     prop.account_balance = float(account_balance) if account_balance.strip() else None
     prop.notes = notes
     db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/owners/new")
+def add_owner(
+    property_id: int,
+    name: str = Form(...),
+    percentage: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    name = name.strip()
+    if name:
+        owner = PropertyOwner(
+            property_id=property_id,
+            name=name,
+            percentage=float(percentage) if percentage.strip() else 0,
+        )
+        db.add(owner)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/owners/{owner_id}/delete")
+def delete_owner(property_id: int, owner_id: int, db: Session = Depends(get_db)):
+    owner = db.get(PropertyOwner, owner_id)
+    if owner and owner.property_id == property_id:
+        db.delete(owner)
+        db.commit()
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 

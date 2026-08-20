@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investment Report — {{ prop.address }}</title>
+{% import "_rentals_macros.html" as rm %}
+<style>
+  :root {
+    --ink: #1a1f2b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --panel: #f8fafc;
+    --accent: #2952a3;
+    --green: #1a7f37;
+    --red: #c53030;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+  }
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 40px 60px;
+  }
+  .toolbar {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 16px 40px 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .print-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  header.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 16px;
+    margin-bottom: 28px;
+  }
+  header.report-header h1 {
+    font-size: 26px;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  header.report-header .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  header.report-header .meta {
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-top: 6px;
+  }
+  .status-occupied { background: #e6f4ea; color: var(--green); }
+  .status-vacant { background: #f1f3f5; color: var(--muted); }
+
+  section { margin-bottom: 32px; page-break-inside: avoid; }
+  section h2 {
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+
+  .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tile {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .tile .value { font-size: 19px; font-weight: 700; }
+  .tile .label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .tile.accent { border-color: var(--accent); background: #eef2fb; }
+  .tile.accent .value { font-size: 22px; color: var(--accent); }
+  .profit-up { color: var(--green); }
+  .profit-down { color: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tfoot td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: none; }
+  .num { text-align: right; white-space: nowrap; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 13px; }
+  .detail-grid .k { color: var(--muted); }
+  .detail-grid .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  @media print {
+    .toolbar { display: none; }
+    body { padding: 0; }
+    .page { padding: 0 20px; max-width: none; }
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="page">
+
+  <header class="report-header">
+    <div>
+      <div class="subtitle">Investment Report</div>
+      <h1>{{ prop.address }}</h1>
+      {% if prop.is_occupied %}
+      <span class="status-badge status-occupied">Occupied — {{ rm.money(prop.rent_price) }}/mo</span>
+      {% else %}
+      <span class="status-badge status-vacant">Not Occupied</span>
+      {% endif %}
+    </div>
+    <div class="meta">
+      Prepared {{ generated_at }}<br>
+      {% if prop.purchase_date %}Purchased {{ prop.purchase_date.strftime('%B %d, %Y') }}{% endif %}
+    </div>
+  </header>
+
+  {% if prop.owners %}
+  <section>
+    <h2>Ownership</h2>
+    <table>
+      <thead><tr><th>Owner</th><th class="num">Percentage</th></tr></thead>
+      <tbody>
+        {% for o in prop.owners %}
+        <tr><td>{{ o.name }}</td><td class="num">{{ "%.0f"|format(o.percentage) }}%</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td>Total</td><td class="num">{{ "%.0f"|format(prop.total_owner_percentage) }}%</td></tr>
+      </tfoot>
+    </table>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Investment Summary</h2>
+    <div class="tile-grid" style="margin-bottom:12px;">
+      <div class="tile"><div class="value">{{ rm.money(prop.total_purchase_price) }}</div><div class="label">Purchase Price</div></div>
+      <div class="tile"><div class="value">{{ rm.money(prop.total_renovation_costs) }}</div><div class="label">Renovation</div></div>
+      <div class="tile"><div class="value">{{ rm.money(prop.estimated_value) }}</div><div class="label">Est. Value</div></div>
+    </div>
+    <div class="tile-grid" style="margin-bottom:12px;">
+      <div class="tile"><div class="value">{{ rm.money(prop.total_invested) }}</div><div class="label">All-In Cost</div></div>
+      <div class="tile"><div class="value">{{ rm.money(prop.max_arv) }}</div><div class="label">Max ARV</div></div>
+      <div class="tile"><div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money(prop.estimated_profit) }}</div><div class="label">Est. Profit</div></div>
+    </div>
+    <div class="tile-grid">
+      <div class="tile"><div class="value">{{ rm.money(py.total_expenses) }}</div><div class="label">Operational Costs</div></div>
+      <div class="tile"><div class="value">{{ rm.money(py.total_income) }}</div><div class="label">Rent Collected</div></div>
+      <div class="tile accent"><div class="value {{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</div><div class="label">Cash-on-Cash Yield</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Property Overview</h2>
+    <div class="detail-grid">
+      <div class="row"><span class="k">Purchase Price</span><span>{{ rm.money(prop.purchase_price) }}</span></div>
+      <div class="row"><span class="k">Closing Costs</span><span>{{ rm.money(prop.closing_costs) }}</span></div>
+      <div class="row"><span class="k">Purchase Date</span><span>{{ prop.purchase_date.strftime('%B %d, %Y') if prop.purchase_date else "—" }}</span></div>
+      <div class="row"><span class="k">Tenant Move-in</span><span>{{ prop.tenant_move_in_date.strftime('%B %d, %Y') if prop.tenant_move_in_date else "—" }}</span></div>
+      <div class="row"><span class="k">Months Recorded</span><span>{{ py.months_recorded }}</span></div>
+      <div class="row"><span class="k">Cumulative Net Cash Flow</span><span class="{{ 'profit-up' if cumulative_net_cash_flow >= 0 else 'profit-down' }}">{{ rm.money(cumulative_net_cash_flow) }}</span></div>
+    </div>
+  </section>
+
+  {% if owner_shares %}
+  <section>
+    <h2>Ownership Distribution</h2>
+    <table>
+      <thead><tr><th>Owner</th><th class="num">Share</th><th class="num">Est. Profit Share</th><th class="num">Cash Flow Share</th></tr></thead>
+      <tbody>
+        {% for o in owner_shares %}
+        <tr>
+          <td>{{ o.name }}</td>
+          <td class="num">{{ "%.0f"|format(o.percentage) }}%</td>
+          <td class="num {{ 'profit-up' if o.profit_share and o.profit_share >= 0 else 'profit-down' if o.profit_share else '' }}">{{ rm.money(o.profit_share) }}</td>
+          <td class="num {{ 'profit-up' if o.cash_flow_share >= 0 else 'profit-down' }}">{{ rm.money(o.cash_flow_share) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if renovations %}
+  <section>
+    <h2>Renovation Expenses</h2>
+    <table>
+      <thead><tr><th>Description</th><th>Contractor</th><th class="num">Cost</th></tr></thead>
+      <tbody>
+        {% for r in renovations %}
+        <tr><td>{{ r.description }}</td><td>{{ r.contractor or "—" }}</td><td class="num">{{ rm.money(r.cost) }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="2">Total</td><td class="num">{{ rm.money(prop.total_renovation_costs) }}</td></tr>
+      </tfoot>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if months %}
+  <section>
+    <h2>Monthly Performance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th><th class="num">Income</th><th class="num">Utilities</th><th class="num">Insurance</th>
+          <th class="num">Repairs</th><th class="num">Mgmt Fees</th><th class="num">Prop. Tax</th><th class="num">Other</th>
+          <th class="num">Expenses</th><th class="num">Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in months %}
+        <tr>
+          <td>{{ m.month.strftime('%b %Y') }}</td>
+          <td class="num">{{ rm.money(m.income) }}</td>
+          <td class="num">{{ rm.money(m.utilities) }}</td>
+          <td class="num">{{ rm.money(m.insurance) }}</td>
+          <td class="num">{{ rm.money(m.repairs) }}</td>
+          <td class="num">{{ rm.money(m.management_fees) }}</td>
+          <td class="num">{{ rm.money(m.property_tax) }}</td>
+          <td class="num">{{ rm.money(m.other) }}</td>
+          <td class="num">{{ rm.money(m.total_expenses) }}</td>
+          <td class="num {{ 'profit-up' if m.net_cash_flow >= 0 else 'profit-down' }}">{{ rm.money(m.net_cash_flow) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Total</td>
+          <td class="num">{{ rm.money(py.total_income) }}</td>
+          <td colspan="6"></td>
+          <td class="num">{{ rm.money(py.total_expenses) }}</td>
+          <td class="num {{ 'profit-up' if cumulative_net_cash_flow >= 0 else 'profit-down' }}">{{ rm.money(cumulative_net_cash_flow) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+  {% endif %}
+
+  <footer class="report-footer">
+    Investment report for {{ prop.address }}, generated {{ generated_at }}.
+  </footer>
+
+</div>
+</body>
+</html>
