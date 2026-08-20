@@ -29,6 +29,8 @@ class PropertyYield:
     avg_monthly_net_cash_flow: float = 0.0
     annual_net_cash_flow: float = 0.0
     total_invested: float = 0.0
+    total_income: float = 0.0
+    total_expenses: float = 0.0
     yield_pct: Optional[float] = None
 
     @property
@@ -39,8 +41,15 @@ class PropertyYield:
 def get_property_yield(prop: Property) -> PropertyYield:
     months = prop.monthly_expenses
     total_invested = prop.total_invested
+    total_income = sum(float(m.income) for m in months)
+    total_expenses = sum(m.total_expenses for m in months)
     if not months or total_invested <= 0:
-        return PropertyYield(months_recorded=len(months), total_invested=total_invested)
+        return PropertyYield(
+            months_recorded=len(months),
+            total_invested=total_invested,
+            total_income=total_income,
+            total_expenses=total_expenses,
+        )
 
     avg_monthly = sum(m.net_cash_flow for m in months) / len(months)
     annual = avg_monthly * 12
@@ -49,6 +58,8 @@ def get_property_yield(prop: Property) -> PropertyYield:
         avg_monthly_net_cash_flow=avg_monthly,
         annual_net_cash_flow=annual,
         total_invested=total_invested,
+        total_income=total_income,
+        total_expenses=total_expenses,
         yield_pct=(annual / total_invested) * 100,
     )
 

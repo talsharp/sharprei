@@ -730,7 +730,6 @@ def add_monthly_expense(
     management_fees: str = Form("0"),
     property_tax: str = Form("0"),
     other: str = Form("0"),
-    notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
     prop = db.get(Property, property_id)
@@ -754,7 +753,6 @@ def add_monthly_expense(
                 management_fees=float(management_fees) if management_fees.strip() else 0,
                 property_tax=float(property_tax) if property_tax.strip() else 0,
                 other=float(other) if other.strip() else 0,
-                notes=notes,
             )
             db.add(entry)
             db.commit()
@@ -774,24 +772,34 @@ def update_monthly_expense(
     request: Request,
     income: str = Form("0"),
     utilities: str = Form("0"),
+    utilities_note: str = Form(""),
     insurance: str = Form("0"),
+    insurance_note: str = Form(""),
     repairs: str = Form("0"),
+    repairs_note: str = Form(""),
     management_fees: str = Form("0"),
+    management_fees_note: str = Form(""),
     property_tax: str = Form("0"),
+    property_tax_note: str = Form(""),
     other: str = Form("0"),
-    notes: str = Form(""),
+    other_note: str = Form(""),
     db: Session = Depends(get_db),
 ):
     entry = db.get(MonthlyExpense, month_id)
     if entry and entry.property_id == property_id:
         entry.income = float(income) if income.strip() else 0
         entry.utilities = float(utilities) if utilities.strip() else 0
+        entry.utilities_note = utilities_note.strip() or None
         entry.insurance = float(insurance) if insurance.strip() else 0
+        entry.insurance_note = insurance_note.strip() or None
         entry.repairs = float(repairs) if repairs.strip() else 0
+        entry.repairs_note = repairs_note.strip() or None
         entry.management_fees = float(management_fees) if management_fees.strip() else 0
+        entry.management_fees_note = management_fees_note.strip() or None
         entry.property_tax = float(property_tax) if property_tax.strip() else 0
+        entry.property_tax_note = property_tax_note.strip() or None
         entry.other = float(other) if other.strip() else 0
-        entry.notes = notes
+        entry.other_note = other_note.strip() or None
         db.commit()
 
     if _is_htmx(request) and entry:

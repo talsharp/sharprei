@@ -58,63 +58,92 @@
 
   <div class="card">
     <h3>Investment Summary</h3>
-    <div class="summary-hero">
-      <div class="summary-tile accent">
-        <div class="value">{{ py.display }}</div>
-        <div class="label">Cash-on-Cash Yield</div>
+    <div class="summary-grid">
+      <div class="summary-tile">
+        <div class="value">{{ rm.money(prop.total_purchase_price) }}</div>
+        <div class="label">Total Purchase Price</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value">{{ rm.money(prop.total_renovation_costs) }}</div>
+        <div class="label">Renovation</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value">{{ rm.money(prop.estimated_value) }}</div>
+        <div class="label">Estimated Value</div>
       </div>
       <div class="summary-tile">
         <div class="value">{{ rm.money(prop.total_invested) }}</div>
-        <div class="label">Total Invested</div>
+        <div class="label">All-In Cost</div>
       </div>
       <div class="summary-tile">
-        <div class="value" style="color: {{ 'var(--green)' if prop.estimated_profit and prop.estimated_profit >= 0 else 'var(--red)' if prop.estimated_profit else 'var(--text)' }};">{{ rm.money(prop.estimated_profit) }}</div>
+        <div class="value">{{ rm.money(prop.max_arv) }}</div>
+        <div class="label">Max ARV</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money(prop.estimated_profit) }}</div>
         <div class="label">Est. Profit (Appreciation)</div>
       </div>
+      <div class="summary-tile">
+        <div class="value">{{ rm.money(py.total_expenses) }}</div>
+        <div class="label">Total Expenses (all-time)</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value">{{ rm.money(py.total_income) }}</div>
+        <div class="label">Total Rent Collected</div>
+      </div>
+      <div class="summary-tile accent">
+        <div class="value {{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</div>
+        <div class="label">Cash-on-Cash Yield</div>
+      </div>
     </div>
-    <div class="stat-row" style="margin-bottom:14px;">
-      <div class="stat"><div class="value">{{ rm.money(prop.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
-      <div class="stat"><div class="value">{{ rm.money(prop.total_renovation_costs) }}</div><div class="label">Renovation &amp; Other</div></div>
+    <div class="stat-row" style="margin-top:14px;">
+      <div class="stat"><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
       <div class="stat"><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
     </div>
-    <div class="stat-row" style="margin-bottom:14px;">
-      <div class="stat"><div class="value">{{ rm.money(prop.max_arv) }}</div><div class="label">Max ARV</div></div>
-      <div class="stat"><div class="value">{{ rm.money(prop.estimated_value) }}</div><div class="label">Estimated Value</div></div>
-      <div class="stat"><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
-    </div>
-    <p class="muted" style="font-size:12px; margin-bottom:0;">Yield = average monthly (income − expenses) across all recorded months, annualized, ÷ Total Invested. Est. Profit = Estimated Value − Total Invested.</p>
+    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost.</p>
   </div>
 </div>
 
 <div class="card">
-  <h3>Renovation &amp; Other Expenses</h3>
-  <p class="muted" style="margin-top:-8px; font-size:13px;">Any one-time cost from buying the property - renovation, inspection, initial insurance, whatever. Click ▸ for notes/files. Counted in Total Invested.</p>
-  <div id="reno-list">
-    {% for r in renovations %}{{ rm.renovation_row(r, prop) }}{% endfor %}
+  <h3 style="cursor:pointer; user-select:none;" onclick="var el=document.getElementById('reno-body'); var open = el.style.display !== 'none'; el.style.display = open ? 'none' : 'block'; document.getElementById('reno-arrow').textContent = open ? '▸' : '▾';">
+    <span id="reno-arrow" class="section-toggle">▸</span> Renovation
+    <span class="muted" style="font-size:13px; font-weight:400;">({{ rm.money(prop.total_renovation_costs) }} across {{ renovations|length }} item{{ "s" if renovations|length != 1 else "" }})</span>
+  </h3>
+  <div id="reno-body" style="display:none;">
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Description</th><th>Cost</th><th>Contractor</th><th>Notes</th><th>File</th><th></th></tr>
+      </thead>
+      <tbody id="reno-list">
+        {% for r in renovations %}{{ rm.renovation_row(r, prop) }}{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if not renovations %}<p class="muted" id="reno-empty" style="text-align:center; padding:12px;">No renovation expenses logged yet</p>{% endif %}
+    <form id="reno-add-form" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:14px;"
+      hx-post="/rentals/{{ prop.id }}/renovations/new" hx-target="#reno-list" hx-swap="beforeend"
+      hx-encoding="multipart/form-data"
+      hx-on::after-request="if(event.detail.successful){this.reset(); var e=document.getElementById('reno-empty'); if(e) e.remove();}">
+      <div class="form-row" style="margin-bottom:0;"><label>Description</label><input type="text" name="description" placeholder="e.g. Roof replacement" required></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Cost ($)</label><input type="number" step="any" name="cost" value="0" style="width:110px;"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Contractor</label><input type="text" name="contractor" placeholder="optional"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="optional"></div>
+      <div class="form-row" style="margin-bottom:0;"><label>File</label><input type="file" name="file"></div>
+      <button type="submit">Add Expense</button>
+    </form>
   </div>
-  {% if not renovations %}<p class="muted" id="reno-empty" style="text-align:center; padding:12px;">No expenses logged yet</p>{% endif %}
-  <form id="reno-add-form" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:14px;"
-    hx-post="/rentals/{{ prop.id }}/renovations/new" hx-target="#reno-list" hx-swap="beforeend"
-    hx-encoding="multipart/form-data"
-    hx-on::after-request="if(event.detail.successful){this.reset(); var e=document.getElementById('reno-empty'); if(e) e.remove();}">
-    <div class="form-row" style="margin-bottom:0;"><label>Description</label><input type="text" name="description" placeholder="e.g. Roof replacement, Inspection" required></div>
-    <div class="form-row" style="margin-bottom:0;"><label>Cost ($)</label><input type="number" step="any" name="cost" value="0" style="width:110px;"></div>
-    <div class="form-row" style="margin-bottom:0;"><label>Contractor</label><input type="text" name="contractor" placeholder="optional"></div>
-    <div class="form-row" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="optional"></div>
-    <div class="form-row" style="margin-bottom:0;"><label>File</label><input type="file" name="file"></div>
-    <button type="submit">Add Expense</button>
-  </form>
 </div>
 
 <div class="card">
   <h3>Monthly Performance</h3>
-  <p class="muted" style="margin-top:-8px;">Click Edit on a row to change it. Hover a row to see its note.</p>
+  <p class="muted" style="margin-top:-8px;">Click Edit on a row to change it. Hover an expense to see its note (add one via Edit).</p>
   <div style="overflow-x:auto; margin-bottom:16px;">
   <table>
     <thead>
       <tr>
         <th>Month</th><th>Income</th><th>Utilities</th><th>Insurance</th><th>Repairs</th>
-        <th>Mgmt Fees</th><th>Property Tax</th><th>Other</th><th>Total Expenses</th><th>Net Cash Flow</th><th>Note</th><th></th>
+        <th>Mgmt Fees</th><th>Property Tax</th><th>Other</th><th>Total Expenses</th><th>Net Cash Flow</th><th></th>
       </tr>
     </thead>
     <tbody id="month-list">
@@ -134,16 +163,13 @@
     <div class="form-row" style="margin-bottom:0;"><label>Mgmt Fees</label><input type="number" step="any" name="management_fees" value="0" style="width:80px;"></div>
     <div class="form-row" style="margin-bottom:0;"><label>Property Tax</label><input type="number" step="any" name="property_tax" value="0" style="width:80px;"></div>
     <div class="form-row" style="margin-bottom:0;"><label>Other</label><input type="number" step="any" name="other" value="0" style="width:80px;"></div>
-    <div class="form-row" style="margin-bottom:0;"><label>Note</label><input type="text" name="notes" placeholder="optional"></div>
     <button type="submit">Add Month</button>
   </form>
 </div>
 
 <script>
-function toggleMonthEdit(id, editing) {
-  var row = document.getElementById('month-' + id);
-  row.querySelectorAll('.month-view').forEach(function(el) { el.style.display = editing ? 'none' : (el.tagName === 'SPAN' ? 'inline-flex' : ''); });
-  row.querySelectorAll('.month-edit').forEach(function(el) { el.style.display = editing ? '' : 'none'; });
+function toggleRowEdit(prefix, id) {
+  document.getElementById(prefix + '-' + id).classList.toggle('editing');
 }
 </script>
 

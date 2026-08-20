@@ -189,15 +189,25 @@ button.danger, .btn.danger { background: var(--red); }
 .insights-result ul { padding-inline-start: 20px; }
 .insights-result li { margin-bottom: 6px; }
 
-.reno-item { border-bottom: 1px solid var(--border); padding: 10px 0; }
-.reno-item:last-child { border-bottom: none; }
-.reno-view { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.reno-toggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; }
-.reno-summary { flex: 1; min-width: 200px; }
-.reno-actions { display: flex; gap: 6px; margin-inline-start: auto; }
+.section-toggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px 0 0; }
 
-.summary-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
-.summary-tile { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
-.summary-tile .value { font-size: 24px; font-weight: 700; }
+tr.editing .row-view { display: none; }
+.row-edit { display: none; }
+tr.editing .row-edit { display: inline-block; }
+.row-edit-stack { display: none; flex-direction: column; gap: 3px; }
+.row-edit-stack input { width: 100%; box-sizing: border-box; }
+.row-edit-stack input[type=text] { font-size: 11px; padding: 4px 6px; }
+tr.editing .row-edit-stack { display: flex; }
+.row-edit-actions { display: none; gap: 6px; }
+tr.editing .row-edit-actions { display: inline-flex; }
+.month-actions, .reno-actions-cell { white-space: nowrap; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.summary-tile { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; }
+.summary-tile .value { font-size: 20px; font-weight: 700; }
 .summary-tile .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .summary-tile.accent { border-color: var(--accent); background: rgba(79,140,255,0.08); }
+.summary-tile.accent .value { font-size: 24px; }
+
+.profit-up { color: var(--green); }
+.profit-down { color: var(--red); }

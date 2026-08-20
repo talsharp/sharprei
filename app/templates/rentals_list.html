@@ -64,9 +64,9 @@
       <td>{{ rm.money(p.total_invested) }}</td>
       <td>{{ rm.money(p.max_arv) }}</td>
       <td>{{ rm.money(p.estimated_value) }}</td>
-      <td style="color: {{ 'var(--green)' if p.estimated_profit and p.estimated_profit >= 0 else 'var(--red)' if p.estimated_profit else 'var(--text)' }};">{{ rm.money(p.estimated_profit) }}</td>
+      <td class="{{ 'profit-up' if p.estimated_profit and p.estimated_profit >= 0 else 'profit-down' if p.estimated_profit else '' }}">{{ rm.money(p.estimated_profit) }}</td>
       <td>{% if p.is_occupied %}<span class="badge badge-active">{{ rm.money(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
-      <td>{{ py.display }}</td>
+      <td class="{{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</td>
     </tr>
     {% else %}
     <tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
