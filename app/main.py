@@ -4,7 +4,7 @@ import markdown as md
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -31,11 +31,21 @@ from app.models import (
     CampaignRun,
     Deal,
     ImportBatch,
+    MonthlyExpense,
     Neighborhood,
+    Property,
+    RenovationExpense,
     RunType,
     ZipCode,
     ZipNeighborhood,
     ZipStatus,
+)
+from app.rentals import (
+    RENOVATION_UPLOAD_DIR,
+    get_portfolio_summary,
+    get_properties,
+    get_property_yield,
+    save_renovation_file,
 )
 
 app = FastAPI(title="AAA Houses - SMS")
@@ -522,3 +532,219 @@ def insights_run(request: Request, db: Session = Depends(get_db)):
             "error": error,
         },
     )
+
+
+@app.get("/rentals")
+def rentals_list(request: Request, db: Session = Depends(get_db)):
+    properties = get_properties(db)
+    summary = get_portfolio_summary(properties)
+    property_yields = {p.id: get_property_yield(p) for p in properties}
+    return templates.TemplateResponse(
+        "rentals_list.html",
+        {
+            "request": request,
+            "active": "rentals",
+            "properties": properties,
+            "summary": summary,
+            "property_yields": property_yields,
+        },
+    )
+
+
+@app.post("/rentals/new")
+def create_property(address: str = Form(...), db: Session = Depends(get_db)):
+    address = address.strip()
+    if address:
+        prop = Property(address=address)
+        db.add(prop)
+        db.commit()
+        db.refresh(prop)
+        return RedirectResponse(f"/rentals/{prop.id}", status_code=303)
+    return RedirectResponse("/rentals", status_code=303)
+
+
+@app.get("/rentals/{property_id}")
+def property_detail(request: Request, property_id: int, db: Session = Depends(get_db)):
+    prop = db.get(Property, property_id)
+    if not prop:
+        return RedirectResponse("/rentals", status_code=303)
+    months = sorted(prop.monthly_expenses, key=lambda m: m.month, reverse=True)
+    renovations = sorted(
+        prop.renovation_expenses, key=lambda r: r.expense_date or date.min, reverse=True
+    )
+    py = get_property_yield(prop)
+    all_zips = db.query(ZipCode).order_by(ZipCode.zip_code).all()
+    return templates.TemplateResponse(
+        "property_detail.html",
+        {
+            "request": request,
+            "active": "rentals",
+            "prop": prop,
+            "months": months,
+            "renovations": renovations,
+            "py": py,
+            "all_zips": all_zips,
+            "today": date.today().isoformat(),
+            "this_month": date.today().replace(day=1).strftime("%Y-%m"),
+        },
+    )
+
+
+@app.post("/rentals/{property_id}/update")
+def update_property(
+    property_id: int,
+    address: str = Form(...),
+    zip_code_id: str = Form(""),
+    purchase_price: str = Form("0"),
+    closing_costs: str = Form("0"),
+    purchase_date: str = Form(""),
+    max_arv: str = Form(""),
+    estimated_value: str = Form(""),
+    rent_price: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    prop = db.get(Property, property_id)
+    prop.address = address.strip()
+    prop.zip_code_id = int(zip_code_id) if zip_code_id.strip() else None
+    prop.purchase_price = float(purchase_price) if purchase_price.strip() else 0
+    prop.closing_costs = float(closing_costs) if closing_costs.strip() else 0
+    prop.purchase_date = date.fromisoformat(purchase_date) if purchase_date.strip() else None
+    prop.max_arv = float(max_arv) if max_arv.strip() else None
+    prop.estimated_value = float(estimated_value) if estimated_value.strip() else None
+    prop.rent_price = float(rent_price) if rent_price.strip() else None
+    prop.notes = notes
+    db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/renovations/new")
+async def add_renovation_expense(property_id: int, request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    description = (form.get("description") or "").strip()
+    cost = form.get("cost") or "0"
+    expense_date = form.get("expense_date") or ""
+    notes = form.get("notes") or ""
+    upload = form.get("file")
+
+    file_path = None
+    file_original_name = None
+    if upload is not None and getattr(upload, "filename", None):
+        content = await upload.read()
+        if content:
+            file_path = save_renovation_file(upload.filename, content)
+            file_original_name = upload.filename
+
+    if description:
+        expense = RenovationExpense(
+            property_id=property_id,
+            description=description,
+            cost=float(cost) if cost.strip() else 0,
+            expense_date=date.fromisoformat(expense_date) if expense_date.strip() else None,
+            notes=notes,
+            file_path=file_path,
+            file_original_name=file_original_name,
+        )
+        db.add(expense)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/renovations/{expense_id}/delete")
+def delete_renovation_expense(property_id: int, expense_id: int, db: Session = Depends(get_db)):
+    expense = db.get(RenovationExpense, expense_id)
+    if expense and expense.property_id == property_id:
+        db.delete(expense)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.get("/rentals/{property_id}/renovations/{expense_id}/file")
+def download_renovation_file(property_id: int, expense_id: int, db: Session = Depends(get_db)):
+    expense = db.get(RenovationExpense, expense_id)
+    if not expense or expense.property_id != property_id or not expense.file_path:
+        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+    file_path = RENOVATION_UPLOAD_DIR / expense.file_path
+    if not file_path.exists():
+        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+    return FileResponse(file_path, filename=expense.file_original_name or expense.file_path)
+
+
+@app.post("/rentals/{property_id}/months/new")
+def add_monthly_expense(
+    property_id: int,
+    month: str = Form(...),
+    income: str = Form(""),
+    utilities: str = Form("0"),
+    insurance: str = Form("0"),
+    repairs: str = Form("0"),
+    management_fees: str = Form("0"),
+    property_tax: str = Form("0"),
+    other: str = Form("0"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    prop = db.get(Property, property_id)
+    month_date = parse_month(month)
+    if month_date == UNSET_DATE:
+        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+    existing = (
+        db.query(MonthlyExpense)
+        .filter(MonthlyExpense.property_id == property_id, MonthlyExpense.month == month_date)
+        .first()
+    )
+    if existing:
+        return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+    income_val = float(income) if income.strip() else (float(prop.rent_price) if prop.rent_price else 0)
+    entry = MonthlyExpense(
+        property_id=property_id,
+        month=month_date,
+        income=income_val,
+        utilities=float(utilities) if utilities.strip() else 0,
+        insurance=float(insurance) if insurance.strip() else 0,
+        repairs=float(repairs) if repairs.strip() else 0,
+        management_fees=float(management_fees) if management_fees.strip() else 0,
+        property_tax=float(property_tax) if property_tax.strip() else 0,
+        other=float(other) if other.strip() else 0,
+        notes=notes,
+    )
+    db.add(entry)
+    db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/months/{month_id}/update")
+def update_monthly_expense(
+    property_id: int,
+    month_id: int,
+    income: str = Form("0"),
+    utilities: str = Form("0"),
+    insurance: str = Form("0"),
+    repairs: str = Form("0"),
+    management_fees: str = Form("0"),
+    property_tax: str = Form("0"),
+    other: str = Form("0"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    entry = db.get(MonthlyExpense, month_id)
+    if entry and entry.property_id == property_id:
+        entry.income = float(income) if income.strip() else 0
+        entry.utilities = float(utilities) if utilities.strip() else 0
+        entry.insurance = float(insurance) if insurance.strip() else 0
+        entry.repairs = float(repairs) if repairs.strip() else 0
+        entry.management_fees = float(management_fees) if management_fees.strip() else 0
+        entry.property_tax = float(property_tax) if property_tax.strip() else 0
+        entry.other = float(other) if other.strip() else 0
+        entry.notes = notes
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)
+
+
+@app.post("/rentals/{property_id}/months/{month_id}/delete")
+def delete_monthly_expense(property_id: int, month_id: int, db: Session = Depends(get_db)):
+    entry = db.get(MonthlyExpense, month_id)
+    if entry and entry.property_id == property_id:
+        db.delete(entry)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}", status_code=303)

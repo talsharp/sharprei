@@ -149,3 +149,100 @@ class Deal(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     campaign_run: Mapped[CampaignRun] = relationship(back_populates="deals")
+
+
+class Property(Base):
+    __tablename__ = "properties"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    address: Mapped[str] = mapped_column(String(255))
+    zip_code_id: Mapped[Optional[int]] = mapped_column(ForeignKey("zip_codes.id"), nullable=True)
+    purchase_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    closing_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    purchase_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    max_arv: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    estimated_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    rent_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    zip_code: Mapped[Optional[ZipCode]] = relationship()
+    renovation_expenses: Mapped[list["RenovationExpense"]] = relationship(
+        back_populates="property_ref", cascade="all, delete-orphan"
+    )
+    monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(
+        back_populates="property_ref", cascade="all, delete-orphan"
+    )
+
+    @property
+    def total_purchase_price(self) -> float:
+        return float(self.purchase_price) + float(self.closing_costs)
+
+    @property
+    def total_renovation_costs(self) -> float:
+        return sum(float(r.cost) for r in self.renovation_expenses)
+
+    @property
+    def total_invested(self) -> float:
+        return self.total_purchase_price + self.total_renovation_costs
+
+    @property
+    def is_occupied(self) -> bool:
+        return self.rent_price is not None and float(self.rent_price) > 0
+
+
+class RenovationExpense(Base):
+    __tablename__ = "renovation_expenses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"))
+    description: Mapped[str] = mapped_column(String(255))
+    cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    expense_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    file_original_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    property_ref: Mapped[Property] = relationship(back_populates="renovation_expenses")
+
+
+class MonthlyExpense(Base):
+    __tablename__ = "monthly_expenses"
+    __table_args__ = (UniqueConstraint("property_id", "month"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"))
+    month: Mapped[date] = mapped_column(Date)
+    income: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    utilities: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    insurance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    repairs: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    management_fees: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    property_tax: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    other: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    property_ref: Mapped[Property] = relationship(back_populates="monthly_expenses")
+
+    @property
+    def total_expenses(self) -> float:
+        return (
+            float(self.utilities)
+            + float(self.insurance)
+            + float(self.repairs)
+            + float(self.management_fees)
+            + float(self.property_tax)
+            + float(self.other)
+        )
+
+    @property
+    def net_cash_flow(self) -> float:
+        return float(self.income) - self.total_expenses

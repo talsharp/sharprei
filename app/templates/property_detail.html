@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}{{ prop.address }}{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <h2 style="margin:0;">{{ prop.address }} {% if prop.is_occupied %}<span class="badge badge-active">${{ "%.0f"|format(prop.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</h2>
+  <a class="btn secondary" href="/rentals">Back to portfolio</a>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Property Details</h3>
+    <form method="post" action="/rentals/{{ prop.id }}/update">
+      <div class="form-row">
+        <label>Address</label>
+        <input type="text" name="address" value="{{ prop.address }}" required>
+      </div>
+      <div class="form-row">
+        <label>Zip Code</label>
+        <select name="zip_code_id">
+          <option value="">— None —</option>
+          {% for z in all_zips %}
+          <option value="{{ z.id }}" {{ "selected" if prop.zip_code_id == z.id else "" }}>{{ z.zip_code }}{% if z.region_override or z.region %} ({{ z.region_override or z.region }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Purchase Price ($)</label>
+        <input type="number" step="1000" name="purchase_price" value="{{ prop.purchase_price }}">
+      </div>
+      <div class="form-row">
+        <label>Closing Costs ($)</label>
+        <input type="number" step="100" name="closing_costs" value="{{ prop.closing_costs }}">
+      </div>
+      <div class="form-row">
+        <label>Purchase Date</label>
+        <input type="date" name="purchase_date" value="{{ prop.purchase_date if prop.purchase_date else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Max ARV ($)</label>
+        <input type="number" step="1000" name="max_arv" value="{{ prop.max_arv if prop.max_arv is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Estimated Value ($)</label>
+        <input type="number" step="1000" name="estimated_value" value="{{ prop.estimated_value if prop.estimated_value is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Rent Price ($/mo) - leave blank if not occupied</label>
+        <input type="number" step="50" name="rent_price" value="{{ prop.rent_price if prop.rent_price is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea name="notes" rows="3">{{ prop.notes or "" }}</textarea>
+      </div>
+      <button type="submit">Save</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Investment Summary</h3>
+    <div class="stat-row" style="margin-bottom:16px;">
+      <div class="stat"><div class="value">${{ "%.0f"|format(prop.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
+      <div class="stat"><div class="value">${{ "%.0f"|format(prop.total_renovation_costs) }}</div><div class="label">Renovation Costs</div></div>
+      <div class="stat"><div class="value">${{ "%.0f"|format(prop.total_invested) }}</div><div class="label">Total Invested</div></div>
+    </div>
+    <div class="stat-row" style="margin-bottom:16px;">
+      <div class="stat"><div class="value">{{ ("$" ~ "%.0f"|format(prop.max_arv)) if prop.max_arv is not none else "—" }}</div><div class="label">Max ARV</div></div>
+      <div class="stat"><div class="value">{{ ("$" ~ "%.0f"|format(prop.estimated_value)) if prop.estimated_value is not none else "—" }}</div><div class="label">Estimated Value</div></div>
+    </div>
+    <div class="stat-row" style="margin-bottom:8px;">
+      <div class="stat"><div class="value">{{ py.display }}</div><div class="label">Cash-on-Cash Yield</div></div>
+      <div class="stat"><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
+    </div>
+    <p class="muted" style="font-size:12px; margin-bottom:0;">Yield = average monthly (income − expenses) across all recorded months, annualized, ÷ Total Invested. Updates as you add more months.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Renovation Expenses</h3>
+  <p class="muted" style="margin-top:-8px; font-size:13px;">Itemized rehab costs, each with an optional note and file (receipt, invoice, etc).</p>
+  <div style="overflow-x:auto; margin-bottom:16px;">
+  <table>
+    <thead>
+      <tr><th>Description</th><th>Cost</th><th>Date</th><th>Notes</th><th>File</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in renovations %}
+      <tr>
+        <td>{{ r.description }}</td>
+        <td>${{ "%.0f"|format(r.cost) }}</td>
+        <td>{{ r.expense_date if r.expense_date else "—" }}</td>
+        <td class="muted">{{ r.notes or "—" }}</td>
+        <td>
+          {% if r.file_path %}
+          <a class="btn secondary" style="padding:4px 10px; font-size:12px;" href="/rentals/{{ prop.id }}/renovations/{{ r.id }}/file">{{ r.file_original_name or "Download" }}</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/rentals/{{ prop.id }}/renovations/{{ r.id }}/delete">
+            <button type="submit" class="danger" style="padding:4px 8px; font-size:12px;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">No renovation expenses logged yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" action="/rentals/{{ prop.id }}/renovations/new" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+    <div class="form-row" style="margin-bottom:0;"><label>Description</label><input type="text" name="description" placeholder="e.g. Roof replacement" required></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Cost ($)</label><input type="number" step="1" name="cost" value="0" style="width:110px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Date</label><input type="date" name="expense_date" value="{{ today }}"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="optional"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>File</label><input type="file" name="file"></div>
+    <button type="submit">Add Expense</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Monthly Performance</h3>
+  <p class="muted" style="margin-top:-8px;">Every field below is editable in place - change a value and press Save on that row.</p>
+  {% for m in months %}
+  <form id="month-edit-{{ m.id }}" method="post" action="/rentals/{{ prop.id }}/months/{{ m.id }}/update" style="display:none;"></form>
+  {% endfor %}
+  <div style="overflow-x:auto; margin-bottom:16px;">
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th><th>Income</th><th>Utilities</th><th>Insurance</th><th>Repairs</th>
+        <th>Mgmt Fees</th><th>Property Tax</th><th>Other</th><th>Total Expenses</th><th>Net Cash Flow</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in months %}
+      <tr>
+        <td>{{ m.month.strftime('%B %Y') }}</td>
+        <td><input type="number" name="income" value="{{ m.income }}" form="month-edit-{{ m.id }}" style="width:80px;"></td>
+        <td><input type="number" name="utilities" value="{{ m.utilities }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td><input type="number" name="insurance" value="{{ m.insurance }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td><input type="number" name="repairs" value="{{ m.repairs }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td><input type="number" name="management_fees" value="{{ m.management_fees }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td><input type="number" name="property_tax" value="{{ m.property_tax }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td><input type="number" name="other" value="{{ m.other }}" form="month-edit-{{ m.id }}" style="width:75px;"></td>
+        <td>${{ "%.0f"|format(m.total_expenses) }}</td>
+        <td style="color: {{ 'var(--green)' if m.net_cash_flow >= 0 else 'var(--red)' }};">${{ "%.0f"|format(m.net_cash_flow) }}</td>
+        <td style="display:flex; gap:6px;">
+          <button type="submit" form="month-edit-{{ m.id }}" style="font-size:12px;">Save</button>
+          <form method="post" action="/rentals/{{ prop.id }}/months/{{ m.id }}/delete">
+            <button type="submit" class="danger" style="font-size:12px;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="muted" style="text-align:center; padding:20px;">No months recorded yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" action="/rentals/{{ prop.id }}/months/new" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+    <div class="form-row" style="margin-bottom:0;"><label>Month</label><input type="month" name="month" value="{{ this_month }}" required></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Income ($, blank = current rent)</label><input type="number" name="income" placeholder="{{ prop.rent_price|int if prop.rent_price else 0 }}" style="width:150px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Utilities</label><input type="number" name="utilities" value="0" style="width:80px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Insurance</label><input type="number" name="insurance" value="0" style="width:80px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Repairs</label><input type="number" name="repairs" value="0" style="width:80px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Mgmt Fees</label><input type="number" name="management_fees" value="0" style="width:80px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Property Tax</label><input type="number" name="property_tax" value="0" style="width:80px;"></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Other</label><input type="number" name="other" value="0" style="width:80px;"></div>
+    <button type="submit">Add Month</button>
+  </form>
+</div>
+
+{% endblock %}

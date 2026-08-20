@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Rentals{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 style="margin:0;">Rentals Portfolio</h2>
+    <p class="muted" style="margin-bottom:0; font-size:13px;">Purchased properties - fix &amp; hold. Click a property for month-by-month detail.</p>
+  </div>
+  <form method="post" action="/rentals/new" style="display:flex; gap:8px;">
+    <input type="text" name="address" placeholder="Add new property (address)" required style="width:260px;">
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card">
+    <h3>Portfolio Totals</h3>
+    <div class="stat-row" style="margin-bottom:16px;">
+      <div class="stat"><div class="value">{{ summary.property_count }}</div><div class="label">Properties</div></div>
+      <div class="stat"><div class="value">{{ summary.occupied_count }}</div><div class="label">Occupied</div></div>
+      <div class="stat"><div class="value">{{ summary.yield_display }}</div><div class="label">Portfolio Yield</div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
+      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_renovation_costs) }}</div><div class="label">Total Renovation Costs</div></div>
+      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_invested) }}</div><div class="label">Total Invested</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Value</h3>
+    <div class="stat-row">
+      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_max_arv) }}</div><div class="label">Total Max ARV ({{ summary.properties_with_arv }} priced)</div></div>
+      <div class="stat"><div class="value">${{ "%.0f"|format(summary.total_estimated_value) }}</div><div class="label">Total Estimated Value ({{ summary.properties_with_estimated_value }} priced)</div></div>
+    </div>
+    <p class="muted" style="font-size:12px; margin-top:16px; margin-bottom:0;">Portfolio Yield is dollar-weighted: sum of each property's annualized net cash flow ÷ sum of Total Invested (across properties with at least one month recorded) - not a plain average of percentages.</p>
+  </div>
+</div>
+
+<div style="overflow-x:auto;">
+<table class="sticky-table">
+  <thead>
+    <tr>
+      <th>Address</th>
+      <th>Zip / Region</th>
+      <th>Purchase Price</th>
+      <th>Renovation</th>
+      <th>Total Invested</th>
+      <th>Max ARV</th>
+      <th>Estimated Value</th>
+      <th>Occupancy</th>
+      <th>Yield</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in properties %}
+    {% set py = property_yields[p.id] %}
+    <tr>
+      <td><a class="zip-link" href="/rentals/{{ p.id }}">{{ p.address }}</a></td>
+      <td class="muted">{% if p.zip_code %}{{ p.zip_code.zip_code }} ({{ p.zip_code.region_override or p.zip_code.region or "—" }}){% else %}—{% endif %}</td>
+      <td>${{ "%.0f"|format(p.total_purchase_price) }}</td>
+      <td>${{ "%.0f"|format(p.total_renovation_costs) }}</td>
+      <td>${{ "%.0f"|format(p.total_invested) }}</td>
+      <td>{{ ("$" ~ "%.0f"|format(p.max_arv)) if p.max_arv is not none else "—" }}</td>
+      <td>{{ ("$" ~ "%.0f"|format(p.estimated_value)) if p.estimated_value is not none else "—" }}</td>
+      <td>{% if p.is_occupied %}<span class="badge badge-active">${{ "%.0f"|format(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
+      <td>{{ py.display }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td>Totals</td>
+      <td></td>
+      <td>${{ "%.0f"|format(summary.total_purchase_price) }}</td>
+      <td>${{ "%.0f"|format(summary.total_renovation_costs) }}</td>
+      <td>${{ "%.0f"|format(summary.total_invested) }}</td>
+      <td>${{ "%.0f"|format(summary.total_max_arv) }}</td>
+      <td>${{ "%.0f"|format(summary.total_estimated_value) }}</td>
+      <td>{{ summary.occupied_count }} / {{ summary.property_count }}</td>
+      <td>{{ summary.yield_display }}</td>
+    </tr>
+  </tfoot>
+</table>
+</div>
+
+{% endblock %}
