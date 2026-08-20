@@ -1,4 +1,6 @@
+import os
 from datetime import date
+from pathlib import Path
 
 import markdown as md
 import pandas as pd
@@ -72,6 +74,12 @@ templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["ZipStatus"] = ZipStatus
 templates.env.globals["TIER_ORDER"] = TIER_ORDER
 templates.env.globals["UNSET_DATE"] = UNSET_DATE
+# Cache-buster for /static assets: derived from style.css's own mtime, so the
+# browser always fetches fresh CSS after a deploy instead of serving a stale
+# cached copy until the user manually hard-refreshes.
+templates.env.globals["STATIC_VERSION"] = int(
+    os.path.getmtime(Path(__file__).resolve().parent / "static" / "style.css")
+)
 
 
 @app.on_event("startup")

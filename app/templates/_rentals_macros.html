@@ -1,11 +1,23 @@
 {% macro money(v) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v) }}{% endif %}{% endmacro %}
 
+{% macro note_field(form_id, field_name, note_name, value, note_value, width) %}
+<input type="number" step="any" name="{{ field_name }}" form="{{ form_id }}" value="{{ value }}" style="width:{{ width }};">
+<button type="button" class="note-btn" onclick="toggleNoteInput(this)">{{ '−' if note_value else '+' }}</button>
+<input type="text" name="{{ note_name }}" form="{{ form_id }}" value="{{ note_value or '' }}" placeholder="note" class="note-input" style="{{ '' if note_value else 'display:none;' }}">
+{% endmacro %}
+
 {% macro renovation_row(r, prop) %}
 <tr id="reno-{{ r.id }}" class="reno-row">
-  <td><span class="row-view">{{ r.description }}</span><input class="row-edit" type="text" name="description" form="reno-form-{{ r.id }}" value="{{ r.description }}" required style="width:150px;"></td>
-  <td><span class="row-view">{{ money(r.cost) }}</span><input class="row-edit" type="number" step="any" name="cost" form="reno-form-{{ r.id }}" value="{{ r.cost }}" style="width:90px;"></td>
-  <td><span class="row-view">{{ r.contractor or "—" }}</span><input class="row-edit" type="text" name="contractor" form="reno-form-{{ r.id }}" value="{{ r.contractor or '' }}" style="width:110px;"></td>
-  <td><span class="row-view">{{ r.notes or "—" }}</span><input class="row-edit" type="text" name="notes" form="reno-form-{{ r.id }}" value="{{ r.notes or '' }}" style="width:130px;"></td>
+  <td>
+    <span class="row-view" title="{{ r.notes or '' }}">{{ r.description }}</span>
+    <span class="row-edit-inline">
+      <input type="text" name="description" form="reno-form-{{ r.id }}" value="{{ r.description }}" required style="width:130px;">
+      <button type="button" class="note-btn" onclick="toggleNoteInput(this)">{{ '−' if r.notes else '+' }}</button>
+      <input type="text" name="notes" form="reno-form-{{ r.id }}" value="{{ r.notes or '' }}" placeholder="note" class="note-input" style="width:90px;{{ '' if r.notes else ' display:none;' }}">
+    </span>
+  </td>
+  <td><span class="row-view">{{ money(r.cost) }}</span><input class="row-edit" type="number" step="any" name="cost" form="reno-form-{{ r.id }}" value="{{ r.cost }}" style="width:80px;"></td>
+  <td><span class="row-view">{{ r.contractor or "—" }}</span><input class="row-edit" type="text" name="contractor" form="reno-form-{{ r.id }}" value="{{ r.contractor or '' }}" style="width:100px;"></td>
   <td>
     <span class="row-view">{% if r.file_path %}<a href="/rentals/{{ prop.id }}/renovations/{{ r.id }}/file">{{ r.file_original_name or "Download" }}</a>{% else %}—{% endif %}</span>
     <input class="row-edit" type="file" name="file" form="reno-form-{{ r.id }}">
@@ -29,13 +41,12 @@
   hx-target="#reno-{{ r.id }}" hx-swap="outerHTML" hx-encoding="multipart/form-data"></form>
 {% endmacro %}
 
-{% macro month_cell(m, prop, field, note_field) %}
+{% macro month_cell(m, prop, field, note_field_name, width='65px') %}
 <td>
-  <span class="row-view" title="{{ m[note_field] or '' }}">{{ money(m[field]) }}</span>
-  <div class="row-edit-stack">
-    <input type="number" step="any" name="{{ field }}" form="month-form-{{ m.id }}" value="{{ m[field] }}">
-    <input type="text" name="{{ note_field }}" form="month-form-{{ m.id }}" value="{{ m[note_field] or '' }}" placeholder="note">
-  </div>
+  <span class="row-view" title="{{ m[note_field_name] or '' }}">{{ money(m[field]) }}</span>
+  <span class="row-edit-inline">
+    {{ note_field('month-form-' ~ m.id, field, note_field_name, m[field], m[note_field_name], width) }}
+  </span>
 </td>
 {% endmacro %}
 

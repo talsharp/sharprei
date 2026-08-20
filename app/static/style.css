@@ -194,20 +194,31 @@ button.danger, .btn.danger { background: var(--red); }
 tr.editing .row-view { display: none; }
 .row-edit { display: none; }
 tr.editing .row-edit { display: inline-block; }
-.row-edit-stack { display: none; flex-direction: column; gap: 3px; }
-.row-edit-stack input { width: 100%; box-sizing: border-box; }
-.row-edit-stack input[type=text] { font-size: 11px; padding: 4px 6px; }
-tr.editing .row-edit-stack { display: flex; }
+.row-edit-inline { display: none; align-items: center; gap: 4px; }
+tr.editing .row-edit-inline { display: inline-flex; }
 .row-edit-actions { display: none; gap: 6px; }
 tr.editing .row-edit-actions { display: inline-flex; }
 .month-actions, .reno-actions-cell { white-space: nowrap; }
 
-.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.summary-tile { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; }
-.summary-tile .value { font-size: 20px; font-weight: 700; }
-.summary-tile .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.summary-tile.accent { border-color: var(--accent); background: rgba(79,140,255,0.08); }
-.summary-tile.accent .value { font-size: 24px; }
+.note-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 4px; width: 20px; height: 20px; min-width: 20px;
+  font-size: 13px; line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0;
+}
+.note-btn:hover { border-color: var(--accent); color: var(--text); }
+.note-input { width: 80px; font-size: 11px; padding: 4px 6px; }
+
+.summary-grid { display: flex; flex-direction: column; gap: 10px; }
+.summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.summary-tile {
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 8px; text-align: center; transition: border-color 0.15s;
+}
+.summary-tile:hover { border-color: rgba(255,255,255,0.2); }
+.summary-tile .value { font-size: 19px; font-weight: 700; white-space: nowrap; }
+.summary-tile .label { font-size: 11px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+.summary-tile.accent { border-color: var(--accent); background: rgba(79,140,255,0.1); }
+.summary-tile.accent .value { font-size: 23px; }
 
 .profit-up { color: var(--green); }
 .profit-down { color: var(--red); }
