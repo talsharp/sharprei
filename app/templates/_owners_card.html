@@ -1,0 +1,28 @@
+<div class="card" id="owners-card">
+  <h3>Owners</h3>
+  <p class="muted" style="margin-top:-8px; font-size:13px;">Ownership split, shown on the investor report.</p>
+  <div class="pill-list" style="margin-bottom:10px; align-items:center;">
+    {% for o in prop.owners %}
+    <span class="btn secondary" style="padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+      {{ o.name }} <strong>{{ "%.0f"|format(o.percentage) }}%</strong>
+      <button type="button" class="danger" style="padding:2px 6px; font-size:11px;"
+        hx-post="/rentals/{{ prop.id }}/owners/{{ o.id }}/delete"
+        hx-target="#owners-card" hx-swap="outerHTML"
+        hx-confirm="Remove {{ o.name }}?">✕</button>
+    </span>
+    {% else %}
+    <span class="muted">No owners added yet</span>
+    {% endfor %}
+  </div>
+  {% if prop.owners %}
+  <p class="muted" style="font-size:12px; margin-bottom:10px; {{ 'color: var(--red);' if prop.total_owner_percentage != 100 else '' }}">
+    Total allocated: {{ "%.0f"|format(prop.total_owner_percentage) }}%{% if prop.total_owner_percentage != 100 %} (doesn't add up to 100%){% endif %}
+  </p>
+  {% endif %}
+  <form hx-post="/rentals/{{ prop.id }}/owners/new" hx-target="#owners-card" hx-swap="outerHTML"
+        method="post" action="/rentals/{{ prop.id }}/owners/new" style="display:flex; gap:8px; align-items:flex-end;">
+    <div class="form-row" style="margin-bottom:0;"><label>Name</label><input type="text" name="name" placeholder="e.g. Tal Perry" required></div>
+    <div class="form-row" style="margin-bottom:0;"><label>Percentage (%)</label><input type="number" step="any" name="percentage" value="0" style="width:90px;"></div>
+    <button type="submit">Add Owner</button>
+  </form>
+</div>

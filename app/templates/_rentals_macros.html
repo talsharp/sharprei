@@ -49,7 +49,7 @@
 {% endmacro %}
 
 {% macro month_row(m, prop) %}
-<tr id="month-{{ m.id }}" class="month-row">
+<tr id="month-{{ m.id }}" class="month-row" data-month="{{ m.month.isoformat() }}">
   <td>{{ m.month.strftime('%B %Y') }}</td>
   <td><span class="row-view">{{ money(m.income) }}</span><input class="row-edit" type="number" step="any" name="income" form="month-form-{{ m.id }}" value="{{ m.income }}" style="width:80px;"></td>
   {{ month_cell(m, prop, 'utilities', 'utilities_note') }}
@@ -67,6 +67,10 @@
     <span class="row-edit-actions">
       <button type="submit" form="month-form-{{ m.id }}" style="font-size:12px;">Save</button>
       <button type="button" class="secondary" style="font-size:12px;" onclick="toggleRowEdit('month', '{{ m.id }}')">Cancel</button>
+      <button type="button" class="danger" style="font-size:12px;"
+        hx-post="/rentals/{{ prop.id }}/months/{{ m.id }}/delete"
+        hx-target="#month-{{ m.id }}" hx-swap="outerHTML"
+        hx-confirm="Delete this month's data?">Delete</button>
     </span>
   </td>
 </tr>

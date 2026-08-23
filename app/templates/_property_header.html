@@ -1,0 +1,113 @@
+{% import "_rentals_macros.html" as rm %}
+<div id="property-header">
+<div class="top-actions">
+  <h2 style="margin:0;">{{ prop.address }} {% if prop.is_occupied %}<span class="badge badge-active">{{ rm.money(prop.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</h2>
+  <div style="display:flex; gap:8px;">
+    <a class="btn secondary" href="/rentals/{{ prop.id }}/report" target="_blank">Export Report</a>
+    <a class="btn secondary" href="/rentals">Back to portfolio</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Property Details</h3>
+    <form hx-post="/rentals/{{ prop.id }}/update" hx-target="#property-header" hx-swap="outerHTML"
+          method="post" action="/rentals/{{ prop.id }}/update">
+      <div class="form-row">
+        <label>Address</label>
+        <input type="text" name="address" value="{{ prop.address }}" required>
+      </div>
+      <div class="form-row">
+        <label>Purchase Price ($)</label>
+        <input type="number" step="any" name="purchase_price" value="{{ prop.purchase_price }}">
+      </div>
+      <div class="form-row">
+        <label>Closing Costs ($)</label>
+        <input type="number" step="any" name="closing_costs" value="{{ prop.closing_costs }}">
+      </div>
+      <div class="form-row">
+        <label>Purchase Date</label>
+        <input type="date" name="purchase_date" value="{{ prop.purchase_date if prop.purchase_date else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Max ARV ($)</label>
+        <input type="number" step="any" name="max_arv" value="{{ prop.max_arv if prop.max_arv is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Estimated Value ($)</label>
+        <input type="number" step="any" name="estimated_value" value="{{ prop.estimated_value if prop.estimated_value is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Rent Price ($/mo) - leave blank if not occupied</label>
+        <input type="number" step="any" name="rent_price" value="{{ prop.rent_price if prop.rent_price is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Tenant Move-in Date</label>
+        <input type="date" name="tenant_move_in_date" value="{{ prop.tenant_move_in_date if prop.tenant_move_in_date else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Account Balance ($) - reserved for this property's expenses</label>
+        <input type="number" step="any" name="account_balance" value="{{ prop.account_balance if prop.account_balance is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea name="notes" rows="3">{{ prop.notes or "" }}</textarea>
+      </div>
+      <button type="submit">Save</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Investment Summary</h3>
+    <div class="summary-grid">
+      <div class="summary-row">
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(prop.total_purchase_price) }}</div>
+          <div class="label">Purchase Price</div>
+        </div>
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(prop.total_renovation_costs) }}</div>
+          <div class="label">Renovation</div>
+        </div>
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(prop.estimated_value) }}</div>
+          <div class="label">Est. Value</div>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(prop.total_invested) }}</div>
+          <div class="label">All-In Cost</div>
+        </div>
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(prop.max_arv) }}</div>
+          <div class="label">Max ARV</div>
+        </div>
+        <div class="summary-tile">
+          <div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money(prop.estimated_profit) }}</div>
+          <div class="label">Est. Profit</div>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(py.total_expenses) }}</div>
+          <div class="label">Operational Costs</div>
+        </div>
+        <div class="summary-tile">
+          <div class="value">{{ rm.money(py.total_income) }}</div>
+          <div class="label">Rent Collected</div>
+        </div>
+        <div class="summary-tile accent">
+          <div class="value {{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</div>
+          <div class="label">Cash-on-Cash Yield</div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-row" style="margin-top:16px;">
+      <div class="stat"><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
+      <div class="stat"><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
+    </div>
+    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost.</p>
+  </div>
+</div>
+</div>

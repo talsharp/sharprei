@@ -5,7 +5,7 @@ from pathlib import Path
 import markdown as md
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -548,6 +548,8 @@ def rentals_list(request: Request, db: Session = Depends(get_db)):
     properties = get_properties(db)
     summary = get_portfolio_summary(properties)
     property_yields = {p.id: get_property_yield(p) for p in properties}
+    owner_names = sorted({o.name for p in properties for o in p.owners})
+    has_unassigned = any(not p.owners for p in properties)
     return templates.TemplateResponse(
         "rentals_list.html",
         {
@@ -556,6 +558,8 @@ def rentals_list(request: Request, db: Session = Depends(get_db)):
             "properties": properties,
             "summary": summary,
             "property_yields": property_yields,
+            "owner_names": owner_names,
+            "has_unassigned": has_unassigned,
         },
     )
 
@@ -652,6 +656,7 @@ def property_report(request: Request, property_id: int, db: Session = Depends(ge
 @app.post("/rentals/{property_id}/update")
 def update_property(
     property_id: int,
+    request: Request,
     address: str = Form(...),
     purchase_price: str = Form("0"),
     closing_costs: str = Form("0"),
@@ -678,12 +683,19 @@ def update_property(
     prop.account_balance = float(account_balance) if account_balance.strip() else None
     prop.notes = notes
     db.commit()
+
+    if _is_htmx(request):
+        py = get_property_yield(prop)
+        return templates.TemplateResponse(
+            "_property_header.html", {"request": request, "prop": prop, "py": py}
+        )
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
 @app.post("/rentals/{property_id}/owners/new")
 def add_owner(
     property_id: int,
+    request: Request,
     name: str = Form(...),
     percentage: str = Form("0"),
     db: Session = Depends(get_db),
@@ -697,15 +709,23 @@ def add_owner(
         )
         db.add(owner)
         db.commit()
+
+    if _is_htmx(request):
+        prop = db.get(Property, property_id)
+        return templates.TemplateResponse("_owners_card.html", {"request": request, "prop": prop})
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
 @app.post("/rentals/{property_id}/owners/{owner_id}/delete")
-def delete_owner(property_id: int, owner_id: int, db: Session = Depends(get_db)):
+def delete_owner(property_id: int, owner_id: int, request: Request, db: Session = Depends(get_db)):
     owner = db.get(PropertyOwner, owner_id)
     if owner and owner.property_id == property_id:
         db.delete(owner)
         db.commit()
+
+    if _is_htmx(request):
+        prop = db.get(Property, property_id)
+        return templates.TemplateResponse("_owners_card.html", {"request": request, "prop": prop})
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
@@ -788,7 +808,7 @@ def delete_renovation_expense(
         db.delete(expense)
         db.commit()
     if _is_htmx(request):
-        return ""
+        return Response(content="", media_type="text/html")
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)
 
 
@@ -904,5 +924,5 @@ def delete_monthly_expense(
         db.delete(entry)
         db.commit()
     if _is_htmx(request):
-        return ""
+        return Response(content="", media_type="text/html")
     return RedirectResponse(f"/rentals/{property_id}", status_code=303)

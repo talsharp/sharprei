@@ -14,36 +14,67 @@
   </form>
 </div>
 
+{% if owner_names or has_unassigned %}
+<div class="filters" style="margin-bottom:16px;">
+  <div class="columns-toggle">
+    <button type="button" class="secondary" id="owner-filter-btn">Owners <span id="owner-filter-count" class="muted"></span></button>
+    <div class="columns-panel" id="owner-filter-panel">
+      {% for name in owner_names %}
+      <label><input type="checkbox" class="owner-filter-cb" value="{{ name }}" checked> {{ name }}</label>
+      {% endfor %}
+      {% if has_unassigned %}
+      <label><input type="checkbox" class="owner-filter-cb" value="" checked> <em>Unassigned</em></label>
+      {% endif %}
+      <div style="display:flex; gap:6px; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+        <button type="button" class="secondary" id="owner-filter-all" style="font-size:12px; padding:4px 8px;">All</button>
+        <button type="button" class="secondary" id="owner-filter-none" style="font-size:12px; padding:4px 8px;">None</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card" style="margin-bottom:20px;">
   <h3>Portfolio Summary</h3>
-  <div class="summary-hero">
-    <div class="summary-tile accent">
-      <div class="value">{{ summary.yield_display }}</div>
-      <div class="label">Portfolio Yield</div>
+  <div class="summary-grid">
+    <div class="summary-row">
+      <div class="summary-tile">
+        <div class="value" id="tile-invested">{{ rm.money(summary.total_invested) }}</div>
+        <div class="label">Total Invested</div>
+      </div>
+      <div class="summary-tile accent">
+        <div class="value {{ 'profit-up' if summary.yield_pct and summary.yield_pct >= 0 else 'profit-down' if summary.yield_pct is not none else '' }}" id="tile-yield">{{ summary.yield_display }}</div>
+        <div class="label">Portfolio Yield</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value {{ 'profit-up' if summary.monthly_cash_flow and summary.monthly_cash_flow >= 0 else 'profit-down' if summary.monthly_cash_flow is not none else '' }}" id="tile-monthly-cf">{{ rm.money(summary.monthly_cash_flow) }}</div>
+        <div class="label">Monthly Cash Flow</div>
+      </div>
     </div>
-    <div class="summary-tile">
-      <div class="value">{{ rm.money(summary.total_invested) }}</div>
-      <div class="label">Total Invested</div>
-    </div>
-    <div class="summary-tile">
-      <div class="value">{{ summary.occupied_count }} / {{ summary.property_count }}</div>
-      <div class="label">Occupied Properties</div>
+    <div class="summary-row">
+      <div class="summary-tile">
+        <div class="value" id="tile-occupied">{{ summary.occupied_count }} / {{ summary.property_count }}</div>
+        <div class="label">Occupied Properties</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value" id="tile-est-value">{{ rm.money(summary.total_estimated_value) }}</div>
+        <div class="label">Total Estimated Value</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value" id="tile-max-arv">{{ rm.money(summary.total_max_arv) }}</div>
+        <div class="label">Total Max ARV</div>
+      </div>
     </div>
   </div>
-  <div class="stat-row">
-    <div class="stat"><div class="value">{{ rm.money(summary.total_purchase_price) }}</div><div class="label">Total Purchase Price</div></div>
-    <div class="stat"><div class="value">{{ rm.money(summary.total_renovation_costs) }}</div><div class="label">Renovation &amp; Other</div></div>
-    <div class="stat"><div class="value">{{ rm.money(summary.total_max_arv) }}</div><div class="label">Total Max ARV ({{ summary.properties_with_arv }} priced)</div></div>
-    <div class="stat"><div class="value">{{ rm.money(summary.total_estimated_value) }}</div><div class="label">Total Estimated Value ({{ summary.properties_with_estimated_value }} priced)</div></div>
-  </div>
-  <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Portfolio Yield is dollar-weighted: sum of each property's annualized net cash flow ÷ sum of Total Invested (across properties with at least one month recorded) - not a plain average of percentages.</p>
+  <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Portfolio Yield and Monthly Cash Flow are dollar-weighted across properties with at least one month recorded, not a plain average of percentages.</p>
 </div>
 
 <div style="overflow-x:auto;">
-<table class="sticky-table">
+<table class="sticky-table" id="rentals-table">
   <thead>
     <tr>
       <th>Address</th>
+      <th>Owners</th>
       <th>Purchase Price</th>
       <th>Renovation</th>
       <th>Total Invested</th>
@@ -57,8 +88,18 @@
   <tbody>
     {% for p in properties %}
     {% set py = property_yields[p.id] %}
-    <tr>
+    {% set owner_list = p.owners|map(attribute='name')|list %}
+    <tr data-owners="{{ owner_list|join('|') }}"
+        data-invested="{{ p.total_invested }}"
+        data-estimated-value="{{ p.estimated_value or 0 }}"
+        data-max-arv="{{ p.max_arv or 0 }}"
+        data-occupied="{{ '1' if p.is_occupied else '0' }}"
+        data-annual-ncf="{{ py.annual_net_cash_flow if py.yield_pct is not none else '' }}"
+        data-invested-with-data="{{ py.total_invested if py.yield_pct is not none else '' }}"
+        data-purchase-price="{{ p.total_purchase_price }}"
+        data-renovation="{{ p.total_renovation_costs }}">
       <td><a class="zip-link" href="/rentals/{{ p.id }}">{{ p.address }}</a></td>
+      <td class="muted" style="font-size:12px;">{{ owner_list|join(', ') if owner_list else "—" }}</td>
       <td>{{ rm.money(p.total_purchase_price) }}</td>
       <td>{{ rm.money(p.total_renovation_costs) }}</td>
       <td>{{ rm.money(p.total_invested) }}</td>
@@ -69,23 +110,158 @@
       <td class="{{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
+    <tr><td colspan="10" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
     <tr>
       <td>Totals</td>
-      <td>{{ rm.money(summary.total_purchase_price) }}</td>
-      <td>{{ rm.money(summary.total_renovation_costs) }}</td>
-      <td>{{ rm.money(summary.total_invested) }}</td>
-      <td>{{ rm.money(summary.total_max_arv) }}</td>
-      <td>{{ rm.money(summary.total_estimated_value) }}</td>
       <td></td>
-      <td>{{ summary.occupied_count }} / {{ summary.property_count }}</td>
-      <td>{{ summary.yield_display }}</td>
+      <td id="foot-purchase-price">{{ rm.money(summary.total_purchase_price) }}</td>
+      <td id="foot-renovation">{{ rm.money(summary.total_renovation_costs) }}</td>
+      <td id="foot-invested">{{ rm.money(summary.total_invested) }}</td>
+      <td id="foot-max-arv">{{ rm.money(summary.total_max_arv) }}</td>
+      <td id="foot-est-value">{{ rm.money(summary.total_estimated_value) }}</td>
+      <td></td>
+      <td id="foot-occupied">{{ summary.occupied_count }} / {{ summary.property_count }}</td>
+      <td id="foot-yield">{{ summary.yield_display }}</td>
     </tr>
   </tfoot>
 </table>
 </div>
+
+<script>
+(function() {
+  function checkedValues(selector) {
+    return Array.from(document.querySelectorAll(selector)).filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+  }
+
+  function setupFilterGroup(opts) {
+    var STORAGE_KEY = opts.storageKey;
+    var checkboxes = document.querySelectorAll(opts.checkboxSelector);
+    var countEl = document.getElementById(opts.countId);
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) {}
+    if (Array.isArray(saved)) {
+      checkboxes.forEach(function(cb) { cb.checked = saved.indexOf(cb.value) !== -1; });
+    }
+    function updateCount() {
+      var total = checkboxes.length;
+      var checked = Array.from(checkboxes).filter(function(cb) { return cb.checked; }).length;
+      if (countEl) countEl.textContent = (checked === total) ? '' : '(' + checked + '/' + total + ')';
+    }
+    checkboxes.forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+        updateCount();
+        applyFilters();
+      });
+    });
+    var allBtn = document.getElementById(opts.allId);
+    var noneBtn = document.getElementById(opts.noneId);
+    if (allBtn) allBtn.addEventListener('click', function() {
+      checkboxes.forEach(function(cb) { cb.checked = true; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+      updateCount();
+      applyFilters();
+    });
+    if (noneBtn) noneBtn.addEventListener('click', function() {
+      checkboxes.forEach(function(cb) { cb.checked = false; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(checkedValues(opts.checkboxSelector)));
+      updateCount();
+      applyFilters();
+    });
+    updateCount();
+  }
+
+  setupFilterGroup({ storageKey: 'rentalsOwnerFilter', checkboxSelector: '.owner-filter-cb', countId: 'owner-filter-count', allId: 'owner-filter-all', noneId: 'owner-filter-none' });
+
+  var ownerBtn = document.getElementById('owner-filter-btn');
+  if (ownerBtn) {
+    ownerBtn.addEventListener('click', function() {
+      document.getElementById('owner-filter-panel').classList.toggle('open');
+    });
+    document.addEventListener('click', function(e) {
+      var panel = document.getElementById('owner-filter-panel');
+      if (panel && !panel.contains(e.target) && !e.target.closest('.columns-toggle')) {
+        panel.classList.remove('open');
+      }
+    });
+  }
+
+  function num(v) { return parseFloat(v) || 0; }
+
+  function money(v) {
+    if (v === null) return '—';
+    return '$' + Math.round(v).toLocaleString();
+  }
+
+  function recompute() {
+    var rows = Array.from(document.querySelectorAll('#rentals-table tbody tr')).filter(function(tr) {
+      return !tr.classList.contains('hidden-row') && tr.hasAttribute('data-invested');
+    });
+
+    var totalPurchase = 0, totalRenovation = 0, totalInvested = 0, totalEstValue = 0, totalMaxArv = 0, occupiedCount = 0;
+    var totalAnnualNcf = 0, totalInvestedWithData = 0;
+
+    rows.forEach(function(tr) {
+      totalPurchase += num(tr.dataset.purchasePrice);
+      totalRenovation += num(tr.dataset.renovation);
+      totalInvested += num(tr.dataset.invested);
+      totalEstValue += num(tr.dataset.estimatedValue);
+      totalMaxArv += num(tr.dataset.maxArv);
+      if (tr.dataset.occupied === '1') occupiedCount++;
+      if (tr.dataset.annualNcf !== '') {
+        totalAnnualNcf += num(tr.dataset.annualNcf);
+        totalInvestedWithData += num(tr.dataset.investedWithData);
+      }
+    });
+
+    var yieldPct = totalInvestedWithData > 0 ? (totalAnnualNcf / totalInvestedWithData * 100) : null;
+    var monthlyCf = totalInvestedWithData > 0 ? (totalAnnualNcf / 12) : null;
+
+    document.getElementById('tile-invested').textContent = money(totalInvested);
+    document.getElementById('tile-occupied').textContent = occupiedCount + ' / ' + rows.length;
+    document.getElementById('tile-est-value').textContent = money(totalEstValue);
+    document.getElementById('tile-max-arv').textContent = money(totalMaxArv);
+
+    var yieldTile = document.getElementById('tile-yield');
+    yieldTile.textContent = yieldPct !== null ? yieldPct.toFixed(2) + '%' : 'Not enough data';
+    yieldTile.classList.remove('profit-up', 'profit-down');
+    if (yieldPct !== null) yieldTile.classList.add(yieldPct >= 0 ? 'profit-up' : 'profit-down');
+
+    var cfTile = document.getElementById('tile-monthly-cf');
+    cfTile.textContent = money(monthlyCf);
+    cfTile.classList.remove('profit-up', 'profit-down');
+    if (monthlyCf !== null) cfTile.classList.add(monthlyCf >= 0 ? 'profit-up' : 'profit-down');
+
+    document.getElementById('foot-purchase-price').textContent = money(totalPurchase);
+    document.getElementById('foot-renovation').textContent = money(totalRenovation);
+    document.getElementById('foot-invested').textContent = money(totalInvested);
+    document.getElementById('foot-max-arv').textContent = money(totalMaxArv);
+    document.getElementById('foot-est-value').textContent = money(totalEstValue);
+    document.getElementById('foot-occupied').textContent = occupiedCount + ' / ' + rows.length;
+    document.getElementById('foot-yield').textContent = yieldPct !== null ? yieldPct.toFixed(2) + '%' : 'Not enough data';
+  }
+
+  function applyFilters() {
+    var allowedOwners = checkedValues('.owner-filter-cb');
+    document.querySelectorAll('#rentals-table tbody tr').forEach(function(tr) {
+      if (!tr.hasAttribute('data-invested')) return;
+      var owners = (tr.dataset.owners || '').split('|').filter(Boolean);
+      var matches;
+      if (owners.length === 0) {
+        matches = allowedOwners.indexOf('') !== -1;
+      } else {
+        matches = owners.some(function(o) { return allowedOwners.indexOf(o) !== -1; });
+      }
+      tr.classList.toggle('hidden-row', !matches);
+    });
+    recompute();
+  }
+
+  applyFilters();
+})();
+</script>
 
 {% endblock %}

@@ -86,6 +86,10 @@ class PortfolioSummary:
     def yield_display(self) -> str:
         return f"{self.yield_pct:.2f}%" if self.yield_pct is not None else INSUFFICIENT_DATA
 
+    @property
+    def monthly_cash_flow(self) -> Optional[float]:
+        return (self.total_annual_net_cash_flow / 12) if self.total_invested_with_data > 0 else None
+
 
 def get_portfolio_summary(properties: List[Property]) -> PortfolioSummary:
     summary = PortfolioSummary(property_count=len(properties))
