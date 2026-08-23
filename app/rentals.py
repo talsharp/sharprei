@@ -32,10 +32,29 @@ class PropertyYield:
     total_income: float = 0.0
     total_expenses: float = 0.0
     yield_pct: Optional[float] = None
+    est_yield_pct: Optional[float] = None
 
     @property
     def display(self) -> str:
         return f"{self.yield_pct:.2f}%" if self.yield_pct is not None else INSUFFICIENT_DATA
+
+    @property
+    def est_yield_display(self) -> str:
+        return f"{self.est_yield_pct:.2f}%" if self.est_yield_pct is not None else "Not Occupied"
+
+
+# Steady-state expense assumption for Est. Yield: the classic real-estate
+# "50% rule" tuned to 45% - i.e. 45% of gross rent goes to vacancy, repairs,
+# management, taxes, insurance etc. once a property is past its first-year
+# move-in costs, leaving 55% as net operating income.
+EST_YIELD_EXPENSE_RATIO = 0.45
+
+
+def _est_yield_pct(prop: Property) -> Optional[float]:
+    if not prop.rent_price or float(prop.rent_price) <= 0 or prop.total_invested <= 0:
+        return None
+    annual_noi = float(prop.rent_price) * 12 * (1 - EST_YIELD_EXPENSE_RATIO)
+    return (annual_noi / prop.total_invested) * 100
 
 
 def get_property_yield(prop: Property) -> PropertyYield:
@@ -43,12 +62,14 @@ def get_property_yield(prop: Property) -> PropertyYield:
     total_invested = prop.total_invested
     total_income = sum(float(m.income) for m in months)
     total_expenses = sum(m.total_expenses for m in months)
+    est_yield_pct = _est_yield_pct(prop)
     if not months or total_invested <= 0:
         return PropertyYield(
             months_recorded=len(months),
             total_invested=total_invested,
             total_income=total_income,
             total_expenses=total_expenses,
+            est_yield_pct=est_yield_pct,
         )
 
     avg_monthly = sum(m.net_cash_flow for m in months) / len(months)
@@ -61,6 +82,7 @@ def get_property_yield(prop: Property) -> PropertyYield:
         total_income=total_income,
         total_expenses=total_expenses,
         yield_pct=(annual / total_invested) * 100,
+        est_yield_pct=est_yield_pct,
     )
 
 
@@ -73,6 +95,7 @@ class PortfolioSummary:
     total_invested: float = 0.0
     total_max_arv: float = 0.0
     total_estimated_value: float = 0.0
+    total_estimated_profit: float = 0.0
     properties_with_arv: int = 0
     properties_with_estimated_value: int = 0
     # Portfolio-wide cash-on-cash yield: sum of every property's annualized
@@ -105,6 +128,7 @@ def get_portfolio_summary(properties: List[Property]) -> PortfolioSummary:
         if prop.estimated_value is not None:
             summary.total_estimated_value += float(prop.estimated_value)
             summary.properties_with_estimated_value += 1
+            summary.total_estimated_profit += prop.estimated_profit
 
         py = get_property_yield(prop)
         if py.yield_pct is not None:

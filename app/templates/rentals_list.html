@@ -31,6 +31,7 @@
       </div>
     </div>
   </div>
+  <span class="muted" id="owner-filter-scope" style="font-size:13px;"></span>
 </div>
 {% endif %}
 
@@ -41,6 +42,20 @@
       <div class="summary-tile">
         <div class="value" id="tile-invested">{{ rm.money(summary.total_invested) }}</div>
         <div class="label">Total Invested</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value" id="tile-est-value">{{ rm.money(summary.total_estimated_value) }}</div>
+        <div class="label">Total Estimated Value</div>
+      </div>
+      <div class="summary-tile">
+        <div class="value {{ 'profit-up' if summary.total_estimated_profit >= 0 else 'profit-down' }}" id="tile-est-profit">{{ rm.money(summary.total_estimated_profit) }}</div>
+        <div class="label">Est. Profit</div>
+      </div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-tile">
+        <div class="value" id="tile-max-arv">{{ rm.money(summary.total_max_arv) }}</div>
+        <div class="label">Total Max ARV</div>
       </div>
       <div class="summary-tile accent">
         <div class="value {{ 'profit-up' if summary.yield_pct and summary.yield_pct >= 0 else 'profit-down' if summary.yield_pct is not none else '' }}" id="tile-yield">{{ summary.yield_display }}</div>
@@ -57,16 +72,16 @@
         <div class="label">Occupied Properties</div>
       </div>
       <div class="summary-tile">
-        <div class="value" id="tile-est-value">{{ rm.money(summary.total_estimated_value) }}</div>
-        <div class="label">Total Estimated Value</div>
+        <div class="value" id="tile-purchase-price">{{ rm.money(summary.total_purchase_price) }}</div>
+        <div class="label">Total Purchase Price</div>
       </div>
       <div class="summary-tile">
-        <div class="value" id="tile-max-arv">{{ rm.money(summary.total_max_arv) }}</div>
-        <div class="label">Total Max ARV</div>
+        <div class="value" id="tile-renovation">{{ rm.money(summary.total_renovation_costs) }}</div>
+        <div class="label">Total Renovation</div>
       </div>
     </div>
   </div>
-  <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Portfolio Yield and Monthly Cash Flow are dollar-weighted across properties with at least one month recorded, not a plain average of percentages.</p>
+  <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">When filtered to specific owner(s), every figure here (and in the table) shows that owner's dollar share - each property's value × their ownership percentage in it, summed. Portfolio Yield and Monthly Cash Flow are dollar-weighted, not a plain average of percentages.</p>
 </div>
 
 <div style="overflow-x:auto;">
@@ -83,34 +98,38 @@
       <th>Est. Profit</th>
       <th>Occupancy</th>
       <th>Yield</th>
+      <th title="Projected once past first-year move-in costs: Annual Rent × 55% ÷ All-In Cost">Est. Yield</th>
     </tr>
   </thead>
   <tbody>
     {% for p in properties %}
     {% set py = property_yields[p.id] %}
-    {% set owner_list = p.owners|map(attribute='name')|list %}
-    <tr data-owners="{{ owner_list|join('|') }}"
+    {% set owner_list = p.owners|list %}
+    <tr data-owner-names="{{ owner_list|map(attribute='name')|join('|') }}"
+        data-owner-pcts="{{ owner_list|map(attribute='percentage')|join('|') }}"
+        data-purchase-price="{{ p.total_purchase_price }}"
+        data-renovation="{{ p.total_renovation_costs }}"
         data-invested="{{ p.total_invested }}"
-        data-estimated-value="{{ p.estimated_value or 0 }}"
         data-max-arv="{{ p.max_arv or 0 }}"
+        data-estimated-value="{{ p.estimated_value or 0 }}"
+        data-estimated-profit="{{ p.estimated_profit or 0 }}"
         data-occupied="{{ '1' if p.is_occupied else '0' }}"
         data-annual-ncf="{{ py.annual_net_cash_flow if py.yield_pct is not none else '' }}"
-        data-invested-with-data="{{ py.total_invested if py.yield_pct is not none else '' }}"
-        data-purchase-price="{{ p.total_purchase_price }}"
-        data-renovation="{{ p.total_renovation_costs }}">
+        data-invested-with-data="{{ py.total_invested if py.yield_pct is not none else '' }}">
       <td><a class="zip-link" href="/rentals/{{ p.id }}">{{ p.address }}</a></td>
-      <td class="muted" style="font-size:12px;">{{ owner_list|join(', ') if owner_list else "—" }}</td>
-      <td>{{ rm.money(p.total_purchase_price) }}</td>
-      <td>{{ rm.money(p.total_renovation_costs) }}</td>
-      <td>{{ rm.money(p.total_invested) }}</td>
-      <td>{{ rm.money(p.max_arv) }}</td>
-      <td>{{ rm.money(p.estimated_value) }}</td>
-      <td class="{{ 'profit-up' if p.estimated_profit and p.estimated_profit >= 0 else 'profit-down' if p.estimated_profit else '' }}">{{ rm.money(p.estimated_profit) }}</td>
+      <td class="muted" style="font-size:12px;">{{ owner_list|map(attribute='name')|join(', ') if owner_list else "—" }}</td>
+      <td class="cell-purchase-price">{{ rm.money(p.total_purchase_price) }}</td>
+      <td class="cell-renovation">{{ rm.money(p.total_renovation_costs) }}</td>
+      <td class="cell-invested">{{ rm.money(p.total_invested) }}</td>
+      <td class="cell-max-arv">{{ rm.money(p.max_arv) }}</td>
+      <td class="cell-estimated-value">{{ rm.money(p.estimated_value) }}</td>
+      <td class="cell-estimated-profit {{ 'profit-up' if p.estimated_profit and p.estimated_profit >= 0 else 'profit-down' if p.estimated_profit else '' }}">{{ rm.money(p.estimated_profit) }}</td>
       <td>{% if p.is_occupied %}<span class="badge badge-active">{{ rm.money(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
       <td class="{{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</td>
+      <td class="{{ 'profit-up' if py.est_yield_pct and py.est_yield_pct >= 0 else 'profit-down' if py.est_yield_pct is not none else '' }}">{{ py.est_yield_display }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="10" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
+    <tr><td colspan="11" class="muted" style="text-align:center; padding:24px;">No properties yet. Add one above.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -122,13 +141,15 @@
       <td id="foot-invested">{{ rm.money(summary.total_invested) }}</td>
       <td id="foot-max-arv">{{ rm.money(summary.total_max_arv) }}</td>
       <td id="foot-est-value">{{ rm.money(summary.total_estimated_value) }}</td>
-      <td></td>
+      <td id="foot-est-profit">{{ rm.money(summary.total_estimated_profit) }}</td>
       <td id="foot-occupied">{{ summary.occupied_count }} / {{ summary.property_count }}</td>
       <td id="foot-yield">{{ summary.yield_display }}</td>
+      <td></td>
     </tr>
   </tfoot>
 </table>
 </div>
+<p class="muted" style="font-size:12px; margin-top:8px;">The table's dollar columns (Purchase Price through Est. Profit) also scale to the selected owner(s)' share when filtered. Yield and Est. Yield are rates, not dollar amounts, so they're always shown at the property's own full rate regardless of ownership share.</p>
 
 <script>
 (function() {
@@ -196,34 +217,86 @@
     return '$' + Math.round(v).toLocaleString();
   }
 
-  function recompute() {
+  // Fraction of a property "credited" to the currently selected owner set:
+  // sum of the selected owners' percentages in that property (0-1 scale).
+  // Special case: if every filter option is checked, treat every row as
+  // 100% - avoids exposing ownership-percentage data-entry errors (e.g.
+  // duplicate/overlapping entries that don't sum to exactly 100%) in the
+  // default "everyone" view, where the honest answer is just "the whole
+  // property".
+  function rowFraction(tr, allowed, allSelected) {
+    if (allSelected) return 1;
+    var names = (tr.dataset.ownerNames || '').split('|').filter(Boolean);
+    if (names.length === 0) {
+      return allowed.indexOf('') !== -1 ? 1 : 0;
+    }
+    var pcts = (tr.dataset.ownerPcts || '').split('|').filter(Boolean).map(Number);
+    var frac = 0;
+    names.forEach(function(name, i) {
+      if (allowed.indexOf(name) !== -1) frac += (pcts[i] || 0) / 100;
+    });
+    return frac;
+  }
+
+  var WEIGHTED_FIELDS = [
+    ['purchasePrice', 'cell-purchase-price', 'foot-purchase-price'],
+    ['renovation', 'cell-renovation', 'foot-renovation'],
+    ['invested', 'cell-invested', 'foot-invested'],
+    ['maxArv', 'cell-max-arv', 'foot-max-arv'],
+    ['estimatedValue', 'cell-estimated-value', 'foot-est-value'],
+    ['estimatedProfit', 'cell-estimated-profit', 'foot-est-profit']
+  ];
+
+  function recompute(allowed, allSelected) {
     var rows = Array.from(document.querySelectorAll('#rentals-table tbody tr')).filter(function(tr) {
-      return !tr.classList.contains('hidden-row') && tr.hasAttribute('data-invested');
+      return tr.hasAttribute('data-invested');
     });
 
-    var totalPurchase = 0, totalRenovation = 0, totalInvested = 0, totalEstValue = 0, totalMaxArv = 0, occupiedCount = 0;
+    var totals = {};
+    WEIGHTED_FIELDS.forEach(function(f) { totals[f[0]] = 0; });
+    var occupiedCount = 0, visibleCount = 0;
     var totalAnnualNcf = 0, totalInvestedWithData = 0;
 
     rows.forEach(function(tr) {
-      totalPurchase += num(tr.dataset.purchasePrice);
-      totalRenovation += num(tr.dataset.renovation);
-      totalInvested += num(tr.dataset.invested);
-      totalEstValue += num(tr.dataset.estimatedValue);
-      totalMaxArv += num(tr.dataset.maxArv);
+      var frac = rowFraction(tr, allowed, allSelected);
+      var visible = frac > 0;
+      tr.classList.toggle('hidden-row', !visible);
+      if (!visible) {
+        WEIGHTED_FIELDS.forEach(function(f) {
+          var cell = tr.querySelector('.' + f[1]);
+          if (cell) cell.textContent = money(num(tr.dataset[f[0]]));
+        });
+        return;
+      }
+      visibleCount++;
+      WEIGHTED_FIELDS.forEach(function(f) {
+        var raw = num(tr.dataset[f[0]]);
+        var weighted = raw * frac;
+        totals[f[0]] += weighted;
+        var cell = tr.querySelector('.' + f[1]);
+        if (cell) cell.textContent = money(weighted);
+      });
       if (tr.dataset.occupied === '1') occupiedCount++;
       if (tr.dataset.annualNcf !== '') {
-        totalAnnualNcf += num(tr.dataset.annualNcf);
-        totalInvestedWithData += num(tr.dataset.investedWithData);
+        totalAnnualNcf += num(tr.dataset.annualNcf) * frac;
+        totalInvestedWithData += num(tr.dataset.investedWithData) * frac;
       }
     });
 
     var yieldPct = totalInvestedWithData > 0 ? (totalAnnualNcf / totalInvestedWithData * 100) : null;
     var monthlyCf = totalInvestedWithData > 0 ? (totalAnnualNcf / 12) : null;
 
-    document.getElementById('tile-invested').textContent = money(totalInvested);
-    document.getElementById('tile-occupied').textContent = occupiedCount + ' / ' + rows.length;
-    document.getElementById('tile-est-value').textContent = money(totalEstValue);
-    document.getElementById('tile-max-arv').textContent = money(totalMaxArv);
+    document.getElementById('tile-invested').textContent = money(totals.invested);
+    document.getElementById('tile-est-value').textContent = money(totals.estimatedValue);
+    document.getElementById('tile-est-profit').textContent = money(totals.estimatedProfit);
+    document.getElementById('tile-max-arv').textContent = money(totals.maxArv);
+    document.getElementById('tile-occupied').textContent = occupiedCount + ' / ' + visibleCount;
+    document.getElementById('tile-purchase-price').textContent = money(totals.purchasePrice);
+    document.getElementById('tile-renovation').textContent = money(totals.renovation);
+
+    var estProfitTile = document.getElementById('tile-est-profit');
+    estProfitTile.classList.remove('profit-up', 'profit-down');
+    estProfitTile.classList.add(totals.estimatedProfit >= 0 ? 'profit-up' : 'profit-down');
 
     var yieldTile = document.getElementById('tile-yield');
     yieldTile.textContent = yieldPct !== null ? yieldPct.toFixed(2) + '%' : 'Not enough data';
@@ -235,29 +308,33 @@
     cfTile.classList.remove('profit-up', 'profit-down');
     if (monthlyCf !== null) cfTile.classList.add(monthlyCf >= 0 ? 'profit-up' : 'profit-down');
 
-    document.getElementById('foot-purchase-price').textContent = money(totalPurchase);
-    document.getElementById('foot-renovation').textContent = money(totalRenovation);
-    document.getElementById('foot-invested').textContent = money(totalInvested);
-    document.getElementById('foot-max-arv').textContent = money(totalMaxArv);
-    document.getElementById('foot-est-value').textContent = money(totalEstValue);
-    document.getElementById('foot-occupied').textContent = occupiedCount + ' / ' + rows.length;
+    document.getElementById('foot-purchase-price').textContent = money(totals.purchasePrice);
+    document.getElementById('foot-renovation').textContent = money(totals.renovation);
+    document.getElementById('foot-invested').textContent = money(totals.invested);
+    document.getElementById('foot-max-arv').textContent = money(totals.maxArv);
+    document.getElementById('foot-est-value').textContent = money(totals.estimatedValue);
+    document.getElementById('foot-est-profit').textContent = money(totals.estimatedProfit);
+    document.getElementById('foot-occupied').textContent = occupiedCount + ' / ' + visibleCount;
     document.getElementById('foot-yield').textContent = yieldPct !== null ? yieldPct.toFixed(2) + '%' : 'Not enough data';
   }
 
   function applyFilters() {
-    var allowedOwners = checkedValues('.owner-filter-cb');
-    document.querySelectorAll('#rentals-table tbody tr').forEach(function(tr) {
-      if (!tr.hasAttribute('data-invested')) return;
-      var owners = (tr.dataset.owners || '').split('|').filter(Boolean);
-      var matches;
-      if (owners.length === 0) {
-        matches = allowedOwners.indexOf('') !== -1;
+    var checkboxes = document.querySelectorAll('.owner-filter-cb');
+    var allowed = checkedValues('.owner-filter-cb');
+    var allSelected = checkboxes.length > 0 && allowed.length === checkboxes.length;
+
+    var scopeEl = document.getElementById('owner-filter-scope');
+    if (scopeEl) {
+      if (checkboxes.length === 0 || allSelected) {
+        scopeEl.textContent = 'Showing: all owners together';
+      } else if (allowed.length === 0) {
+        scopeEl.textContent = 'Showing: nobody selected';
       } else {
-        matches = owners.some(function(o) { return allowedOwners.indexOf(o) !== -1; });
+        scopeEl.textContent = 'Showing: ' + allowed.map(function(a) { return a || 'Unassigned'; }).join(', ') + "'s share";
       }
-      tr.classList.toggle('hidden-row', !matches);
-    });
-    recompute();
+    }
+
+    recompute(allowed, allSelected);
   }
 
   applyFilters();

@@ -106,8 +106,12 @@
     <div class="stat-row" style="margin-top:16px;">
       <div class="stat"><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
       <div class="stat"><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
+      <div class="stat" title="Projected once the property is past its first-year move-in costs - not based on your actual recorded months.">
+        <div class="value {{ 'profit-up' if py.est_yield_pct and py.est_yield_pct >= 0 else 'profit-down' if py.est_yield_pct is not none else '' }}">{{ py.est_yield_display }}</div>
+        <div class="label">Est. Yield (Stabilized)</div>
+      </div>
     </div>
-    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost.</p>
+    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost. Est. Yield (Stabilized) = Annual Rent × 55% ÷ All-In Cost - a steady-state projection assuming 45% of rent goes to expenses, since the first 12 months are often skewed by move-in repairs.</p>
   </div>
 </div>
 </div>
