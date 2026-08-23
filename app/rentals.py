@@ -96,6 +96,11 @@ class PortfolioSummary:
     total_max_arv: float = 0.0
     total_estimated_value: float = 0.0
     total_estimated_profit: float = 0.0
+    # Total Invested, but only summed over properties that have an
+    # estimated_value (i.e. the same scope as total_estimated_profit) - the
+    # correct denominator for estimated_profit_pct, since including
+    # properties with no estimate in the denominator would understate the %.
+    total_invested_with_estimate: float = 0.0
     properties_with_arv: int = 0
     properties_with_estimated_value: int = 0
     # Portfolio-wide cash-on-cash yield: sum of every property's annualized
@@ -113,6 +118,12 @@ class PortfolioSummary:
     def monthly_cash_flow(self) -> Optional[float]:
         return (self.total_annual_net_cash_flow / 12) if self.total_invested_with_data > 0 else None
 
+    @property
+    def estimated_profit_pct(self) -> Optional[float]:
+        if self.total_invested_with_estimate <= 0:
+            return None
+        return (self.total_estimated_profit / self.total_invested_with_estimate) * 100
+
 
 def get_portfolio_summary(properties: List[Property]) -> PortfolioSummary:
     summary = PortfolioSummary(property_count=len(properties))
@@ -129,6 +140,7 @@ def get_portfolio_summary(properties: List[Property]) -> PortfolioSummary:
             summary.total_estimated_value += float(prop.estimated_value)
             summary.properties_with_estimated_value += 1
             summary.total_estimated_profit += prop.estimated_profit
+            summary.total_invested_with_estimate += prop.total_invested
 
         py = get_property_yield(prop)
         if py.yield_pct is not None:

@@ -188,7 +188,7 @@
     <div class="tile-grid" style="margin-bottom:12px;">
       <div class="tile"><div class="value">{{ rm.money(prop.total_invested) }}</div><div class="label">All-In Cost</div></div>
       <div class="tile"><div class="value">{{ rm.money(prop.max_arv) }}</div><div class="label">Max ARV</div></div>
-      <div class="tile"><div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money(prop.estimated_profit) }}</div><div class="label">Est. Profit</div></div>
+      <div class="tile"><div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money_pct(prop.estimated_profit, prop.estimated_profit_pct) }}</div><div class="label">Est. Profit</div></div>
     </div>
     <div class="tile-grid" style="margin-bottom:12px;">
       <div class="tile"><div class="value">{{ rm.money(py.total_expenses) }}</div><div class="label">Operational Costs</div></div>

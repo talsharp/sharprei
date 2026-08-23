@@ -61,52 +61,52 @@
     <h3>Investment Summary</h3>
     <div class="summary-grid">
       <div class="summary-row">
-        <div class="summary-tile">
+        <div class="summary-tile" title="Purchase Price + Closing Costs.">
           <div class="value">{{ rm.money(prop.total_purchase_price) }}</div>
           <div class="label">Purchase Price</div>
         </div>
-        <div class="summary-tile">
+        <div class="summary-tile" title="Sum of all itemized renovation/other expenses logged below.">
           <div class="value">{{ rm.money(prop.total_renovation_costs) }}</div>
           <div class="label">Renovation</div>
         </div>
-        <div class="summary-tile">
+        <div class="summary-tile" title="Manually entered current estimated value.">
           <div class="value">{{ rm.money(prop.estimated_value) }}</div>
           <div class="label">Est. Value</div>
         </div>
       </div>
       <div class="summary-row">
-        <div class="summary-tile">
+        <div class="summary-tile" title="Purchase Price + Renovation - your total money invested in this property.">
           <div class="value">{{ rm.money(prop.total_invested) }}</div>
           <div class="label">All-In Cost</div>
         </div>
-        <div class="summary-tile">
+        <div class="summary-tile" title="Manually entered after-repair value ceiling.">
           <div class="value">{{ rm.money(prop.max_arv) }}</div>
           <div class="label">Max ARV</div>
         </div>
-        <div class="summary-tile">
-          <div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money(prop.estimated_profit) }}</div>
+        <div class="summary-tile" title="Estimated Value − All-In Cost. Percentage is that profit ÷ All-In Cost.">
+          <div class="value {{ 'profit-up' if prop.estimated_profit and prop.estimated_profit >= 0 else 'profit-down' if prop.estimated_profit else '' }}">{{ rm.money_pct(prop.estimated_profit, prop.estimated_profit_pct) }}</div>
           <div class="label">Est. Profit</div>
         </div>
       </div>
       <div class="summary-row">
-        <div class="summary-tile">
+        <div class="summary-tile" title="Sum of every expense category across all months recorded below.">
           <div class="value">{{ rm.money(py.total_expenses) }}</div>
           <div class="label">Operational Costs</div>
         </div>
-        <div class="summary-tile">
+        <div class="summary-tile" title="Sum of income across all months recorded below.">
           <div class="value">{{ rm.money(py.total_income) }}</div>
           <div class="label">Rent Collected</div>
         </div>
-        <div class="summary-tile accent">
+        <div class="summary-tile accent" title="Average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost.">
           <div class="value {{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</div>
           <div class="label">Cash-on-Cash Yield</div>
         </div>
       </div>
     </div>
     <div class="stat-row" style="margin-top:16px;">
-      <div class="stat"><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
-      <div class="stat"><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
-      <div class="stat" title="Projected once the property is past its first-year move-in costs - not based on your actual recorded months.">
+      <div class="stat" title="Manually set - money you've set aside for this property's expenses."><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
+      <div class="stat" title="How many months of income/expense data have been recorded below."><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
+      <div class="stat" title="Annual Rent × 55% ÷ All-In Cost. Projected once the property is past its first-year move-in costs - not based on your actual recorded months.">
         <div class="value {{ 'profit-up' if py.est_yield_pct and py.est_yield_pct >= 0 else 'profit-down' if py.est_yield_pct is not none else '' }}">{{ py.est_yield_display }}</div>
         <div class="label">Est. Yield (Stabilized)</div>
       </div>

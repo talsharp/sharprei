@@ -1,5 +1,7 @@
 {% macro money(v) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v) }}{% endif %}{% endmacro %}
 
+{% macro money_pct(v, pct) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v) }}{% if pct is not none %} ({{ "%.1f"|format(pct) }}%){% endif %}{% endif %}{% endmacro %}
+
 {% macro note_field(form_id, field_name, note_name, value, note_value, width, field_type='number') %}
 <div class="row-edit-block">
   <div style="display:flex; align-items:center; gap:4px;">

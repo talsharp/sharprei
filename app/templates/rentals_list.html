@@ -39,43 +39,43 @@
   <h3>Portfolio Summary</h3>
   <div class="summary-grid">
     <div class="summary-row">
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of All-In Cost (Purchase Price + Renovation) across the shown properties.">
         <div class="value" id="tile-invested">{{ rm.money(summary.total_invested) }}</div>
         <div class="label">Total Invested</div>
       </div>
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of Estimated Value across the shown properties.">
         <div class="value" id="tile-est-value">{{ rm.money(summary.total_estimated_value) }}</div>
         <div class="label">Total Estimated Value</div>
       </div>
-      <div class="summary-tile">
-        <div class="value {{ 'profit-up' if summary.total_estimated_profit >= 0 else 'profit-down' }}" id="tile-est-profit">{{ rm.money(summary.total_estimated_profit) }}</div>
+      <div class="summary-tile" title="Total Estimated Value − Total Invested. Percentage is that profit ÷ Total Invested.">
+        <div class="value {{ 'profit-up' if summary.total_estimated_profit >= 0 else 'profit-down' }}" id="tile-est-profit">{{ rm.money_pct(summary.total_estimated_profit, summary.estimated_profit_pct) }}</div>
         <div class="label">Est. Profit</div>
       </div>
     </div>
     <div class="summary-row">
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of Max ARV across the shown properties.">
         <div class="value" id="tile-max-arv">{{ rm.money(summary.total_max_arv) }}</div>
         <div class="label">Total Max ARV</div>
       </div>
-      <div class="summary-tile accent">
+      <div class="summary-tile accent" title="Dollar-weighted: sum of each property's annualized net cash flow ÷ sum of All-In Cost, across properties with at least one month recorded.">
         <div class="value {{ 'profit-up' if summary.yield_pct and summary.yield_pct >= 0 else 'profit-down' if summary.yield_pct is not none else '' }}" id="tile-yield">{{ summary.yield_display }}</div>
         <div class="label">Portfolio Yield</div>
       </div>
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of each property's annualized net cash flow ÷ 12.">
         <div class="value {{ 'profit-up' if summary.monthly_cash_flow and summary.monthly_cash_flow >= 0 else 'profit-down' if summary.monthly_cash_flow is not none else '' }}" id="tile-monthly-cf">{{ rm.money(summary.monthly_cash_flow) }}</div>
         <div class="label">Monthly Cash Flow</div>
       </div>
     </div>
     <div class="summary-row">
-      <div class="summary-tile">
+      <div class="summary-tile" title="Count of shown properties currently occupied, out of the total shown.">
         <div class="value" id="tile-occupied">{{ summary.occupied_count }} / {{ summary.property_count }}</div>
         <div class="label">Occupied Properties</div>
       </div>
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of Purchase Price + Closing Costs across the shown properties.">
         <div class="value" id="tile-purchase-price">{{ rm.money(summary.total_purchase_price) }}</div>
         <div class="label">Total Purchase Price</div>
       </div>
-      <div class="summary-tile">
+      <div class="summary-tile" title="Sum of renovation/other expenses across the shown properties.">
         <div class="value" id="tile-renovation">{{ rm.money(summary.total_renovation_costs) }}</div>
         <div class="label">Total Renovation</div>
       </div>
@@ -112,7 +112,9 @@
         data-invested="{{ p.total_invested }}"
         data-max-arv="{{ p.max_arv or 0 }}"
         data-estimated-value="{{ p.estimated_value or 0 }}"
+        data-has-estimate="{{ '1' if p.estimated_value is not none else '0' }}"
         data-estimated-profit="{{ p.estimated_profit or 0 }}"
+        data-estimated-profit-pct="{{ p.estimated_profit_pct if p.estimated_profit_pct is not none else '' }}"
         data-occupied="{{ '1' if p.is_occupied else '0' }}"
         data-annual-ncf="{{ py.annual_net_cash_flow if py.yield_pct is not none else '' }}"
         data-invested-with-data="{{ py.total_invested if py.yield_pct is not none else '' }}">
@@ -123,7 +125,7 @@
       <td class="cell-invested">{{ rm.money(p.total_invested) }}</td>
       <td class="cell-max-arv">{{ rm.money(p.max_arv) }}</td>
       <td class="cell-estimated-value">{{ rm.money(p.estimated_value) }}</td>
-      <td class="cell-estimated-profit {{ 'profit-up' if p.estimated_profit and p.estimated_profit >= 0 else 'profit-down' if p.estimated_profit else '' }}">{{ rm.money(p.estimated_profit) }}</td>
+      <td class="cell-estimated-profit {{ 'profit-up' if p.estimated_profit and p.estimated_profit >= 0 else 'profit-down' if p.estimated_profit else '' }}">{{ rm.money_pct(p.estimated_profit, p.estimated_profit_pct) }}</td>
       <td>{% if p.is_occupied %}<span class="badge badge-active">{{ rm.money(p.rent_price) }}/mo</span>{% else %}<span class="badge badge-not_tried">Not Occupied</span>{% endif %}</td>
       <td class="{{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</td>
       <td class="{{ 'profit-up' if py.est_yield_pct and py.est_yield_pct >= 0 else 'profit-down' if py.est_yield_pct is not none else '' }}">{{ py.est_yield_display }}</td>
@@ -256,6 +258,13 @@
     WEIGHTED_FIELDS.forEach(function(f) { totals[f[0]] = 0; });
     var occupiedCount = 0, visibleCount = 0;
     var totalAnnualNcf = 0, totalInvestedWithData = 0;
+    var investedWithEstimate = 0;
+
+    function estProfitCellText(tr, dollarVal) {
+      var pctStr = tr.dataset.estimatedProfitPct;
+      var pct = pctStr ? parseFloat(pctStr) : null;
+      return money(dollarVal) + (pct !== null && !isNaN(pct) ? ' (' + pct.toFixed(1) + '%)' : '');
+    }
 
     rows.forEach(function(tr) {
       var frac = rowFraction(tr, allowed, allSelected);
@@ -264,7 +273,10 @@
       if (!visible) {
         WEIGHTED_FIELDS.forEach(function(f) {
           var cell = tr.querySelector('.' + f[1]);
-          if (cell) cell.textContent = money(num(tr.dataset[f[0]]));
+          if (!cell) return;
+          cell.textContent = f[0] === 'estimatedProfit'
+            ? estProfitCellText(tr, num(tr.dataset[f[0]]))
+            : money(num(tr.dataset[f[0]]));
         });
         return;
       }
@@ -274,9 +286,11 @@
         var weighted = raw * frac;
         totals[f[0]] += weighted;
         var cell = tr.querySelector('.' + f[1]);
-        if (cell) cell.textContent = money(weighted);
+        if (!cell) return;
+        cell.textContent = f[0] === 'estimatedProfit' ? estProfitCellText(tr, weighted) : money(weighted);
       });
       if (tr.dataset.occupied === '1') occupiedCount++;
+      if (tr.dataset.hasEstimate === '1') investedWithEstimate += num(tr.dataset.invested) * frac;
       if (tr.dataset.annualNcf !== '') {
         totalAnnualNcf += num(tr.dataset.annualNcf) * frac;
         totalInvestedWithData += num(tr.dataset.investedWithData) * frac;
@@ -285,10 +299,11 @@
 
     var yieldPct = totalInvestedWithData > 0 ? (totalAnnualNcf / totalInvestedWithData * 100) : null;
     var monthlyCf = totalInvestedWithData > 0 ? (totalAnnualNcf / 12) : null;
+    var estProfitPct = investedWithEstimate > 0 ? (totals.estimatedProfit / investedWithEstimate * 100) : null;
 
     document.getElementById('tile-invested').textContent = money(totals.invested);
     document.getElementById('tile-est-value').textContent = money(totals.estimatedValue);
-    document.getElementById('tile-est-profit').textContent = money(totals.estimatedProfit);
+    document.getElementById('tile-est-profit').textContent = money(totals.estimatedProfit) + (estProfitPct !== null ? ' (' + estProfitPct.toFixed(1) + '%)' : '');
     document.getElementById('tile-max-arv').textContent = money(totals.maxArv);
     document.getElementById('tile-occupied').textContent = occupiedCount + ' / ' + visibleCount;
     document.getElementById('tile-purchase-price').textContent = money(totals.purchasePrice);

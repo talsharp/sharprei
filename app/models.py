@@ -206,6 +206,12 @@ class Property(Base):
             return None
         return float(self.estimated_value) - self.total_invested
 
+    @property
+    def estimated_profit_pct(self) -> Optional[float]:
+        if self.estimated_profit is None or self.total_invested <= 0:
+            return None
+        return (self.estimated_profit / self.total_invested) * 100
+
 
 class RenovationExpense(Base):
     __tablename__ = "renovation_expenses"
