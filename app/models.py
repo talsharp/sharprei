@@ -3,6 +3,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -283,3 +284,90 @@ class MonthlyExpense(Base):
     @property
     def net_cash_flow(self) -> float:
         return float(self.income) - self.total_expenses
+
+
+class Vendor(Base):
+    __tablename__ = "finance_vendors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    default_channel: Mapped[str] = mapped_column(String(20), default="shared")
+    recurring: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    expenses: Mapped[list["FinanceExpense"]] = relationship(back_populates="vendor")
+
+
+class FinanceMonth(Base):
+    __tablename__ = "finance_months"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    month: Mapped[date] = mapped_column(Date, unique=True)
+    sms_leads: Mapped[int] = mapped_column(default=0)
+    sms_follow_up_leads: Mapped[int] = mapped_column(default=0)
+    cold_call_leads: Mapped[int] = mapped_column(default=0)
+    facebook_leads: Mapped[int] = mapped_column(default=0)
+
+    expenses: Mapped[list["FinanceExpense"]] = relationship(
+        back_populates="finance_month", cascade="all, delete-orphan"
+    )
+
+    @property
+    def total_leads(self) -> int:
+        return self.sms_leads + self.sms_follow_up_leads + self.cold_call_leads + self.facebook_leads
+
+
+class FinanceExpense(Base):
+    __tablename__ = "finance_expenses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    finance_month_id: Mapped[int] = mapped_column(ForeignKey("finance_months.id"))
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("finance_vendors.id"))
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    channel: Mapped[str] = mapped_column(String(20))
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    finance_month: Mapped[FinanceMonth] = relationship(back_populates="expenses")
+    vendor: Mapped[Vendor] = relationship(back_populates="expenses")
+
+
+class WholesaleDeal(Base):
+    __tablename__ = "wholesale_deals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    address: Mapped[str] = mapped_column(String(255))
+    agreement_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    agreement_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    sell_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="under_contract")
+    closed_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    revenue: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    realtor_commission: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    acquisition_commission: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    closing_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    additional_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    # For deals kept for the portfolio: the estimated profit it would have made
+    # as a wholesale deal. Counted as that deal's wholesale profit (marked est.).
+    estimated_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    channel: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    zip_code_id: Mapped[Optional[int]] = mapped_column(ForeignKey("zip_codes.id"), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    zip_code: Mapped[Optional[ZipCode]] = relationship()
+
+    @property
+    def total_costs(self) -> float:
+        return (
+            float(self.realtor_commission or 0)
+            + float(self.acquisition_commission or 0)
+            + float(self.closing_costs or 0)
+            + float(self.additional_costs or 0)
+        )
+
+    @property
+    def profit(self) -> Optional[float]:
+        if self.status == "closed":
+            return float(self.revenue or 0) - self.total_costs
+        if self.status == "kept":
+            return float(self.estimated_value or 0)
+        return None

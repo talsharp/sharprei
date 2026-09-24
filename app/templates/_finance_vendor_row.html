@@ -1,0 +1,22 @@
+{% import "_finance_macros.html" as fx %}
+{% set st = stats.get(v.id, {}) %}
+<tr id="vendor-{{ v.id }}" hx-post="/finance/vendors/{{ v.id }}/update" hx-trigger="change" hx-include="this" hx-target="this" hx-swap="outerHTML">
+  <td>
+    <input type="text" name="name" value="{{ v.name }}" style="width:180px;">
+    {% if error %}<div class="profit-down" style="font-size:12px;">{{ error }}</div>{% endif %}
+  </td>
+  <td>
+    <select name="default_channel">
+      {% for k, label in CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if k == v.default_channel else '' }}>{{ label }}</option>{% endfor %}
+    </select>
+  </td>
+  <td><input type="checkbox" name="recurring" value="1" {{ 'checked' if v.recurring else '' }} aria-label="Recurring"></td>
+  <td>{{ st.get('count', 0) }}</td>
+  <td>{{ fx.money(st.get('last_amount')) }}{% if st.get('last_month') %} <span class="muted">({{ st.get('last_month').strftime('%b %Y') }})</span>{% endif %}</td>
+  <td>{{ fx.money(st.get('total', 0)) }}</td>
+  <td style="text-align:right;">
+    {% if not st.get('count') %}
+    <button type="button" class="danger small" hx-post="/finance/vendors/{{ v.id }}/delete" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete {{ v.name }}?" hx-trigger="click consume">Delete</button>
+    {% endif %}
+  </td>
+</tr>

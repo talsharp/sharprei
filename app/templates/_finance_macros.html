@@ -1,0 +1,18 @@
+{% macro money(v) %}{% if v is none %}—{% else %}{{ "-" if v < 0 else "" }}${{ "{:,.0f}".format(v|abs) }}{% endif %}{% endmacro %}
+
+{% macro signed_class(v) %}{% if v is not none and v > 0 %}profit-up{% elif v is not none and v < 0 %}profit-down{% endif %}{% endmacro %}
+
+{% macro cpl(v) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v) }}{% endif %}{% endmacro %}
+
+{% macro pct(v) %}{% if v is none %}—{% else %}{{ "%.1f"|format(v * 100) }}%{% endif %}{% endmacro %}
+
+{% macro channel_badge(ch) %}<span class="badge ch-{{ ch }}">{{ CHANNELS.get(ch, ch) }}</span>{% endmacro %}
+
+{% macro status_badge(s) %}<span class="badge deal-{{ s }}">{{ DEAL_STATUSES.get(s, s) }}</span>{% endmacro %}
+
+{% macro page_header(title, subtitle) %}
+<div>
+  <h2 class="page-title">{{ title }}</h2>
+  {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+</div>
+{% endmacro %}

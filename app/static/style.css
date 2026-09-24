@@ -336,3 +336,37 @@ td.profit-up, td.profit-down { font-weight: 600; }
 .summary-tile:has(.value.profit-down) { background: #FDECEC; border-color: #F2B8B8; }
 .summary-tile:has(.value.profit-up) .label { color: #2F6B3B; }
 .summary-tile:has(.value.profit-down) .label { color: #9A3A33; }
+
+/* ---------- Finance ---------- */
+
+button.small, .btn.small { padding: 5px 10px; font-size: 12px; }
+
+table tfoot td { font-weight: 600; color: var(--navy); background: #F1F4F9; border-top: 1px solid var(--border-strong); border-bottom: none; }
+
+.ch-sms { background: #EEEDFE; color: #3C3489; }
+.ch-cold_call { background: #E6F1FB; color: #0C447C; }
+.ch-facebook { background: #E1F5EE; color: #085041; }
+.ch-shared { background: var(--gray-bg); color: var(--gray); }
+.ch-general { background: var(--yellow-bg); color: var(--yellow); }
+
+.deal-under_contract { background: var(--yellow-bg); color: var(--yellow); }
+.deal-closed { background: var(--green-bg); color: var(--green); }
+.deal-kept { background: #E6F1FB; color: #0C447C; }
+.deal-cancelled { background: var(--gray-bg); color: var(--gray); }
+
+.side-notes { display: flex; gap: 12px; flex-wrap: wrap; margin: -6px 0 20px; }
+.side-note { background: var(--panel); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 8px 14px; font-size: 13px; }
+.side-note strong { color: var(--navy); margin-left: 6px; }
+
+.funnel { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.funnel-step { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: center; flex: 1; min-width: 110px; }
+.funnel-step .value { font-size: 22px; font-weight: 700; color: var(--navy); }
+.funnel-step .label { font-size: 12px; color: var(--muted); }
+.funnel-arrow { font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+
+.leads-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-items: end; }
+.leads-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.leads-form button { grid-column: 1 / -1; justify-self: start; }
+
+.expense-table td { vertical-align: middle; }
+.expense-table tr.add-row td { background: var(--panel-soft); }

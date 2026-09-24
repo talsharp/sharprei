@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fm %}
+{% block title %}Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  {{ fm.page_header("Finance Overview", "Wholesale profit and loss, all months") }}
+  <a class="btn" href="/finance/month">Monthly expenses</a>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi" title="All wholesale expenses (every channel except General)."><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM4 11h16M8 15h3"/></svg></div><div><div class="label">Wholesale expenses</div><div class="value">{{ fm.money(totals.wholesale_expenses) }}</div></div></div>
+  <div class="kpi" title="Profit of closed deals (after commissions and closing costs), counted in the month they closed. Houses kept for the portfolio count at their estimated wholesale profit."><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg></div><div><div class="label">Wholesale revenue</div><div class="value">{{ fm.money(totals.revenue) }}</div></div></div>
+  <div class="kpi" title="Wholesale revenue − wholesale expenses."><div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></div><div><div class="label">Profit</div><div class="value {{ fm.signed_class(totals.profit) }}">{{ fm.money(totals.profit) }}</div></div></div>
+  <div class="kpi" title="Profit ÷ wholesale expenses."><div class="kpi-icon coral"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg></div><div><div class="label">ROI</div><div class="value {{ fm.signed_class(totals.roi) }}">{{ fm.pct(totals.roi) }}</div></div></div>
+  <div class="kpi" title="Wholesale expenses ÷ total leads (all channels)."><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0"/></svg></div><div><div class="label">Cost per lead</div><div class="value">{{ fm.cpl(totals.cpl) }}</div></div></div>
+</div>
+
+<div class="side-notes">
+  <div class="side-note" title="Houses you kept for your portfolio, counted at what they would have made as wholesale deals. Already included in revenue and profit above.">
+    <span class="muted">Includes est. profit from houses kept for portfolio</span> <strong>{{ fm.money(totals.kept_value) }}</strong>
+  </div>
+  <div class="side-note" title="Expenses on the General channel (hosting, software, trips...). Shown for reference - not counted as wholesale expenses.">
+    <span class="muted">General expenses (not in profit)</span> <strong>{{ fm.money(totals.general_expenses) }}</strong>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card" style="margin-bottom:0;">
+    <h3>Cost per lead by channel</h3>
+    <table>
+      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th></tr></thead>
+      <tbody>
+        {% for ch in wholesale_channels %}
+        {% set cs = totals.channels[ch] %}
+        <tr>
+          <td>{{ fm.channel_badge(ch) }}</td>
+          <td>{{ fm.money(cs.expenses) }}</td>
+          <td>{{ cs.leads if ch in lead_channels else "—" }}</td>
+          <td>{{ fm.cpl(cs.cpl) if ch in lead_channels else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:12px; margin:10px 0 0;">Wholesale - Shared covers tools used by every channel (ChatGPT, Gsuite...), so it has no leads of its own.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <h3>Deal funnel</h3>
+    <div class="funnel">
+      <div class="funnel-step"><div class="value">{{ totals.leads }}</div><div class="label">Leads</div></div>
+      <div class="funnel-arrow" title="Leads that became signed agreements">{{ fm.pct(totals.lead_to_agreement) }} →</div>
+      <div class="funnel-step"><div class="value">{{ totals.signed_agreements }}</div><div class="label">Signed agreements</div></div>
+      <div class="funnel-arrow" title="Signed agreements that closed (wholesale or kept)">{{ fm.pct(totals.agreement_to_deal) }} →</div>
+      <div class="funnel-step"><div class="value">{{ totals.closed_deals }}</div><div class="label">Closed deals</div></div>
+    </div>
+    <p class="muted" style="font-size:12px; margin:14px 0 0;">Lead to deal: <strong>{{ fm.pct(totals.lead_to_deal) }}</strong> · {{ totals.under_contract }} under contract now. Signed agreements and closed deals come from the <a href="/finance/deals">Deals</a> list.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Monthly profit and loss</h3>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th><th>Wholesale expenses</th><th>Revenue</th><th>Profit</th><th>Leads</th><th>CPL</th><th>General</th><th>Of which kept (est.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in summaries %}
+      <tr>
+        <td><a class="zip-link" href="/finance/month/{{ s.month.strftime('%Y-%m') }}">{{ s.month.strftime('%b %Y') }}</a></td>
+        <td>{{ fm.money(s.wholesale_expenses) }}</td>
+        <td title="{% for d in s.closed_deals %}{{ d.address }}: {{ fm.money(d.profit) }}&#10;{% endfor %}{% for d in s.kept_deals %}{{ d.address }}: {{ fm.money(d.profit) }} (est., kept for portfolio)&#10;{% endfor %}">{{ fm.money(s.revenue) }}</td>
+        <td class="{{ fm.signed_class(s.profit) }}">{{ fm.money(s.profit) }}</td>
+        <td>{{ s.leads }}</td>
+        <td>{{ fm.cpl(s.cpl) }}</td>
+        <td class="muted">{{ fm.money(s.general_expenses) if s.general_expenses else "—" }}</td>
+        <td class="muted" title="{% for d in s.kept_deals %}{{ d.address }}: {{ fm.money(d.profit) }}&#10;{% endfor %}">{{ fm.money(s.kept_value) if s.kept_value else "—" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted" style="text-align:center; padding:24px;">No months yet. Start one from Monthly expenses.</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="font-weight:600;">
+        <td>Total</td>
+        <td>{{ fm.money(totals.wholesale_expenses) }}</td>
+        <td>{{ fm.money(totals.revenue) }}</td>
+        <td class="{{ fm.signed_class(totals.profit) }}">{{ fm.money(totals.profit) }}</td>
+        <td>{{ totals.leads }}</td>
+        <td>{{ fm.cpl(totals.cpl) }}</td>
+        <td>{{ fm.money(totals.general_expenses) }}</td>
+        <td>{{ fm.money(totals.kept_value) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Hover a revenue amount to see which deals it came from. Houses kept for the portfolio are included at their estimated wholesale profit.</p>
+</div>
+
+{% endblock %}

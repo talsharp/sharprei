@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Vendors · Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Vendors</h2>
+    <p class="page-subtitle">Each vendor's usual channel, and whether it's copied into every new month</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Add a vendor</h3>
+  <form method="post" action="/finance/vendors/new" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input type="text" name="name" placeholder="Vendor name" required style="min-width:220px;">
+    <select name="default_channel">
+      {% for k, label in CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if k == 'shared' else '' }}>{{ label }}</option>{% endfor %}
+    </select>
+    <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" name="recurring" value="1"> Recurring</label>
+    <button type="submit">Add vendor</button>
+  </form>
+</div>
+
+<table class="sticky-table">
+  <thead>
+    <tr><th>Vendor</th><th>Default channel</th><th title="Recurring vendors are copied (with last month's amount) into each new month">Recurring</th><th>Months used</th><th>Last amount</th><th>Total spent</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for v in vendors %}
+    {% include "_finance_vendor_row.html" %}
+    {% endfor %}
+  </tbody>
+</table>
+<p class="muted" style="font-size:12px;">Changes save as soon as you edit them. Changing a vendor's default channel only affects new expenses - past months keep the channel they were entered with. A vendor can only be deleted if it has no expenses.</p>
+
+{% endblock %}

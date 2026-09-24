@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import CampaignRun, Deal, RunType, ZipCode
+from app.models import CampaignRun, Deal, RunType, WholesaleDeal, ZipCode
 
 # Minimum SMS volume before a zip code is eligible for a tier - below this,
 # lead/reply rates are too noisy on a small sample to grade reliably.
@@ -223,6 +223,13 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
         .outerjoin(deal_agg, deal_agg.c.zip_code_id == ZipCode.id)
     )
 
+    # Closed deals from Finance > Deals that were tagged with a zip code count
+    # toward that zip too (kept-for-portfolio houses count at their est. profit).
+    finance_deals = {}
+    for d in db.query(WholesaleDeal).filter(WholesaleDeal.status.in_(("closed", "kept")), WholesaleDeal.zip_code_id.isnot(None)):
+        count, profit = finance_deals.get(d.zip_code_id, (0, 0.0))
+        finance_deals[d.zip_code_id] = (count + 1, profit + (d.profit or 0))
+
     results = []
     for row in db.execute(stmt).all():
         (
@@ -249,8 +256,8 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
                 total_signed_agreements=total_signed_agreements or 0,
                 total_opt_out=total_opt_out,
                 run_count=run_count or 0,
-                deal_count=deal_count or 0,
-                total_profit=float(total_profit or 0),
+                deal_count=(deal_count or 0) + finance_deals.get(zc.id, (0, 0.0))[0],
+                total_profit=float(total_profit or 0) + finance_deals.get(zc.id, (0, 0.0))[1],
             )
         )
 

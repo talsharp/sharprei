@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ month.strftime('%B %Y') }} · Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h2 class="page-title" style="margin-right:6px;">{{ month.strftime('%B %Y') }}</h2>
+    <select aria-label="Choose month" onchange="window.location='/finance/month/' + this.value">
+      {% for m in all_months %}
+      <option value="{{ m.strftime('%Y-%m') }}" {{ 'selected' if m == month else '' }}>{{ m.strftime('%B %Y') }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <form method="post" action="/finance/month/start" style="display:flex; gap:8px; align-items:center;" title="Creates the month and copies in last month's recurring vendors with their amounts - then just adjust what changed.">
+    <input type="month" name="month" value="{{ next_new_month.strftime('%Y-%m') }}" required>
+    <button type="submit">Start new month</button>
+  </form>
+</div>
+
+{% include "_finance_month_body.html" %}
+
+<script>
+function toggleRowEdit(id) {
+  document.getElementById('exp-' + id).classList.toggle('editing');
+}
+function fillVendorChannel(input) {
+  var opt = document.querySelector('#vendor-list option[value="' + CSS.escape(input.value) + '"]');
+  var select = input.closest('tr').querySelector('select[name=channel]');
+  if (opt && select) select.value = opt.dataset.channel;
+}
+</script>
+
+{% endblock %}

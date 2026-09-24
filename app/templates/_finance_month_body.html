@@ -1,0 +1,153 @@
+{% import "_finance_macros.html" as fx %}
+<div id="month-body">
+{% if not fm %}
+<div class="card">
+  <h3>No data for {{ month.strftime('%B %Y') }} yet</h3>
+  <p class="muted">Start this month to add its expenses and leads. Last month's recurring vendors are copied in automatically.</p>
+  <form method="post" action="/finance/month/start">
+    <input type="hidden" name="month" value="{{ key }}">
+    <button type="submit">Start {{ month.strftime('%B %Y') }}</button>
+  </form>
+</div>
+{% else %}
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM4 11h16M8 15h3"/></svg></div><div><div class="label">Wholesale expenses</div><div class="value">{{ fx.money(summary.wholesale_expenses) }}</div></div></div>
+  <div class="kpi" title="{% for d in summary.closed_deals + summary.kept_deals %}{{ d.address }}: {{ fx.money(d.profit) }}{{ " (est., kept for portfolio)" if d.status == "kept" else "" }}&#10;{% else %}No deals closed this month{% endfor %}"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg></div><div><div class="label">Revenue</div><div class="value">{{ fx.money(summary.revenue) }}</div></div></div>
+  <div class="kpi"><div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></div><div><div class="label">Profit</div><div class="value {{ fx.signed_class(summary.profit) }}">{{ fx.money(summary.profit) }}</div></div></div>
+  <div class="kpi"><div class="kpi-icon coral"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0"/></svg></div><div><div class="label">Leads · CPL</div><div class="value">{{ summary.leads }} · {{ fx.cpl(summary.cpl) }}</div></div></div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card" style="margin-bottom:0;">
+    <h3>By channel</h3>
+    <table>
+      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th></tr></thead>
+      <tbody>
+        {% for ch in wholesale_channels %}
+        {% set cs = summary.channels[ch] %}
+        <tr>
+          <td>{{ fx.channel_badge(ch) }}</td>
+          <td>{{ fx.money(cs.expenses) }}</td>
+          <td>{{ cs.leads if ch in lead_channels else "—" }}</td>
+          <td>{{ fx.cpl(cs.cpl) if ch in lead_channels else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <h3>Leads this month</h3>
+    <form hx-post="/finance/month/{{ key }}/leads" hx-target="#month-body" hx-swap="outerHTML" class="leads-form">
+      <label>SMS - normal<input type="number" min="0" step="1" name="sms_leads" value="{{ fm.sms_leads }}"></label>
+      <label>SMS - follow-up<input type="number" min="0" step="1" name="sms_follow_up_leads" value="{{ fm.sms_follow_up_leads }}"></label>
+      <label>Cold call<input type="number" min="0" step="1" name="cold_call_leads" value="{{ fm.cold_call_leads }}"></label>
+      <label>Facebook<input type="number" min="0" step="1" name="facebook_leads" value="{{ fm.facebook_leads }}"></label>
+      <button type="submit">Save leads</button>
+    </form>
+  </div>
+</div>
+
+<datalist id="vendor-list">
+  {% for v in vendors %}<option value="{{ v.name }}" data-channel="{{ v.default_channel }}"></option>{% endfor %}
+</datalist>
+
+{% macro expense_rows(rows) %}
+  {% for e in rows %}
+  <tr id="exp-{{ e.id }}">
+    <td>
+      <span class="row-view"><strong>{{ e.vendor.name }}</strong></span>
+      <input class="row-edit" type="text" name="vendor_name" value="{{ e.vendor.name }}" list="vendor-list" style="width:150px;">
+    </td>
+    <td>
+      <span class="row-view">{{ fx.channel_badge(e.channel) }}</span>
+      <select class="row-edit" name="channel">
+        {% for k, label in CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if k == e.channel else '' }}>{{ label }}</option>{% endfor %}
+      </select>
+    </td>
+    <td>
+      <span class="row-view">{{ fx.money(e.amount|float) }}</span>
+      <input class="row-edit" type="number" step="any" name="amount" value="{{ '%g'|format(e.amount|float) }}" style="width:100px;">
+    </td>
+    <td>
+      <span class="row-view muted">{{ e.description or "" }}</span>
+      <input class="row-edit" type="text" name="description" value="{{ e.description or '' }}" style="width:100%; min-width:220px;">
+    </td>
+    <td class="month-actions" style="text-align:right;">
+      <span class="row-view">
+        <button type="button" class="secondary small" onclick="toggleRowEdit({{ e.id }})">Edit</button>
+        <button type="button" class="danger small" hx-post="/finance/expenses/{{ e.id }}/delete" hx-target="#month-body" hx-swap="outerHTML" hx-confirm="Delete {{ e.vendor.name }} ({{ fx.money(e.amount|float) }})?">Delete</button>
+      </span>
+      <span class="row-edit-actions">
+        <button type="button" class="small" hx-post="/finance/expenses/{{ e.id }}/update" hx-include="closest tr" hx-target="#month-body" hx-swap="outerHTML">Save</button>
+        <button type="button" class="secondary small" onclick="toggleRowEdit({{ e.id }})">Cancel</button>
+      </span>
+    </td>
+  </tr>
+  {% endfor %}
+{% endmacro %}
+
+{% if not wholesale_expenses %}
+<div class="card" style="border-color:#B5D4F4; background:#F4F9FE;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <div><strong>No wholesale expenses yet.</strong> <span class="muted">Copy in your recurring vendors with the amounts from the last month that had them, then adjust what changed.</span></div>
+    <button type="button" hx-post="/finance/month/{{ key }}/copy-recurring" hx-target="#month-body" hx-swap="outerHTML">Copy recurring expenses</button>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Wholesale expenses <span class="muted" style="font-weight:400;">· {{ fx.money(summary.wholesale_expenses) }}</span></h3>
+  <table class="expense-table">
+    <thead><tr><th>Vendor</th><th>Channel</th><th>Amount</th><th>Description</th><th></th></tr></thead>
+    <tbody>
+      {{ expense_rows(wholesale_expenses) }}
+      <tr class="add-row">
+        <td><input type="text" name="vendor_name" list="vendor-list" placeholder="Vendor" style="width:150px;" onchange="fillVendorChannel(this)" required></td>
+        <td>
+          <select name="channel">
+            {% for k, label in CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if k == 'shared' else '' }}>{{ label }}</option>{% endfor %}
+          </select>
+        </td>
+        <td><input type="number" step="any" name="amount" placeholder="0" style="width:100px;"></td>
+        <td><input type="text" name="description" placeholder="Optional note" style="width:100%; min-width:220px;"></td>
+        <td style="text-align:right;"><button type="button" class="small" hx-post="/finance/month/{{ key }}/expenses/new" hx-include="closest tr" hx-target="#month-body" hx-swap="outerHTML">Add</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Pick a vendor from the list and its usual channel fills in. A new vendor name is saved automatically. Choose "General" for costs that aren't wholesale - they'll move to the section below.</p>
+</div>
+
+<div class="card">
+  <h3>General expenses <span class="muted" style="font-weight:400;">· {{ fx.money(summary.general_expenses) }} · not counted in wholesale profit</span></h3>
+  {% if general_expenses %}
+  <table class="expense-table">
+    <thead><tr><th>Vendor</th><th>Channel</th><th>Amount</th><th>Description</th><th></th></tr></thead>
+    <tbody>{{ expense_rows(general_expenses) }}</tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="margin:0;">None this month.</p>
+  {% endif %}
+</div>
+
+{% if summary.closed_deals or summary.kept_deals %}
+<div class="card">
+  <h3>Deals closed this month</h3>
+  <table>
+    <thead><tr><th>Address</th><th>Status</th><th>Profit</th></tr></thead>
+    <tbody>
+      {% for d in summary.closed_deals + summary.kept_deals %}
+      <tr>
+        <td><a class="zip-link" href="/finance/deals/{{ d.id }}">{{ d.address }}</a></td>
+        <td>{{ fx.status_badge(d.status) }}</td>
+        <td class="{{ fx.signed_class(d.profit) }}">{{ fx.money(d.profit) }}{% if d.status == 'kept' %} <span class="muted">(est.)</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+</div>

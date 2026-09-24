@@ -27,6 +27,16 @@
         <a href="/followups" class="nav-item sub {{ 'active' if active == 'followups' else '' }}">Follow-ups</a>
         <a href="/import/weekly" class="nav-item sub {{ 'active' if active == 'weekly_import' else '' }}">Weekly Update</a>
 
+        {% set in_finance = active in ['fin_overview', 'fin_month', 'fin_deals', 'fin_vendors'] %}
+        <div class="nav-group {{ 'current' if in_finance else '' }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg>
+          Finance
+        </div>
+        <a href="/finance" class="nav-item sub {{ 'active' if active == 'fin_overview' else '' }}">Overview</a>
+        <a href="/finance/month" class="nav-item sub {{ 'active' if active == 'fin_month' else '' }}">Monthly Expenses</a>
+        <a href="/finance/deals" class="nav-item sub {{ 'active' if active == 'fin_deals' else '' }}">Deals</a>
+        <a href="/finance/vendors" class="nav-item sub {{ 'active' if active == 'fin_vendors' else '' }}">Vendors</a>
+
         <div class="nav-section">Rentals</div>
         <a href="/rentals" class="nav-item {{ 'active' if active == 'rentals' else '' }}">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6"/></svg>

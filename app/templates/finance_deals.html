@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}Deals · Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  {{ fx.page_header("Deals", "Every signed agreement - closed, kept, in progress, or didn't close") }}
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM11 12h5M11 16h5"/></svg></div><div><div class="label">Signed agreements</div><div class="value">{{ totals.signed_agreements }}</div></div></div>
+  <div class="kpi"><div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></div><div><div class="label">Closed (incl. kept)</div><div class="value">{{ totals.closed_deals }}</div></div></div>
+  <div class="kpi"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 3M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/></svg></div><div><div class="label">Under contract</div><div class="value">{{ totals.under_contract }}</div></div></div>
+  <div class="kpi"><div class="kpi-icon coral"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg></div><div><div class="label">Wholesale profit</div><div class="value {{ fx.signed_class(totals.revenue) }}">{{ fx.money(totals.revenue) }}</div></div></div>
+</div>
+
+<div class="card">
+  <h3>Add a signed agreement</h3>
+  <form method="post" action="/finance/deals/new" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input type="text" name="address" placeholder="Address, e.g. 819 Middle St, Braddock, PA 15104" required style="flex:1; min-width:280px;">
+    <input type="date" name="agreement_date" value="{{ today }}" title="Agreement date">
+    <input type="number" step="any" name="agreement_price" placeholder="Agreement price" style="width:160px;">
+    <button type="submit">Add deal</button>
+  </form>
+</div>
+
+<div style="overflow-x:auto;">
+<table class="sticky-table">
+  <thead>
+    <tr>
+      <th>Address</th><th>Status</th><th>Agreement date</th><th>Agreement price</th><th>Sell price</th><th>Closed</th><th>Revenue</th><th>Costs</th><th>Profit</th><th>Channel</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in deals %}
+    <tr>
+      <td><a class="zip-link" href="/finance/deals/{{ d.id }}" {% if d.notes %}title="{{ d.notes }}"{% endif %}>{{ d.address }}</a>{% if d.notes %} <span class="muted" title="{{ d.notes }}">ⓘ</span>{% endif %}</td>
+      <td>{{ fx.status_badge(d.status) }}</td>
+      <td>{{ d.agreement_date.strftime('%b %d, %Y') if d.agreement_date else "—" }}</td>
+      <td>{{ fx.money(d.agreement_price|float if d.agreement_price is not none else none) }}</td>
+      <td>{{ fx.money(d.sell_price|float if d.sell_price is not none else none) }}</td>
+      <td>{{ d.closed_date.strftime('%b %d, %Y') if d.closed_date else "—" }}</td>
+      <td>{{ fx.money(d.revenue|float) if d.status == 'closed' else "—" }}</td>
+      <td>{{ fx.money(d.total_costs) if d.status == 'closed' else "—" }}</td>
+      <td class="{{ fx.signed_class(d.profit) }}">
+        {{ fx.money(d.profit) }}{% if d.status == 'kept' %} <span class="muted" title="Estimated wholesale profit - this house was kept for the portfolio">(est.)</span>{% endif %}
+      </td>
+      <td>{{ fx.channel_badge(d.channel) if d.channel else "—" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="muted" style="text-align:center; padding:24px;">No deals yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted" style="font-size:12px;">Click an address to edit it. Profit = revenue − realtor commission − acquisition commission − closing costs − additional costs, and counts in the month the deal closed. Houses kept for the portfolio count at their estimated wholesale profit, marked (est.).</p>
+
+{% endblock %}

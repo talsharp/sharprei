@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import backup_db, get_db, init_db
+from app.finance_routes import build_router as build_finance_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -74,6 +75,8 @@ templates.env.globals["UNSET_DATE"] = UNSET_DATE
 templates.env.globals["STATIC_VERSION"] = int(
     os.path.getmtime(Path(__file__).resolve().parent / "static" / "style.css")
 )
+
+app.include_router(build_finance_router(templates))
 
 
 @app.on_event("startup")
