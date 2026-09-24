@@ -3,23 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}AAA Houses - SMS{% endblock %}</title>
+  <title>{% block title %}REI With LOVE{% endblock %} · REI With LOVE</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ STATIC_VERSION }}">
   <link rel="stylesheet" href="/static/style.css?v={{ STATIC_VERSION }}">
   <script src="/static/htmx.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>AAA Houses - SMS</h1>
-    <nav>
-      <a href="/" class="{{ 'active' if active == 'list' else '' }}">Zip Codes</a>
-      <a href="/followups" class="{{ 'active' if active == 'followups' else '' }}">Follow-ups</a>
-      <a href="/import" class="{{ 'active' if active == 'import' else '' }}">Import File</a>
-      <a href="/insights" class="{{ 'active' if active == 'insights' else '' }}">Insights</a>
-      <a href="/rentals" class="{{ 'active' if active == 'rentals' else '' }}">Rentals</a>
-    </nav>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  <div class="layout">
+    <aside class="sidebar">
+      <a href="/" class="logo" aria-label="REI With LOVE - home">
+        <span class="logo-rei">REI</span><span class="logo-with">w/</span>
+        <svg class="logo-heart" viewBox="0 0 48 44" aria-hidden="true"><path d="M24 42 C24 42 2 28 2 14 C2 6 8 1 14.5 1 C19 1 22.5 3.5 24 7 C25.5 3.5 29 1 33.5 1 C40 1 46 6 46 14 C46 28 24 42 24 42 Z"/></svg>
+      </a>
+
+      <nav class="side-nav">
+        <div class="nav-section">Wholesale</div>
+        {% set in_sms = active in ['list', 'followups', 'weekly_import'] %}
+        <div class="nav-group {{ 'current' if in_sms else '' }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
+          SMS Campaign
+        </div>
+        <a href="/" class="nav-item sub {{ 'active' if active == 'list' else '' }}">Zip Codes</a>
+        <a href="/followups" class="nav-item sub {{ 'active' if active == 'followups' else '' }}">Follow-ups</a>
+        <a href="/import/weekly" class="nav-item sub {{ 'active' if active == 'weekly_import' else '' }}">Weekly Update</a>
+
+        <div class="nav-section">Rentals</div>
+        <a href="/rentals" class="nav-item {{ 'active' if active == 'rentals' else '' }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6"/></svg>
+          Portfolio
+        </a>
+      </nav>
+    </aside>
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>

@@ -7,3 +7,5 @@ uploads/
 .claude/
 .DS_Store
 ~$*.xlsx
+logs/
+backups/

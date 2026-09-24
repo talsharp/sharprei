@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Weekly Update Preview{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <h2 style="margin:0;">Weekly Update Preview</h2>
+  <a class="btn secondary" href="/import/weekly">Cancel</a>
+</div>
+
+<div class="card">
+  <h3>Summary</h3>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr><th>Round</th><th>Will Update</th><th>Will Create</th><th>Skipped</th></tr>
+    </thead>
+    <tbody>
+      {% for key in round_order %}
+      {% if summary[key]['update'] or summary[key]['create'] or summary[key]['skip'] %}
+      <tr>
+        <td>{{ round_labels[key] }}</td>
+        <td>{{ summary[key]['update'] }}</td>
+        <td>{{ summary[key]['create'] }}</td>
+        <td class="{{ 'profit-down' if summary[key]['skip'] else '' }}">{{ summary[key]['skip'] }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if warnings %}
+<div class="card" style="border-color: var(--yellow);">
+  <h3 style="color: var(--yellow);">Skipped - needs attention ({{ warnings|length }})</h3>
+  <ul class="muted" style="margin:0; padding-inline-start:20px;">
+    {% for w in warnings %}
+    <li>{{ w }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% for key in round_order %}
+{% set rows = by_round[key] %}
+{% set visible_rows = rows|rejectattr('action', 'equalto', 'skip')|list %}
+{% if visible_rows %}
+<div class="card">
+  <h3>{{ round_labels[key] }} ({{ visible_rows|length }} zip{{ "s" if visible_rows|length != 1 else "" }})</h3>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Zip</th><th></th>
+        {% for f in metric_fields %}<th>{{ metric_labels[f] }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in visible_rows %}
+      <tr>
+        <td><strong>{{ c.zip_code }}</strong>{% if c.zip_is_new %} <span class="badge badge-active" style="font-size:10px;">new zip</span>{% endif %}</td>
+        <td>{% if c.action == 'create' %}<span class="badge badge-active">new round</span>{% else %}<span class="badge badge-watchlist">update</span>{% endif %}</td>
+        {% for f in metric_fields %}
+        <td>
+          {% if c.action == 'update' %}
+            {% if c.old_values[f] != c.new_values[f] %}
+            <span class="muted">{{ c.old_values[f] }}</span> → <strong>{{ c.new_values[f] }}</strong>
+            {% else %}
+            {{ c.new_values[f] }}
+            {% endif %}
+          {% else %}
+          {{ c.new_values[f] }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% if by_round.values() | map('length') | sum == 0 %}
+<div class="card">
+  <p class="muted">No changes found - every round already matches this file, or no recognizable rows were found.</p>
+</div>
+{% else %}
+<form method="post" action="/import/weekly/commit">
+  <input type="hidden" name="token" value="{{ token }}">
+  <button type="submit">Confirm &amp; Apply</button>
+  <a class="btn secondary" href="/import/weekly">Cancel</a>
+</form>
+{% endif %}
+
+{% endblock %}

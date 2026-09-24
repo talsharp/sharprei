@@ -85,7 +85,7 @@
 <div class="card">
   <h3>Follow-up {{ num }}</h3>
   <div style="overflow-x:auto;">
-  <table class="sticky-table fu-filterable-table">
+  <table class="sticky-table fu-filterable-table fu-sortable" data-sort-key="round-{{ num }}">
     <thead>
       <tr>
         <th>Zip Code</th>
@@ -109,8 +109,8 @@
       {% set r_effective_region = rzc.region_override or rzc.region %}
       <tr class="fu-data-row" data-status="{{ rzc.status }}" data-fustatus="{{ rzc.follow_up_status }}" data-region="{{ r_effective_region or '' }}">
         <td><a class="zip-link" href="/zip/{{ rnd.run.zip_code_id }}">{{ rnd.run.zip_code.zip_code }}</a></td>
-        <td data-col="date">{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
-        <td data-col="days_since">{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
+        <td data-col="date" data-sort="{{ rnd.run.run_date.strftime('%Y%m%d') if rnd.run.run_date != UNSET_DATE else '' }}">{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+        <td data-col="days_since" data-sort="{{ rnd.days_since_initial if rnd.days_since_initial is not none else '' }}">{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
         <td data-col="sms">{{ rnd.run.sms_sent }}</td>
         <td data-col="replies">{{ rnd.run.replies }}</td>
         <td data-col="reply_rate" title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate * 100) }}%</td>
@@ -151,7 +151,7 @@
   <h3>All Follow-ups Combined</h3>
   <p class="muted">Every follow-up round rolled up into one number per zip code. Percentages are compared to the average across zips' combined totals.</p>
   <div style="overflow-x:auto;">
-  <table class="sticky-table fu-filterable-table">
+  <table class="sticky-table fu-filterable-table fu-sortable" data-sort-key="combined">
     <thead>
       <tr>
         <th>Zip Code</th>
@@ -372,6 +372,61 @@
   if (searchBtn) searchBtn.addEventListener('click', applyFilters);
 
   applyFilters();
+})();
+
+(function() {
+  function cellValue(tr, idx) {
+    var td = tr.children[idx];
+    if (!td) return null;
+    var raw = td.hasAttribute('data-sort') ? td.getAttribute('data-sort') : td.textContent.trim();
+    if (raw === '' || raw === '--') return null;
+    if (/^[\s$%,.\d-]+$/.test(raw)) {
+      var n = parseFloat(raw.replace(/[$,%\s]/g, ''));
+      if (!isNaN(n)) return n;
+    }
+    return raw.toLowerCase();
+  }
+
+  function sortTable(table, idx, dir) {
+    var tbody = table.tBodies[0];
+    var rows = Array.from(tbody.querySelectorAll('tr.fu-data-row'));
+    rows.sort(function(a, b) {
+      var va = cellValue(a, idx), vb = cellValue(b, idx);
+      if (va === null && vb === null) return a.dataset.origIdx - b.dataset.origIdx;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      var cmp = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb));
+      if (cmp === 0) return a.dataset.origIdx - b.dataset.origIdx;
+      return dir === 'desc' ? -cmp : cmp;
+    });
+    rows.forEach(function(tr) { tbody.appendChild(tr); });
+    table.querySelectorAll('thead th').forEach(function(th, i) {
+      var arrow = th.querySelector('.sort-arrow');
+      if (arrow) arrow.textContent = (i === idx) ? (dir === 'desc' ? ' \u25BC' : ' \u25B2') : '';
+    });
+  }
+
+  document.querySelectorAll('table.fu-sortable').forEach(function(table) {
+    var key = 'fuSort:' + table.dataset.sortKey;
+    table.querySelectorAll('tbody tr.fu-data-row').forEach(function(tr, i) { tr.dataset.origIdx = i; });
+    var state = null;
+    try { state = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+
+    table.querySelectorAll('thead th').forEach(function(th, idx) {
+      var arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      th.appendChild(arrow);
+      th.title = 'Click to sort';
+      th.addEventListener('click', function() {
+        var dir = (state && state.idx === idx && state.dir === 'desc') ? 'asc' : 'desc';
+        state = { idx: idx, dir: dir };
+        try { localStorage.setItem(key, JSON.stringify(state)); } catch (e) {}
+        sortTable(table, idx, dir);
+      });
+    });
+
+    if (state && typeof state.idx === 'number') sortTable(table, state.idx, state.dir);
+  });
 })();
 </script>
 

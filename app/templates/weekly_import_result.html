@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Weekly Update Complete{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h3>Weekly Update Complete</h3>
+  <div class="stat-row">
+    <div class="stat"><div class="value">{{ updated }}</div><div class="label">Rounds Updated</div></div>
+    <div class="stat"><div class="value">{{ created }}</div><div class="label">New Rounds Created</div></div>
+    <div class="stat"><div class="value">{{ skipped }}</div><div class="label">Skipped</div></div>
+  </div>
+  {% if backup_filename %}
+  <p class="muted" style="margin-top:12px;">A backup of the database from just before this update was saved as <code>backups/{{ backup_filename }}</code>, in case anything needs to be rolled back.</p>
+  {% endif %}
+  <div style="margin-top:16px; display:flex; gap:10px;">
+    <a class="btn" href="/">View Zip Code List</a>
+    <a class="btn secondary" href="/followups">View Follow-ups</a>
+    <a class="btn secondary" href="/import/weekly">Upload Another Week</a>
+  </div>
+</div>
+
+{% endblock %}

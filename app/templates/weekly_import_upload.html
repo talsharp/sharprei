@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Weekly Update{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Weekly Update</h2>
+    <p class="page-subtitle">Upload your VA's weekly results file</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Upload this week's file</h3>
+  <p class="muted">Upload the VA's weekly Excel file (First Text, Follow up 1, Follow up 2, Follow up 3 tabs). Numbers in the file are treated as the current total-to-date for each zip's round - this <strong>updates</strong> existing rounds to match the file, and creates new rounds for zips that don't have one yet. You'll see exactly what will change before anything is saved.</p>
+  <form method="post" action="/import/weekly/preview" enctype="multipart/form-data">
+    <div class="form-row">
+      <input type="file" name="file" accept=".xlsx,.xls" required>
+    </div>
+    <button type="submit">Continue to Preview</button>
+  </form>
+</div>
+
+{% if error %}
+<div class="card" style="border-color: var(--red);">
+  <strong style="color: var(--red);">Error:</strong> {{ error }}
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Expected format</h3>
+  <p class="muted" style="margin-bottom:8px;">4 tabs, named (roughly) "First Text", "Follow up 1", "Follow up 2", "Follow up 3" - a tab can be missing if that round hasn't happened yet. Each tab needs a Zip Code column plus:</p>
+  <ul class="muted" style="margin:0; padding-inline-start:20px;">
+    <li>SMS Sent</li>
+    <li>Replies</li>
+    <li>Hot Leads</li>
+    <li>Warm Leads</li>
+    <li>Drips</li>
+  </ul>
+</div>
+
+{% endblock %}

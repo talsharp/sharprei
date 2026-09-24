@@ -2,37 +2,30 @@ import os
 from datetime import date, datetime
 from pathlib import Path
 
-import markdown as md
 import pandas as pd
-from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-load_dotenv()
-
-from app.database import get_db, init_db
-from app.importer import (
-    FIELD_LABELS,
-    TARGET_FIELDS,
-    classify_run_type,
-    clean_zip,
-    guess_mapping,
-    parse_int,
-    parse_optional_int,
-    read_table,
-    save_upload,
-)
+from app.database import backup_db, get_db, init_db
 from app.followups import get_follow_up_summaries, get_rounds_overview
-from app.insights import generate_insights
+from app.weekly_import import (
+    METRIC_FIELDS,
+    METRIC_LABELS,
+    ROUND_LABELS,
+    ROUND_ORDER,
+    apply_plan,
+    build_plan,
+    read_workbook,
+    save_workbook,
+)
 from app.metrics import TIER_ORDER, get_zip_metrics
 from app.models import (
     UNSET_DATE,
     CampaignRun,
     Deal,
-    ImportBatch,
     MonthlyExpense,
     Neighborhood,
     Property,
@@ -51,7 +44,7 @@ from app.rentals import (
     save_renovation_file,
 )
 
-app = FastAPI(title="AAA Houses - SMS")
+app = FastAPI(title="REI With LOVE")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -367,178 +360,99 @@ def create_zip(zip_code: str = Form(...), db: Session = Depends(get_db)):
     return RedirectResponse("/", status_code=303)
 
 
-@app.get("/import")
-def import_upload(request: Request):
+@app.get("/import/weekly")
+def weekly_import_upload(request: Request):
     return templates.TemplateResponse(
-        "import_upload.html", {"request": request, "active": "import", "error": None}
+        "weekly_import_upload.html", {"request": request, "active": "weekly_import", "error": None}
     )
 
 
-@app.post("/import/preview")
-async def import_preview(request: Request, file: UploadFile = File(...)):
+@app.post("/import/weekly/preview")
+async def weekly_import_preview(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     content = await file.read()
     if not content:
         return templates.TemplateResponse(
-            "import_upload.html",
-            {"request": request, "active": "import", "error": "The file is empty"},
+            "weekly_import_upload.html",
+            {"request": request, "active": "weekly_import", "error": "The file is empty"},
         )
-    token = save_upload(file.filename, content)
+    token = save_workbook(file.filename, content)
     try:
-        df = read_table(token)
+        sheets = read_workbook(token)
     except Exception as exc:
         return templates.TemplateResponse(
-            "import_upload.html",
-            {"request": request, "active": "import", "error": f"Could not read the file: {exc}"},
+            "weekly_import_upload.html",
+            {"request": request, "active": "weekly_import", "error": f"Could not read the file: {exc}"},
         )
-    columns = list(df.columns)
-    mapping = guess_mapping(columns)
-    preview_rows = df.head(10).fillna("").to_dict(orient="records")
+    if not sheets:
+        return templates.TemplateResponse(
+            "weekly_import_upload.html",
+            {
+                "request": request,
+                "active": "weekly_import",
+                "error": (
+                    "None of the expected tabs (First Text, Follow up 1/2/3) were found in this "
+                    "workbook. Check the tab names match."
+                ),
+            },
+        )
+
+    changes = build_plan(db, sheets)
+    changes = [c for c in changes if c.has_changes]
+    by_round = {key: [c for c in changes if c.round_key == key] for key in ROUND_ORDER}
+    summary = {
+        key: {
+            "update": sum(1 for c in by_round[key] if c.action == "update"),
+            "create": sum(1 for c in by_round[key] if c.action == "create"),
+            "skip": sum(1 for c in by_round[key] if c.action == "skip"),
+        }
+        for key in ROUND_ORDER
+    }
+    warnings = [c.warning for c in changes if c.warning]
+
     return templates.TemplateResponse(
-        "import_preview.html",
+        "weekly_import_preview.html",
         {
             "request": request,
-            "active": "import",
+            "active": "weekly_import",
             "token": token,
-            "columns": columns,
-            "mapping": mapping,
-            "field_labels": FIELD_LABELS,
-            "preview_rows": preview_rows,
-            "row_count": len(df),
-            "today": date.today().isoformat(),
+            "round_order": ROUND_ORDER,
+            "round_labels": ROUND_LABELS,
+            "by_round": by_round,
+            "summary": summary,
+            "warnings": warnings,
+            "metric_fields": METRIC_FIELDS,
+            "metric_labels": METRIC_LABELS,
         },
     )
 
 
-@app.post("/import/commit")
-async def import_commit(request: Request, db: Session = Depends(get_db)):
+@app.post("/import/weekly/commit")
+async def weekly_import_commit(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     token = form.get("token")
-    default_run_type = form.get("default_run_type", "initial")
-    default_date_val = form.get("default_date", "")
-    try:
-        default_date = parse_month(default_date_val)
-    except ValueError:
-        default_date = UNSET_DATE
-    field_map = {field: form.get(f"map_{field}") or None for field in TARGET_FIELDS}
+    sheets = read_workbook(token)
+    changes = build_plan(db, sheets)
+    changes = [c for c in changes if c.has_changes]
 
-    if not field_map.get("zip_code"):
-        return templates.TemplateResponse(
-            "import_upload.html",
-            {"request": request, "active": "import", "error": "You must map the zip code column before importing"},
-        )
+    backup_path = backup_db("weekly_import")
 
-    df = read_table(token).fillna("")
-
-    batch = ImportBatch(filename=token.split("_", 1)[-1], row_count=len(df), status="success")
-    db.add(batch)
-    db.flush()
-
-    imported = 0
-    failed = 0
-    new_zips = 0
-    errors = []
-    zip_cache = {}
-
-    for idx, row in df.iterrows():
-        try:
-            zip_code_val = clean_zip(row.get(field_map["zip_code"]))
-            if not zip_code_val:
-                raise ValueError("Missing zip code")
-
-            if zip_code_val not in zip_cache:
-                zc = db.query(ZipCode).filter(ZipCode.zip_code == zip_code_val).first()
-                if not zc:
-                    zc = ZipCode(zip_code=zip_code_val)
-                    db.add(zc)
-                    db.flush()
-                    new_zips += 1
-                zip_cache[zip_code_val] = zc
-            zc = zip_cache[zip_code_val]
-            zip_code_id = zc.id
-            if zc.status == ZipStatus.not_tried:
-                zc.status = ZipStatus.active
-
-            run_date_col = field_map.get("run_date")
-            run_date_val = row.get(run_date_col) if run_date_col else ""
-            parsed_date = pd.to_datetime(run_date_val, errors="coerce", dayfirst=False)
-            run_date_final = parsed_date.date() if not pd.isna(parsed_date) else default_date
-            run_type_col = field_map.get("run_type")
-            run_type_val = classify_run_type(
-                row.get(run_type_col) if run_type_col else None, default_run_type
-            )
-
-            run = CampaignRun(
-                zip_code_id=zip_code_id,
-                run_date=run_date_final,
-                run_type=run_type_val,
-                sms_sent=parse_int(row.get(field_map.get("sms_sent"))),
-                replies=parse_int(row.get(field_map.get("replies"))),
-                leads=parse_int(row.get(field_map.get("leads"))),
-                warm=parse_int(row.get(field_map.get("warm"))),
-                drip=parse_int(row.get(field_map.get("drip"))),
-                signed_agreements=parse_int(row.get(field_map.get("signed_agreements"))),
-                opt_out=parse_optional_int(row.get(field_map.get("opt_out"))) if field_map.get("opt_out") else None,
-                import_batch_id=batch.id,
-            )
-            db.add(run)
-            imported += 1
-        except Exception as exc:
-            failed += 1
-            if len(errors) < 20:
-                errors.append(f"Row {idx + 2}: {exc}")
-
-    batch.status = "success" if failed == 0 else ("failed" if imported == 0 else "partial")
+    applied = [c for c in changes if c.action in ("update", "create")]
+    apply_plan(db, applied)
     db.commit()
 
+    updated = sum(1 for c in applied if c.action == "update")
+    created = sum(1 for c in applied if c.action == "create")
+    skipped = sum(1 for c in changes if c.action == "skip")
+
     return templates.TemplateResponse(
-        "import_result.html",
+        "weekly_import_result.html",
         {
             "request": request,
-            "active": "import",
-            "imported": imported,
-            "failed": failed,
-            "new_zips": new_zips,
-            "errors": errors,
-        },
-    )
-
-
-@app.get("/insights")
-def insights_page(request: Request, db: Session = Depends(get_db)):
-    metrics = get_zip_metrics(db)
-    return templates.TemplateResponse(
-        "insights.html",
-        {
-            "request": request,
-            "active": "insights",
-            "zip_count": len(metrics),
-            "result_html": None,
-            "error": None,
-        },
-    )
-
-
-@app.post("/insights/run")
-def insights_run(request: Request, db: Session = Depends(get_db)):
-    metrics = get_zip_metrics(db)
-    error = None
-    result_html = None
-    if not metrics:
-        error = "No data yet to analyze. Add zip codes and runs before running insights."
-    else:
-        try:
-            text = generate_insights(metrics)
-            result_html = md.markdown(text)
-        except Exception as exc:
-            error = str(exc)
-    return templates.TemplateResponse(
-        "insights.html",
-        {
-            "request": request,
-            "active": "insights",
-            "zip_count": len(metrics),
-            "result_html": result_html,
-            "error": error,
+            "active": "weekly_import",
+            "updated": updated,
+            "created": created,
+            "skipped": skipped,
+            "backup_filename": backup_path.name,
         },
     )
 

@@ -3,6 +3,21 @@
 {% block title %}Zip Codes{% endblock %}
 {% block content %}
 
+<div class="top-actions" style="margin-bottom:16px;">
+  <div>
+    <h2 class="page-title">Zip Codes</h2>
+    <p class="page-subtitle">SMS campaign performance by zip code</p>
+  </div>
+  <a class="btn" href="/import/weekly">Weekly Update</a>
+</div>
+
+<div class="kpi-row" title="Totals for the zip codes currently shown - they follow your filters.">
+  <div class="kpi"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div><div><div class="label">Zip codes</div><div class="value" id="kpi-zips">0</div></div></div>
+  <div class="kpi"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg></div><div><div class="label">SMS sent</div><div class="value" id="kpi-sms">0</div></div></div>
+  <div class="kpi"><div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div><div><div class="label">Reply rate</div><div class="value" id="kpi-reply">0%</div></div></div>
+  <div class="kpi"><div class="kpi-icon coral"><svg viewBox="0 0 24 24"><path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .3 2 1.5 3 2.5 3-1-3 0-6 0-8z"/></svg></div><div><div class="label">Hot leads</div><div class="value" id="kpi-leads">0</div></div></div>
+</div>
+
 <div class="top-actions">
   <div class="filters" style="flex-wrap:wrap;">
     <div class="columns-toggle">
@@ -145,7 +160,7 @@
     </tr>
     {% if fu and fu.rounds %}
     <tr class="followup-detail-row" id="fu-{{ m.zip_code.id }}" style="display:none;">
-      <td colspan="17" style="padding:12px 16px; background:rgba(255,255,255,0.02);">
+      <td colspan="17" style="padding:12px 16px; background:var(--panel-soft);">
         <table style="width:auto; min-width:900px; background:transparent; border:1px solid var(--border);">
           <thead>
             <tr>
@@ -201,7 +216,7 @@
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="17" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or import a file.</td></tr>
+    <tr><td colspan="17" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or upload a weekly update.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -295,6 +310,24 @@
       var footerCell = document.querySelector('#zip-table tfoot [data-col="' + col + '"]');
       if (footerCell) footerCell.textContent = avg.toFixed(2) + '%';
     });
+
+    var fmt = function(n) { return Math.round(n).toLocaleString('en-US'); };
+    var sumCol = function(col) {
+      return rows.reduce(function(t, tr) {
+        var c = tr.querySelector('[data-col="' + col + '"]');
+        return t + (c ? (parseFloat(c.textContent.replace(/[^0-9.\-]/g, '')) || 0) : 0);
+      }, 0);
+    };
+    var num = function(tr, col) {
+      var c = tr.querySelector('[data-col="' + col + '"]');
+      return c ? (parseFloat(c.textContent.replace(/[^0-9.\-]/g, '')) || 0) : 0;
+    };
+    var totalSms = sumCol('sms');
+    var totalReplies = rows.reduce(function(t, tr) { return t + num(tr, 'sms') * num(tr, 'reply_rate') / 100; }, 0);
+    document.getElementById('kpi-zips').textContent = fmt(rows.length);
+    document.getElementById('kpi-sms').textContent = fmt(totalSms);
+    document.getElementById('kpi-leads').textContent = fmt(sumCol('leads_number'));
+    document.getElementById('kpi-reply').textContent = (totalSms ? (totalReplies / totalSms * 100) : 0).toFixed(2) + '%';
   }
 
   function checkedValues(selector) {
