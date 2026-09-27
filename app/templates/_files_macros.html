@@ -1,6 +1,15 @@
-{% macro files_card(files, base_url, too_big, max_mb, empty_text) %}
+{% macro files_card(files, base_url, too_big, max_mb, empty_text, collapsible=False) %}
 <div class="card" id="files">
+  {% if collapsible %}
+  <h3 style="cursor:pointer; user-select:none;" onclick="toggleFiles()">
+    <span id="files-arrow" class="section-toggle">▸</span> Files
+    <span class="muted" style="font-size:13px; font-weight:400;">({{ files|length }} file{{ "s" if files|length != 1 else "" }})</span>
+  </h3>
+  <div id="files-body" style="display:none;">
+  {% else %}
   <h3>Files <span class="muted" style="font-weight:400;">· {{ files|length }}</span></h3>
+  <div>
+  {% endif %}
   {% if too_big %}<div class="login-error">Not uploaded - over {{ max_mb }} MB: {{ too_big|join(", ") }}</div>{% endif %}
   <form method="post" action="{{ base_url }}" enctype="multipart/form-data" class="file-upload-form">
     <input type="file" name="files" multiple required>
@@ -29,5 +38,18 @@
   {% else %}
   <p class="muted" style="margin:12px 0 0;">{{ empty_text }} You can pick several files at once. Max {{ max_mb }} MB per file.</p>
   {% endif %}
+  </div>
 </div>
+{% if collapsible %}
+<script>
+function toggleFiles(forceOpen) {
+  var body = document.getElementById('files-body');
+  var open = forceOpen === true ? false : body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  document.getElementById('files-arrow').textContent = open ? '▸' : '▾';
+}
+// Right after an upload or delete the page returns to #files - show the list.
+if (location.hash === '#files' || {{ 'true' if too_big else 'false' }}) toggleFiles(true);
+</script>
+{% endif %}
 {% endmacro %}
