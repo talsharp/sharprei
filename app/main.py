@@ -45,7 +45,7 @@ from app.rentals import (
     save_renovation_file,
 )
 
-app = FastAPI(title="REI With LOVE")
+app = FastAPI(title="SharpREI")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
