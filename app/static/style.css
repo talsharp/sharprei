@@ -369,3 +369,23 @@ table tfoot td { font-weight: 600; color: var(--navy); background: #F1F4F9; bord
 
 .expense-table td { vertical-align: middle; }
 .expense-table tr.add-row td { background: var(--panel-soft); }
+
+/* ---------- Login and account ---------- */
+
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+.login-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-pop); padding: 36px 32px; width: 100%; max-width: 380px; text-align: center; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--border-strong); border-radius: 10px; padding: 11px 16px; color: var(--text); text-decoration: none; font-weight: 600; background: var(--panel); }
+.google-btn:hover { background: var(--panel-soft); border-color: #B7C0CE; }
+.google-btn svg { width: 20px; height: 20px; }
+.login-error { background: var(--red-bg); color: var(--red); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; text-align: left; }
+
+.sidebar { display: flex; flex-direction: column; }
+.sidebar-user { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid var(--border); }
+.sidebar-user-email { font-size: 13px; color: var(--muted); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.act-create { background: var(--green-bg); color: var(--green); }
+.act-update { background: #E6F1FB; color: #0C447C; }
+.act-delete { background: var(--red-bg); color: var(--red); }
+.act-sign_in { background: var(--gray-bg); color: var(--gray); }
+.activity-details { font-size: 13px; max-width: 520px; }
+.activity-details summary { cursor: pointer; }

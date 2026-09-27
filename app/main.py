@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date, datetime
 from pathlib import Path
@@ -7,8 +8,12 @@ from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app import config  # noqa: F401  (loads .env before anything else)
+from app import audit  # noqa: F401  (registers the audit log listener)
+from app import auth
 from app.database import backup_db, get_db, init_db
 from app.finance_routes import build_router as build_finance_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
@@ -25,6 +30,7 @@ from app.weekly_import import (
 from app.metrics import TIER_ORDER, get_zip_metrics
 from app.models import (
     UNSET_DATE,
+    AuditLog,
     CampaignRun,
     Deal,
     MonthlyExpense,
@@ -77,6 +83,57 @@ templates.env.globals["STATIC_VERSION"] = int(
 )
 
 app.include_router(build_finance_router(templates))
+auth.install(app, templates)
+
+
+@app.get("/health")
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        return Response('{"status": "error"}', status_code=503, media_type="application/json")
+    return {"status": "ok"}
+
+
+ACTIVITY_AREAS = {
+    "zip_codes": "Zip codes",
+    "campaign_runs": "Campaign runs",
+    "zip_neighborhoods": "Zip neighborhoods",
+    "neighborhoods": "Neighborhoods",
+    "deals": "Zip deals",
+    "properties": "Rentals - properties",
+    "renovation_expenses": "Rentals - renovation",
+    "monthly_expenses": "Rentals - monthly",
+    "property_owners": "Rentals - owners",
+    "finance_months": "Finance - months",
+    "finance_expenses": "Finance - expenses",
+    "finance_vendors": "Finance - vendors",
+    "wholesale_deals": "Finance - deals",
+    "users": "Users",
+    "session": "Sign-ins",
+}
+ACTION_LABELS = {"create": "Added", "update": "Changed", "delete": "Deleted", "sign_in": "Signed in"}
+
+
+@app.get("/activity")
+def activity(request: Request, area: str = "", db: Session = Depends(get_db)):
+    q = db.query(AuditLog)
+    if area:
+        q = q.filter(AuditLog.table_name == area)
+    entries = q.order_by(AuditLog.id.desc()).limit(300).all()
+    for e in entries:
+        e.parsed = json.loads(e.changes) if e.changes else None
+    return templates.TemplateResponse(
+        "activity.html",
+        {
+            "request": request,
+            "active": "activity",
+            "entries": entries,
+            "areas": ACTIVITY_AREAS,
+            "area": area,
+            "action_labels": ACTION_LABELS,
+        },
+    )
 
 
 @app.on_event("startup")

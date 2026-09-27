@@ -1,26 +1,36 @@
-import shutil
+import os
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data.db"
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = Path(os.environ.get("DB_PATH", ROOT / "data.db"))
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-BACKUP_DIR = Path(__file__).resolve().parent.parent / "backups"
-BACKUP_DIR.mkdir(exist_ok=True)
-BACKUPS_TO_KEEP = 20
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", ROOT / "backups"))
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+BACKUPS_TO_KEEP = 45
 
 
 def backup_db(label: str) -> Path:
-    """Copies data.db to backups/ before a risky bulk write (e.g. the weekly
-    import commit), so a bad upload can be undone by restoring the file.
-    Keeps only the most recent BACKUPS_TO_KEEP backups."""
+    """Consistent copy of the database into backups/ (safe while the app is
+    running, unlike copying the file), checked for corruption before it's
+    kept. Used nightly and before risky bulk writes like the weekly import."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     dest = BACKUP_DIR / f"data_{timestamp}_{label}.db"
-    shutil.copy2(DB_PATH, dest)
+    src = sqlite3.connect(DB_PATH)
+    out = sqlite3.connect(dest)
+    try:
+        src.backup(out)
+        if out.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise RuntimeError(f"Backup {dest.name} failed its integrity check")
+    finally:
+        out.close()
+        src.close()
 
     backups = sorted(BACKUP_DIR.glob("data_*.db"), key=lambda p: p.stat().st_mtime)
     for old in backups[:-BACKUPS_TO_KEEP]:

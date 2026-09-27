@@ -371,3 +371,32 @@ class WholesaleDeal(Base):
         if self.status == "kept":
             return float(self.estimated_value or 0)
         return None
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    role: Mapped[str] = mapped_column(String(20), default="owner")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    user_email: Mapped[str] = mapped_column(String(255))
+    action: Mapped[str] = mapped_column(String(20))
+    table_name: Mapped[str] = mapped_column(String(64))
+    record_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    changes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# Registers the audit-log listener wherever the models are used (web app and scripts alike).
+from app import audit  # noqa: E402,F401

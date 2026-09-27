@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Activity{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Activity</h2>
+    <p class="page-subtitle">Every change made in SharpREI - who, when, and what changed</p>
+  </div>
+  <form method="get" action="/activity" style="display:flex; gap:8px; align-items:center;">
+    <select name="area" onchange="this.form.submit()" aria-label="Filter by area">
+      <option value="">All areas</option>
+      {% for key, label in areas.items() %}<option value="{{ key }}" {{ 'selected' if key == area else '' }}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<table class="sticky-table">
+  <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Area</th><th>Record</th><th>Details</th></tr></thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td style="white-space:nowrap;" title="{{ e.created_at.isoformat() }} UTC">{{ e.created_at.strftime('%b %d, %Y %H:%M') }} <span class="muted">UTC</span></td>
+      <td>{{ e.user_email }}</td>
+      <td><span class="badge act-{{ e.action }}">{{ action_labels.get(e.action, e.action) }}</span></td>
+      <td>{{ areas.get(e.table_name, e.table_name) }}</td>
+      <td>{{ e.label or "" }}{% if e.record_id %} <span class="muted">#{{ e.record_id }}</span>{% endif %}</td>
+      <td class="activity-details">
+        {% set ch = e.parsed %}
+        {% if ch %}
+          {% if e.action == 'update' %}
+            {% for field, pair in ch.items() %}<div><span class="muted">{{ field }}:</span> {{ pair[0] if pair[0] is not none else "—" }} → <strong>{{ pair[1] if pair[1] is not none else "—" }}</strong></div>{% endfor %}
+          {% else %}
+            <details><summary class="muted">{{ ch|length }} fields</summary>
+              {% for field, value in ch.items() %}<div><span class="muted">{{ field }}:</span> {{ value if value is not none else "—" }}</div>{% endfor %}
+            </details>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">No activity yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="muted" style="font-size:12px;">Showing the latest {{ entries|length }} entries.</p>
+
+{% endblock %}

@@ -41,7 +41,20 @@
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6"/></svg>
           Portfolio
         </a>
+
+        <div class="nav-section">Account</div>
+        <a href="/activity" class="nav-item {{ 'active' if active == 'activity' else '' }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 3M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/></svg>
+          Activity
+        </a>
       </nav>
+
+      {% if request.state.user is defined and request.state.user %}
+      <div class="sidebar-user">
+        <div class="sidebar-user-email" title="{{ request.state.user.email }}">{{ request.state.user.name or request.state.user.email }}</div>
+        <form method="post" action="/logout"><button type="submit" class="secondary small">Sign out</button></form>
+      </div>
+      {% endif %}
     </aside>
 
     <main>
