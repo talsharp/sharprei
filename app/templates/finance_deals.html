@@ -28,13 +28,13 @@
 <table class="sticky-table">
   <thead>
     <tr>
-      <th>Address</th><th>Status</th><th>Agreement date</th><th>Agreement price</th><th>Sell price</th><th>Closed</th><th>Revenue</th><th>Costs</th><th>Profit</th><th>Channel</th>
+      <th>Address</th><th>Status</th><th>Agreement date</th><th>Agreement price</th><th>Sell price</th><th>Closed</th><th>Revenue</th><th>Costs</th><th>Profit</th><th>Lead source</th>
     </tr>
   </thead>
   <tbody>
     {% for d in deals %}
     <tr>
-      <td><a class="zip-link" href="/finance/deals/{{ d.id }}" {% if d.notes %}title="{{ d.notes }}"{% endif %}>{{ d.address }}</a>{% if d.notes %} <span class="muted" title="{{ d.notes }}">ⓘ</span>{% endif %}</td>
+      <td><a class="zip-link" href="/finance/deals/{{ d.id }}" {% if d.notes %}title="{{ d.notes }}"{% endif %}>{{ d.address }}</a>{% if d.notes %} <span class="muted" title="{{ d.notes }}">ⓘ</span>{% endif %}{% if d.files %} <span class="file-count" title="{{ d.files|length }} file{{ 's' if d.files|length != 1 else '' }}"><svg class="clip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>{{ d.files|length }}</span>{% endif %}</td>
       <td>{{ fx.status_badge(d.status) }}</td>
       <td>{{ d.agreement_date.strftime('%b %d, %Y') if d.agreement_date else "—" }}</td>
       <td>{{ fx.money(d.agreement_price|float if d.agreement_price is not none else none) }}</td>
@@ -45,7 +45,12 @@
       <td class="{{ fx.signed_class(d.profit) }}">
         {{ fx.money(d.profit) }}{% if d.status == 'kept' %} <span class="muted" title="Estimated wholesale profit - this house was kept for the portfolio">(est.)</span>{% endif %}
       </td>
-      <td>{{ fx.channel_badge(d.channel) if d.channel else "—" }}</td>
+      <td>
+        <select name="channel" aria-label="Lead source" class="compact-select" hx-post="/finance/deals/{{ d.id }}/channel" hx-trigger="change" hx-swap="none">
+          <option value="">Unknown</option>
+          {% for ch in lead_channels %}<option value="{{ ch }}" {{ 'selected' if ch == d.channel else '' }}>{{ CHANNELS[ch] }}</option>{% endfor %}
+        </select>
+      </td>
     </tr>
     {% else %}
     <tr><td colspan="10" class="muted" style="text-align:center; padding:24px;">No deals yet.</td></tr>

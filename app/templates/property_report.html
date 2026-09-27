@@ -208,6 +208,8 @@
     <div class="detail-grid">
       <div class="row"><span class="k">Purchase Price</span><span>{{ rm.money(prop.purchase_price) }}</span></div>
       <div class="row"><span class="k">Closing Costs</span><span>{{ rm.money(prop.closing_costs) }}</span></div>
+      <div class="row"><span class="k">Taxes paid at closing</span><span>{{ rm.money(prop.taxes_at_closing|float) }}</span></div>
+      <div class="row"><span class="k">Insurance paid at closing</span><span>{{ rm.money(prop.insurance_at_closing|float) }}</span></div>
       <div class="row"><span class="k">Purchase Date</span><span>{{ prop.purchase_date.strftime('%B %d, %Y') if prop.purchase_date else "—" }}</span></div>
       <div class="row"><span class="k">Tenant Move-in</span><span>{{ prop.tenant_move_in_date.strftime('%B %d, %Y') if prop.tenant_move_in_date else "—" }}</span></div>
       <div class="row"><span class="k">Months Recorded</span><span>{{ py.months_recorded }}</span></div>

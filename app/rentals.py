@@ -32,6 +32,8 @@ class PropertyYield:
     total_invested: float = 0.0
     total_income: float = 0.0
     total_expenses: float = 0.0
+    upfront_costs: float = 0.0
+    upfront_counted: float = 0.0
     yield_pct: Optional[float] = None
     est_yield_pct: Optional[float] = None
 
@@ -64,16 +66,21 @@ def get_property_yield(prop: Property) -> PropertyYield:
     total_income = sum(float(m.income) for m in months)
     total_expenses = sum(m.total_expenses for m in months)
     est_yield_pct = _est_yield_pct(prop)
+    # Taxes/insurance prepaid at closing cover roughly the first year, so they
+    # count as ownership expenses spread over the first 12 recorded months.
+    upfront = prop.upfront_costs
+    upfront_counted = upfront * min(len(months), 12) / 12
     if not months or total_invested <= 0:
         return PropertyYield(
             months_recorded=len(months),
             total_invested=total_invested,
             total_income=total_income,
             total_expenses=total_expenses,
+            upfront_costs=upfront,
             est_yield_pct=est_yield_pct,
         )
 
-    avg_monthly = sum(m.net_cash_flow for m in months) / len(months)
+    avg_monthly = (sum(m.net_cash_flow for m in months) - upfront_counted) / len(months)
     annual = avg_monthly * 12
     return PropertyYield(
         months_recorded=len(months),
@@ -82,6 +89,8 @@ def get_property_yield(prop: Property) -> PropertyYield:
         total_invested=total_invested,
         total_income=total_income,
         total_expenses=total_expenses,
+        upfront_costs=upfront,
+        upfront_counted=upfront_counted,
         yield_pct=(annual / total_invested) * 100,
         est_yield_pct=est_yield_pct,
     )

@@ -1,12 +1,16 @@
+import mimetypes
+import shutil
+import uuid
 from datetime import date
-from typing import Optional
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Form, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import UPLOAD_ROOT, get_db
 from app.finance import (
     CHANNELS,
     DEAL_STATUSES,
@@ -21,7 +25,7 @@ from app.finance import (
     parse_month_key,
     start_month,
 )
-from app.models import FinanceExpense, FinanceMonth, Vendor, WholesaleDeal, ZipCode
+from app.models import DealFile, FinanceExpense, FinanceMonth, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -51,6 +55,17 @@ def _optional_date(value: str) -> Optional[date]:
         return date.fromisoformat(value) if value else None
     except ValueError:
         return None
+
+
+DEAL_FILES_DIR = UPLOAD_ROOT / "deals"
+MAX_FILE_BYTES = 25 * 1024 * 1024
+# Shown in the browser tab instead of downloaded; everything else downloads,
+# so an uploaded HTML/SVG file can never run as a page on this site.
+INLINE_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain"}
+
+
+def _deal_dir(deal_id: int) -> Path:
+    return DEAL_FILES_DIR / str(deal_id)
 
 
 def build_router(templates: Jinja2Templates) -> APIRouter:
@@ -227,8 +242,17 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         totals = build_totals(db, summaries)
         return templates.TemplateResponse(
             "finance_deals.html",
-            {"request": request, "active": "fin_deals", "deals": deals, "totals": totals, "today": date.today().isoformat()},
+            {"request": request, "active": "fin_deals", "deals": deals, "totals": totals,
+             "today": date.today().isoformat(), "lead_channels": LEAD_CHANNELS},
         )
+
+    @router.post("/deals/{deal_id}/channel")
+    def finance_deal_channel(deal_id: int, channel: str = Form(""), db: Session = Depends(get_db)):
+        deal = db.get(WholesaleDeal, deal_id)
+        if deal:
+            deal.channel = channel if channel in LEAD_CHANNELS else None
+            db.commit()
+        return Response(status_code=204)
 
     @router.post("/deals/new")
     def finance_deal_new(
@@ -255,7 +279,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         zip_codes = db.query(ZipCode).order_by(ZipCode.zip_code).all()
         return templates.TemplateResponse(
             "finance_deal_detail.html",
-            {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS},
+            {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
+             "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
+             "max_mb": MAX_FILE_BYTES // (1024 * 1024)},
         )
 
     @router.post("/deals/{deal_id}/update")
@@ -304,7 +330,64 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         if deal:
             db.delete(deal)
             db.commit()
+            shutil.rmtree(_deal_dir(deal_id), ignore_errors=True)
         return RedirectResponse("/finance/deals", status_code=303)
+
+    @router.post("/deals/{deal_id}/files")
+    async def finance_deal_files_upload(
+        deal_id: int,
+        files: List[UploadFile] = File(...),
+        note: str = Form(""),
+        db: Session = Depends(get_db),
+    ):
+        deal = db.get(WholesaleDeal, deal_id)
+        if not deal:
+            return RedirectResponse("/finance/deals", status_code=303)
+        too_big = []
+        folder = _deal_dir(deal_id)
+        folder.mkdir(parents=True, exist_ok=True)
+        for upload in files:
+            if not upload.filename:
+                continue
+            content = await upload.read()
+            if len(content) > MAX_FILE_BYTES:
+                too_big.append(upload.filename)
+                continue
+            original = Path(upload.filename).name[:255]
+            stored = uuid.uuid4().hex + Path(original).suffix.lower()[:10]
+            (folder / stored).write_bytes(content)
+            db.add(DealFile(deal_id=deal_id, original_name=original, stored_name=stored,
+                            size_bytes=len(content), note=note.strip()[:255] or None))
+        db.commit()
+        suffix = "?too_big=" + ",".join(too_big)[:300] if too_big else ""
+        return RedirectResponse(f"/finance/deals/{deal_id}{suffix}#files", status_code=303)
+
+    @router.get("/deals/{deal_id}/files/{file_id}")
+    def finance_deal_file(deal_id: int, file_id: int, db: Session = Depends(get_db)):
+        f = db.get(DealFile, file_id)
+        if not f or f.deal_id != deal_id:
+            return Response("File not found", status_code=404)
+        path = _deal_dir(deal_id) / f.stored_name
+        if not path.is_file():
+            return Response("File is missing on disk", status_code=404)
+        media_type = mimetypes.guess_type(f.original_name)[0] or "application/octet-stream"
+        inline = media_type in INLINE_TYPES
+        return FileResponse(
+            path,
+            filename=f.original_name,
+            media_type=media_type if inline else "application/octet-stream",
+            content_disposition_type="inline" if inline else "attachment",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
+
+    @router.post("/deals/{deal_id}/files/{file_id}/delete")
+    def finance_deal_file_delete(deal_id: int, file_id: int, db: Session = Depends(get_db)):
+        f = db.get(DealFile, file_id)
+        if f and f.deal_id == deal_id:
+            (_deal_dir(deal_id) / f.stored_name).unlink(missing_ok=True)
+            db.delete(f)
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}#files", status_code=303)
 
     # ---------- Vendors ----------
 

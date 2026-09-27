@@ -159,6 +159,10 @@ class Property(Base):
     address: Mapped[str] = mapped_column(String(255))
     purchase_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     closing_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    # Prepaids paid at closing - kept out of closing_costs so All-In Cost is
+    # comparable between properties bought at different times of year.
+    taxes_at_closing: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    insurance_at_closing: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0")
     purchase_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     max_arv: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     estimated_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
@@ -188,6 +192,10 @@ class Property(Base):
     @property
     def total_purchase_price(self) -> float:
         return float(self.purchase_price) + float(self.closing_costs)
+
+    @property
+    def upfront_costs(self) -> float:
+        return float(self.taxes_at_closing or 0) + float(self.insurance_at_closing or 0)
 
     @property
     def total_renovation_costs(self) -> float:
@@ -354,6 +362,9 @@ class WholesaleDeal(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()
+    files: Mapped[list["DealFile"]] = relationship(
+        back_populates="deal", cascade="all, delete-orphan", order_by="DealFile.uploaded_at.desc()"
+    )
 
     @property
     def total_costs(self) -> float:
@@ -371,6 +382,20 @@ class WholesaleDeal(Base):
         if self.status == "kept":
             return float(self.estimated_value or 0)
         return None
+
+
+class DealFile(Base):
+    __tablename__ = "deal_files"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), index=True)
+    original_name: Mapped[str] = mapped_column(String(255))
+    stored_name: Mapped[str] = mapped_column(String(255))
+    size_bytes: Mapped[int] = mapped_column(default=0)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    deal: Mapped[WholesaleDeal] = relationship(back_populates="files")
 
 
 class User(Base):

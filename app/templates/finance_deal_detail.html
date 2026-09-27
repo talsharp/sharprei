@@ -59,7 +59,39 @@
 </div>
 </form>
 
-<form method="post" action="/finance/deals/{{ deal.id }}/delete" onsubmit="return confirm('Delete this deal permanently?');" style="margin-top:28px;">
+<div class="card" id="files" style="margin-top:24px;">
+  <h3>Files <span class="muted" style="font-weight:400;">· {{ deal.files|length }}</span></h3>
+  {% if too_big %}<div class="login-error">Not uploaded - over {{ max_mb }} MB: {{ too_big|join(", ") }}</div>{% endif %}
+  <form method="post" action="/finance/deals/{{ deal.id }}/files" enctype="multipart/form-data" class="file-upload-form">
+    <input type="file" name="files" multiple required>
+    <input type="text" name="note" placeholder="Optional note for these files" style="flex:1; min-width:200px;">
+    <button type="submit">Upload</button>
+  </form>
+  {% if deal.files %}
+  <table style="margin-top:14px;">
+    <thead><tr><th>File</th><th>Note</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+    <tbody>
+      {% for f in deal.files %}
+      <tr>
+        <td><a class="zip-link" href="/finance/deals/{{ deal.id }}/files/{{ f.id }}" target="_blank" rel="noopener">{{ f.original_name }}</a></td>
+        <td class="muted">{{ f.note or "" }}</td>
+        <td class="muted" style="white-space:nowrap;">{{ "%.1f MB"|format(f.size_bytes / 1048576) if f.size_bytes >= 1048576 else "%d KB"|format((f.size_bytes / 1024)|round(0, 'ceil')) }}</td>
+        <td class="muted" style="white-space:nowrap;">{{ f.uploaded_at.strftime('%b %d, %Y') }}</td>
+        <td style="text-align:right;">
+          <form method="post" action="/finance/deals/{{ deal.id }}/files/{{ f.id }}/delete" onsubmit="return confirm('Delete {{ f.original_name|replace("'", "") }}?');">
+            <button type="submit" class="danger small">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="margin:12px 0 0;">No files yet. Upload the agreement, closing documents, or anything else for this deal - you can pick several files at once. Max {{ max_mb }} MB per file.</p>
+  {% endif %}
+</div>
+
+<form method="post" action="/finance/deals/{{ deal.id }}/delete" onsubmit="return confirm('Delete this deal permanently? Its files will be deleted too.');" style="margin-top:28px;">
   <button type="submit" class="danger">Delete deal</button>
 </form>
 

@@ -27,22 +27,25 @@
 
 <div class="grid-2" style="margin-bottom:20px;">
   <div class="card" style="margin-bottom:0;">
-    <h3>Cost per lead by channel</h3>
+    <h3>Performance by channel</h3>
     <table>
-      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th></tr></thead>
+      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Closed and kept deals whose lead source is this channel">Closed deals</th><th>Profit</th><th title="Profit ÷ spent on this channel">ROI</th></tr></thead>
       <tbody>
-        {% for ch in wholesale_channels %}
+        {% for ch in lead_channels %}
         {% set cs = totals.channels[ch] %}
         <tr>
           <td>{{ fm.channel_badge(ch) }}</td>
           <td>{{ fm.money(cs.expenses) }}</td>
-          <td>{{ cs.leads if ch in lead_channels else "—" }}</td>
-          <td>{{ fm.cpl(cs.cpl) if ch in lead_channels else "—" }}</td>
+          <td>{{ cs.leads }}</td>
+          <td>{{ fm.cpl(cs.cpl) }}</td>
+          <td>{{ cs.closed_deals }}</td>
+          <td class="{{ fm.signed_class(cs.profit) }}">{{ fm.money(cs.profit) }}</td>
+          <td class="{{ fm.signed_class(cs.roi) }}">{{ fm.pct(cs.roi) }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    <p class="muted" style="font-size:12px; margin:10px 0 0;">Wholesale - Shared covers tools used by every channel (ChatGPT, Gsuite...), so it has no leads of its own.</p>
+    <p class="muted" style="font-size:12px; margin:10px 0 0;">Tools used by every channel (ChatGPT, Gsuite...) aren't assigned to a channel; they still count in total expenses and profit above.{% if totals.closed_without_channel %} <strong class="profit-down">{{ totals.closed_without_channel }} closed deal{{ "s" if totals.closed_without_channel != 1 else "" }} ha{{ "ve" if totals.closed_without_channel != 1 else "s" }} no lead source yet</strong> - set it on the <a href="/finance/deals">Deals</a> page.{% endif %}</p>
   </div>
 
   <div class="card" style="margin-bottom:0;">

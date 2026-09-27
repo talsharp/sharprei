@@ -389,3 +389,9 @@ table tfoot td { font-weight: 600; color: var(--navy); background: #F1F4F9; bord
 .act-sign_in { background: var(--gray-bg); color: var(--gray); }
 .activity-details { font-size: 13px; max-width: 520px; }
 .activity-details summary { cursor: pointer; }
+
+.form-row-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.compact-select { padding: 4px 8px; font-size: 13px; }
+.file-upload-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.file-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.clip-icon { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; margin-right: 2px; }

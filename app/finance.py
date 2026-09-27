@@ -59,10 +59,16 @@ def parse_month_key(value: str) -> Optional[date]:
 class ChannelStats:
     expenses: float = 0.0
     leads: int = 0
+    closed_deals: int = 0
+    profit: float = 0.0
 
     @property
     def cpl(self) -> Optional[float]:
         return self.expenses / self.leads if self.leads else None
+
+    @property
+    def roi(self) -> Optional[float]:
+        return self.profit / self.expenses if self.expenses else None
 
 
 @dataclass
@@ -146,6 +152,7 @@ class FinanceTotals:
     signed_agreements: int = 0
     closed_deals: int = 0
     under_contract: int = 0
+    closed_without_channel: int = 0
 
     @property
     def profit(self) -> float:
@@ -187,6 +194,13 @@ def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]") -> F
     t.signed_agreements = len(deals)
     t.closed_deals = sum(1 for d in deals if d.status in ("closed", "kept"))
     t.under_contract = sum(1 for d in deals if d.status == "under_contract")
+    for d in deals:
+        if d.status in ("closed", "kept"):
+            if d.channel in LEAD_CHANNELS:
+                t.channels[d.channel].closed_deals += 1
+                t.channels[d.channel].profit += d.profit or 0
+            else:
+                t.closed_without_channel += 1
     return t
 
 

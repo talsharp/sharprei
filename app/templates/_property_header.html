@@ -22,8 +22,18 @@
         <input type="number" step="any" name="purchase_price" value="{{ prop.purchase_price }}">
       </div>
       <div class="form-row">
-        <label>Closing Costs ($)</label>
+        <label>Closing Costs ($) - without taxes and insurance</label>
         <input type="number" step="any" name="closing_costs" value="{{ prop.closing_costs }}">
+      </div>
+      <div class="form-row-pair">
+        <div class="form-row">
+          <label>Taxes paid at closing ($)</label>
+          <input type="number" step="any" name="taxes_at_closing" value="{{ prop.taxes_at_closing }}">
+        </div>
+        <div class="form-row">
+          <label>Insurance paid at closing ($)</label>
+          <input type="number" step="any" name="insurance_at_closing" value="{{ prop.insurance_at_closing }}">
+        </div>
       </div>
       <div class="form-row">
         <label>Purchase Date</label>
@@ -97,13 +107,14 @@
           <div class="value">{{ rm.money(py.total_income) }}</div>
           <div class="label">Rent Collected</div>
         </div>
-        <div class="summary-tile accent" title="Average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost.">
+        <div class="summary-tile accent" title="Average monthly (rent − expenses − upfront taxes and insurance spread over the first 12 months) across all recorded months, annualized, ÷ All-In Cost.">
           <div class="value {{ 'profit-up' if py.yield_pct and py.yield_pct >= 0 else 'profit-down' if py.yield_pct is not none else '' }}">{{ py.display }}</div>
           <div class="label">Cash-on-Cash Yield</div>
         </div>
       </div>
     </div>
     <div class="stat-row" style="margin-top:16px;">
+      <div class="stat" title="Taxes paid at closing: {{ rm.money(prop.taxes_at_closing|float) }}&#10;Insurance paid at closing: {{ rm.money(prop.insurance_at_closing|float) }}&#10;&#10;One-time ownership costs - not part of All-In Cost. Counted in the yield, spread over the first 12 months of ownership."><div class="value">{{ rm.money(prop.upfront_costs) }}</div><div class="label">Upfront Costs</div></div>
       <div class="stat" title="Manually set - money you've set aside for this property's expenses."><div class="value">{{ rm.money(prop.account_balance) }}</div><div class="label">Account Balance</div></div>
       <div class="stat" title="How many months of income/expense data have been recorded below."><div class="value">{{ py.months_recorded }}</div><div class="label">Months Recorded</div></div>
       <div class="stat" title="Annual Rent × 55% ÷ All-In Cost. Projected once the property is past its first-year move-in costs - not based on your actual recorded months.">
@@ -111,7 +122,7 @@
         <div class="label">Est. Yield (Stabilized)</div>
       </div>
     </div>
-    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Est. Profit = Estimated Value − All-In Cost. Est. Yield (Stabilized) = Annual Rent × 55% ÷ All-In Cost - a steady-state projection assuming 45% of rent goes to expenses, since the first 12 months are often skewed by move-in repairs.</p>
+    <p class="muted" style="font-size:12px; margin-top:14px; margin-bottom:0;">Yield = average monthly (rent − expenses) across all recorded months, annualized, ÷ All-In Cost. Upfront Costs (taxes and insurance paid at closing) aren't part of All-In Cost; they count in the yield spread over the first 12 months. Est. Profit = Estimated Value − All-In Cost. Est. Yield (Stabilized) = Annual Rent × 55% ÷ All-In Cost - a steady-state projection assuming 45% of rent goes to expenses, since the first 12 months are often skewed by move-in repairs.</p>
   </div>
 </div>
 </div>

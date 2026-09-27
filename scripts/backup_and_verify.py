@@ -26,7 +26,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.database import BACKUP_DIR, SessionLocal, backup_db, engine  # noqa: E402
+from app.database import BACKUP_DIR, UPLOAD_ROOT, SessionLocal, backup_db, engine  # noqa: E402
 from app.finance import build_month_summaries, build_totals  # noqa: E402
 from app.metrics import get_zip_metrics  # noqa: E402
 
@@ -53,6 +53,37 @@ def fingerprint(eng, session_factory) -> dict:
 
 
 STATUS_FILE = BACKUP_DIR / "last_backup.json"
+FILE_FOLDERS = ["deals", "renovations"]
+FILE_MIRROR = BACKUP_DIR / "files"
+
+
+def _live_files():
+    for folder in FILE_FOLDERS:
+        root = UPLOAD_ROOT / folder
+        if root.exists():
+            yield from (p for p in root.rglob("*") if p.is_file())
+
+
+def mirror_files() -> int:
+    """Copies uploaded files (deal documents, receipts) into the backup folder.
+    Never deletes from the mirror, so a file deleted in the app is recoverable."""
+    copied = 0
+    for src in _live_files():
+        dest = FILE_MIRROR / src.relative_to(UPLOAD_ROOT)
+        if not dest.exists() or dest.stat().st_size != src.stat().st_size:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            copied += 1
+    return copied
+
+
+def verify_files() -> list:
+    problems = []
+    for src in _live_files():
+        dest = FILE_MIRROR / src.relative_to(UPLOAD_ROOT)
+        if not dest.exists() or dest.stat().st_size != src.stat().st_size:
+            problems.append(f"file not backed up: {src.relative_to(UPLOAD_ROOT)}")
+    return problems
 
 
 def write_status(ok: bool, message: str) -> None:
@@ -67,6 +98,7 @@ def notify(message: str) -> None:
 def main(backup_override=None) -> int:
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     backup = backup_override or backup_db("nightly")
+    copied_files = mirror_files() if backup_override is None else 0
 
     live = fingerprint(engine, SessionLocal)
 
@@ -89,6 +121,9 @@ def main(backup_override=None) -> int:
         if restored["figures"].get(key) != value:
             problems.append(f"{key}: live {value}, restored {restored['figures'].get(key)}")
 
+    if backup_override is None:
+        problems += verify_files()
+
     if problems:
         print(f"[{stamp}] BACKUP VERIFY FAILED for {backup.name}:")
         for p in problems:
@@ -100,7 +135,8 @@ def main(backup_override=None) -> int:
 
     tables = len(live["counts"])
     rows = sum(live["counts"].values())
-    print(f"[{stamp}] OK {backup.name}: restored and verified {tables} tables, {rows} rows, figures {restored['figures']}")
+    files = sum(1 for _ in _live_files())
+    print(f"[{stamp}] OK {backup.name}: restored and verified {tables} tables, {rows} rows, figures {restored['figures']}; files {files} backed up ({copied_files} new)")
     if backup_override is None:
         write_status(True, backup.name)
     return 0

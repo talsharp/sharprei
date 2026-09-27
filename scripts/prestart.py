@@ -12,13 +12,15 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app import models  # noqa: E402,F401
-from app.database import Base, engine  # noqa: E402
+from app.database import Base, backup_db, engine  # noqa: E402
 
 BASELINE = "01a81e5ba8d0"
 
@@ -36,6 +38,12 @@ def main() -> None:
             return
         print("prestart: database predates migrations - marking baseline")
         command.stamp(cfg, BASELINE)
+
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    if current != head:
+        print(f"prestart: backing up before migrating {current} -> {head}: {backup_db('before_migration').name}")
 
     command.upgrade(cfg, "head")
     Base.metadata.create_all(engine)  # tables added since the baseline that no migration creates

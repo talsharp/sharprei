@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app import config  # noqa: F401  (loads .env before anything else)
 from app import audit  # noqa: F401  (registers the audit log listener)
 from app import auth, scheduler
-from app.database import backup_db, get_db, init_db
+from app.database import backup_db, get_db
 from app.finance_routes import build_router as build_finance_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
@@ -155,7 +155,8 @@ def activity(request: Request, area: str = "", db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 def on_startup():
-    init_db()
+    # The schema is brought up to date by scripts/prestart.py (Alembic) before
+    # the server starts - creating tables here could race ahead of a migration.
     scheduler.start()
 
 
@@ -652,6 +653,8 @@ def update_property(
     address: str = Form(...),
     purchase_price: str = Form("0"),
     closing_costs: str = Form("0"),
+    taxes_at_closing: str = Form("0"),
+    insurance_at_closing: str = Form("0"),
     purchase_date: str = Form(""),
     max_arv: str = Form(""),
     estimated_value: str = Form(""),
@@ -665,6 +668,8 @@ def update_property(
     prop.address = address.strip()
     prop.purchase_price = float(purchase_price) if purchase_price.strip() else 0
     prop.closing_costs = float(closing_costs) if closing_costs.strip() else 0
+    prop.taxes_at_closing = float(taxes_at_closing) if taxes_at_closing.strip() else 0
+    prop.insurance_at_closing = float(insurance_at_closing) if insurance_at_closing.strip() else 0
     prop.purchase_date = date.fromisoformat(purchase_date) if purchase_date.strip() else None
     prop.max_arv = float(max_arv) if max_arv.strip() else None
     prop.estimated_value = float(estimated_value) if estimated_value.strip() else None
