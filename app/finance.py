@@ -34,7 +34,7 @@ DEAL_STATUSES = OrderedDict(
         ("under_contract", "Under contract"),
         ("closed", "Closed"),
         ("kept", "Closed - kept for portfolio"),
-        ("cancelled", "Didn't close"),
+        ("cancelled", "Dead"),
     ]
 )
 
