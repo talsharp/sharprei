@@ -17,4 +17,7 @@ if len(SECRET_KEY) < 32:
 
 GOOGLE_CONFIGURED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 BASE_HOST = urlparse(BASE_URL).netloc if BASE_URL else ""
-SECURE_COOKIES = BASE_URL.startswith("https://")
+ON_RENDER = bool(os.environ.get("RENDER"))
+SECURE_COOKIES = BASE_URL.startswith("https://") or ON_RENDER
+NIGHTLY_BACKUP = os.environ.get("NIGHTLY_BACKUP") == "1"
+BACKUP_HOUR_UTC = int(os.environ.get("BACKUP_HOUR_UTC", "7"))

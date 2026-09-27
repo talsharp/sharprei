@@ -5,11 +5,12 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.database import UPLOAD_ROOT
 from app.models import MonthlyExpense, Property
 
 INSUFFICIENT_DATA = "Not enough data"
 
-RENOVATION_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "renovations"
+RENOVATION_UPLOAD_DIR = UPLOAD_ROOT / "renovations"
 RENOVATION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

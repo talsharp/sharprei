@@ -13,6 +13,7 @@ doesn't match, so a broken backup is noticed the same night, not months later.
 Usage: venv/bin/python scripts/backup_and_verify.py
 """
 
+import json
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.database import SessionLocal, backup_db, engine  # noqa: E402
+from app.database import BACKUP_DIR, SessionLocal, backup_db, engine  # noqa: E402
 from app.finance import build_month_summaries, build_totals  # noqa: E402
 from app.metrics import get_zip_metrics  # noqa: E402
 
@@ -49,6 +50,13 @@ def fingerprint(eng, session_factory) -> dict:
     finally:
         db.close()
     return {"counts": counts, "figures": key_figures}
+
+
+STATUS_FILE = BACKUP_DIR / "last_backup.json"
+
+
+def write_status(ok: bool, message: str) -> None:
+    STATUS_FILE.write_text(json.dumps({"ok": ok, "at": datetime.utcnow().isoformat(), "message": message}))
 
 
 def notify(message: str) -> None:
@@ -86,11 +94,15 @@ def main(backup_override=None) -> int:
         for p in problems:
             print("  -", p)
         notify("Backup restore test FAILED - check logs/backup.log")
+        if backup_override is None:
+            write_status(False, "; ".join(problems)[:500])
         return 1
 
     tables = len(live["counts"])
     rows = sum(live["counts"].values())
     print(f"[{stamp}] OK {backup.name}: restored and verified {tables} tables, {rows} rows, figures {restored['figures']}")
+    if backup_override is None:
+        write_status(True, backup.name)
     return 0
 
 

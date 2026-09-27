@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: sharprei
+    runtime: python
+    plan: starter
+    region: ohio
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/prestart.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DB_PATH
+        value: /var/data/data.db
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: NIGHTLY_BACKUP
+        value: "1"
+      - key: OWNER_EMAIL
+        value: tal@sharphead.co
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: BASE_URL
+        sync: false

@@ -22,10 +22,10 @@ from uuid import uuid4
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from app.database import UPLOAD_ROOT
 from app.models import CampaignRun, RunType, ZipCode, ZipStatus
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = UPLOAD_ROOT
 
 SHEET_ALIASES = {
     "initial": ["first text", "firsttext", "initial", "initial text", "text1", "text 1"],

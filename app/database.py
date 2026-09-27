@@ -13,6 +13,8 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", ROOT / "backups"))
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_DIR", ROOT / "uploads"))
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 BACKUPS_TO_KEEP = 45
 
 

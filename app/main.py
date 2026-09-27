@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app import config  # noqa: F401  (loads .env before anything else)
 from app import audit  # noqa: F401  (registers the audit log listener)
-from app import auth
+from app import auth, scheduler
 from app.database import backup_db, get_db, init_db
 from app.finance_routes import build_router as build_finance_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
@@ -95,6 +95,23 @@ def health(db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
+@app.get("/health/backup")
+def health_backup():
+    """For uptime monitoring: 503 if the last nightly backup failed its restore
+    test or hasn't run in over 36 hours."""
+    from app.database import BACKUP_DIR
+
+    status_file = BACKUP_DIR / "last_backup.json"
+    try:
+        status = json.loads(status_file.read_text())
+        age_hours = (datetime.utcnow() - datetime.fromisoformat(status["at"])).total_seconds() / 3600
+    except (OSError, ValueError, KeyError):
+        return Response('{"backup": "never ran"}', status_code=503, media_type="application/json")
+    ok = status.get("ok") and age_hours <= 36
+    body = json.dumps({"backup": "ok" if ok else "problem", "hours_ago": round(age_hours, 1), "detail": status.get("message", "")})
+    return Response(body, status_code=200 if ok else 503, media_type="application/json")
+
+
 ACTIVITY_AREAS = {
     "zip_codes": "Zip codes",
     "campaign_runs": "Campaign runs",
@@ -139,6 +156,7 @@ def activity(request: Request, area: str = "", db: Session = Depends(get_db)):
 @app.on_event("startup")
 def on_startup():
     init_db()
+    scheduler.start()
 
 
 SORT_FIELDS = {
