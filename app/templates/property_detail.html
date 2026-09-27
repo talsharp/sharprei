@@ -6,6 +6,8 @@
 {% include "_property_header.html" %}
 
 {% include "_owners_card.html" %}
+{% import "_files_macros.html" as fl %}
+{{ fl.files_card(prop.files, "/rentals/" ~ prop.id ~ "/files", too_big, max_mb, "No files yet. Upload the purchase documents, deed, insurance, leases, management agreement - anything for this property.") }}
 
 <div class="card">
   <h3 style="cursor:pointer; user-select:none;" onclick="var el=document.getElementById('reno-body'); var open = el.style.display !== 'none'; el.style.display = open ? 'none' : 'block'; document.getElementById('reno-arrow').textContent = open ? '▸' : '▾';">

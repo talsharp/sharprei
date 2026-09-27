@@ -2,6 +2,7 @@ import json
 import os
 from datetime import date, datetime
 from pathlib import Path
+from typing import List
 
 import pandas as pd
 from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
@@ -15,6 +16,7 @@ from app import config  # noqa: F401  (loads .env before anything else)
 from app import audit  # noqa: F401  (registers the audit log listener)
 from app import auth, scheduler
 from app.database import backup_db, get_db
+from app.documents import MAX_FILE_MB, folder_for, save_uploads, serve, too_big_suffix
 from app.finance_routes import build_router as build_finance_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
@@ -36,6 +38,7 @@ from app.models import (
     MonthlyExpense,
     Neighborhood,
     Property,
+    PropertyFile,
     PropertyOwner,
     RenovationExpense,
     RunType,
@@ -594,8 +597,45 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
             "py": py,
             "today": date.today().isoformat(),
             "this_month": date.today().replace(day=1).strftime("%Y-%m"),
+            "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
+            "max_mb": MAX_FILE_MB,
         },
     )
+
+
+@app.post("/rentals/{property_id}/files")
+async def property_files_upload(
+    property_id: int,
+    files: List[UploadFile] = File(...),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    prop = db.get(Property, property_id)
+    if not prop:
+        return RedirectResponse("/rentals", status_code=303)
+    saved, too_big = await save_uploads(folder_for("properties", property_id), files)
+    for f in saved:
+        db.add(PropertyFile(property_id=property_id, note=note.strip()[:255] or None, **f))
+    db.commit()
+    return RedirectResponse(f"/rentals/{property_id}{too_big_suffix(too_big)}#files", status_code=303)
+
+
+@app.get("/rentals/{property_id}/files/{file_id}")
+def property_file(property_id: int, file_id: int, db: Session = Depends(get_db)):
+    f = db.get(PropertyFile, file_id)
+    if not f or f.property_id != property_id:
+        return Response("File not found", status_code=404)
+    return serve(folder_for("properties", property_id), f.stored_name, f.original_name)
+
+
+@app.post("/rentals/{property_id}/files/{file_id}/delete")
+def property_file_delete(property_id: int, file_id: int, db: Session = Depends(get_db)):
+    f = db.get(PropertyFile, file_id)
+    if f and f.property_id == property_id:
+        (folder_for("properties", property_id) / f.stored_name).unlink(missing_ok=True)
+        db.delete(f)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}#files", status_code=303)
 
 
 @app.get("/rentals/{property_id}/report")

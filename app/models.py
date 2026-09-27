@@ -184,6 +184,9 @@ class Property(Base):
     owners: Mapped[list["PropertyOwner"]] = relationship(
         back_populates="property_ref", cascade="all, delete-orphan", order_by="PropertyOwner.id"
     )
+    files: Mapped[list["PropertyFile"]] = relationship(
+        back_populates="property_ref", cascade="all, delete-orphan", order_by="PropertyFile.uploaded_at.desc()"
+    )
 
     @property
     def total_owner_percentage(self) -> float:
@@ -382,6 +385,20 @@ class WholesaleDeal(Base):
         if self.status == "kept":
             return float(self.estimated_value or 0)
         return None
+
+
+class PropertyFile(Base):
+    __tablename__ = "property_files"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"), index=True)
+    original_name: Mapped[str] = mapped_column(String(255))
+    stored_name: Mapped[str] = mapped_column(String(255))
+    size_bytes: Mapped[int] = mapped_column(default=0)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    property_ref: Mapped["Property"] = relationship(back_populates="files")
 
 
 class DealFile(Base):

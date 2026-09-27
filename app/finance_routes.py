@@ -1,16 +1,14 @@
-import mimetypes
 import shutil
-import uuid
 from datetime import date
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.database import UPLOAD_ROOT, get_db
+from app.database import get_db
+from app.documents import MAX_FILE_MB, folder_for, save_uploads, serve, too_big_suffix
 from app.finance import (
     CHANNELS,
     DEAL_STATUSES,
@@ -25,7 +23,7 @@ from app.finance import (
     parse_month_key,
     start_month,
 )
-from app.models import DealFile, FinanceExpense, FinanceMonth, Vendor, WholesaleDeal, ZipCode
+from app.models import DealFile, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -57,15 +55,19 @@ def _optional_date(value: str) -> Optional[date]:
         return None
 
 
-DEAL_FILES_DIR = UPLOAD_ROOT / "deals"
-MAX_FILE_BYTES = 25 * 1024 * 1024
-# Shown in the browser tab instead of downloaded; everything else downloads,
-# so an uploaded HTML/SVG file can never run as a page on this site.
-INLINE_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain"}
+def _deal_dir(deal_id: int):
+    return folder_for("deals", deal_id)
 
 
-def _deal_dir(deal_id: int) -> Path:
-    return DEAL_FILES_DIR / str(deal_id)
+def _street(address: str) -> str:
+    return (address or "").split(",")[0].strip().lower()
+
+
+def _matching_property(db: Session, deal: WholesaleDeal):
+    """For a deal kept for the portfolio: the Rentals property at the same address."""
+    if deal.status != "kept":
+        return None
+    return next((p for p in db.query(Property).all() if _street(p.address) == _street(deal.address)), None)
 
 
 def build_router(templates: Jinja2Templates) -> APIRouter:
@@ -281,7 +283,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             "finance_deal_detail.html",
             {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
-             "max_mb": MAX_FILE_BYTES // (1024 * 1024)},
+             "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal)},
         )
 
     @router.post("/deals/{deal_id}/update")
@@ -343,42 +345,18 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         deal = db.get(WholesaleDeal, deal_id)
         if not deal:
             return RedirectResponse("/finance/deals", status_code=303)
-        too_big = []
-        folder = _deal_dir(deal_id)
-        folder.mkdir(parents=True, exist_ok=True)
-        for upload in files:
-            if not upload.filename:
-                continue
-            content = await upload.read()
-            if len(content) > MAX_FILE_BYTES:
-                too_big.append(upload.filename)
-                continue
-            original = Path(upload.filename).name[:255]
-            stored = uuid.uuid4().hex + Path(original).suffix.lower()[:10]
-            (folder / stored).write_bytes(content)
-            db.add(DealFile(deal_id=deal_id, original_name=original, stored_name=stored,
-                            size_bytes=len(content), note=note.strip()[:255] or None))
+        saved, too_big = await save_uploads(_deal_dir(deal_id), files)
+        for f in saved:
+            db.add(DealFile(deal_id=deal_id, note=note.strip()[:255] or None, **f))
         db.commit()
-        suffix = "?too_big=" + ",".join(too_big)[:300] if too_big else ""
-        return RedirectResponse(f"/finance/deals/{deal_id}{suffix}#files", status_code=303)
+        return RedirectResponse(f"/finance/deals/{deal_id}{too_big_suffix(too_big)}#files", status_code=303)
 
     @router.get("/deals/{deal_id}/files/{file_id}")
     def finance_deal_file(deal_id: int, file_id: int, db: Session = Depends(get_db)):
         f = db.get(DealFile, file_id)
         if not f or f.deal_id != deal_id:
             return Response("File not found", status_code=404)
-        path = _deal_dir(deal_id) / f.stored_name
-        if not path.is_file():
-            return Response("File is missing on disk", status_code=404)
-        media_type = mimetypes.guess_type(f.original_name)[0] or "application/octet-stream"
-        inline = media_type in INLINE_TYPES
-        return FileResponse(
-            path,
-            filename=f.original_name,
-            media_type=media_type if inline else "application/octet-stream",
-            content_disposition_type="inline" if inline else "attachment",
-            headers={"X-Content-Type-Options": "nosniff"},
-        )
+        return serve(_deal_dir(deal_id), f.stored_name, f.original_name)
 
     @router.post("/deals/{deal_id}/files/{file_id}/delete")
     def finance_deal_file_delete(deal_id: int, file_id: int, db: Session = Depends(get_db)):
