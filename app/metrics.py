@@ -1,30 +1,51 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import CampaignRun, Deal, RunType, WholesaleDeal, ZipCode
 
-# Minimum SMS volume before a zip code is eligible for a tier - below this,
-# lead/reply rates are too noisy on a small sample to grade reliably.
-MIN_SMS_FOR_TIER = 500
+# Zips with at least this many SMS set the "average zip" that each zip's
+# rates are compared against in the hover text on the % columns.
+MIN_SMS_FOR_AVERAGE = 500
 
-# Weights match the priority order: leads matter most, then replies, then warm, then drip.
-SCORE_WEIGHTS = {"lead_rate": 0.4, "reply_rate": 0.3, "warm_rate": 0.2, "drip_rate": 0.1}
-
-# Relative weight of each "secondary" signal (replies > warm > drip), used to blend them
-# into one combined ratio against their averages.
-SECONDARY_WEIGHTS = {"reply_rate": 0.5, "warm_rate": 0.333, "drip_rate": 0.167}
+# Score: how a zip compares to the average zip, 100 = average. Each rate is
+# per message sent, weighted by importance (leads matter most, then replies,
+# then a little drips). Warm leads are deliberately not part of it.
+SCORE_WEIGHTS = {"leads": 0.6, "replies": 0.3, "drip": 0.1}
+# Small-sample protection: every zip is scored as if it also had this many
+# extra messages performing exactly at average, so a zip with few messages is
+# pulled toward 100 until its own volume is big enough to trust.
+SCORE_PRIOR_SMS = 500
 
 # How far a metric's ratio-to-average has to be to count as "well above" / "well below"
-# average, vs. just "roughly average". These are starting defaults - tune freely.
+# average, vs. just "roughly average" - used for the hover text on the % columns.
 FAR_ABOVE_AVERAGE = 1.5
 ABOVE_AVERAGE = 1.15
 BELOW_AVERAGE = 0.85
 
-TIER_ORDER = ["Great", "Good", "OK", "Not Good", "Bad"]
-INSUFFICIENT_DATA_TIER = "Not enough data"
+
+def score_group(rows: List[Tuple[int, int, int, int]]) -> List[Optional[float]]:
+    """rows are (sms, leads, replies, drip) for every zip in one comparison
+    group (initial sends, or one follow-up round). Returns each zip's score,
+    or None for zips with no messages sent."""
+    total_sms = sum(r[0] for r in rows)
+    if total_sms <= 0:
+        return [None for _ in rows]
+    averages = [sum(r[i] for r in rows) / total_sms for i in (1, 2, 3)]
+    weights = [SCORE_WEIGHTS["leads"], SCORE_WEIGHTS["replies"], SCORE_WEIGHTS["drip"]]
+    scores = []
+    for sms, *counts in rows:
+        if not sms:
+            scores.append(None)
+            continue
+        total = 0.0
+        for count, avg, weight in zip(counts, averages, weights):
+            adjusted = (count + SCORE_PRIOR_SMS * avg) / (sms + SCORE_PRIOR_SMS)
+            total += weight * (adjusted / avg if avg > 0 else 1.0)
+        scores.append(total * 100)
+    return scores
 
 
 @dataclass
@@ -40,10 +61,7 @@ class ZipMetrics:
     run_count: int = 0
     deal_count: int = 0
     total_profit: float = 0.0
-    score: float = 0.0
-    computed_tier: str = INSUFFICIENT_DATA_TIER
-    tier: str = INSUFFICIENT_DATA_TIER
-    tier_reason: str = "Not enough data yet to compare against the average."
+    score: Optional[float] = None
     avg_lead_rate: Optional[float] = None
     avg_reply_rate: Optional[float] = None
     avg_warm_rate: Optional[float] = None
@@ -76,15 +94,6 @@ class ZipMetrics:
         return self.total_opt_out / self.total_sms
 
 
-def _normalize(values: List[float]) -> List[float]:
-    if not values:
-        return []
-    lo, hi = min(values), max(values)
-    if hi == lo:
-        return [0.0 for _ in values]
-    return [(v - lo) / (hi - lo) for v in values]
-
-
 def _ratio_to_average(value: float, average: float) -> float:
     """How many times `value` is over `average`. If the average itself is 0,
     any positive value counts as clearly above average, and 0 counts as average."""
@@ -103,26 +112,8 @@ def _label_ratio(ratio: float) -> str:
     return "below avg"
 
 
-def _classify_tier(lead_ratio: float, secondary_ratio: float, reply_ratio: float) -> str:
-    if lead_ratio >= FAR_ABOVE_AVERAGE:
-        return "Great"
-    if lead_ratio > ABOVE_AVERAGE and secondary_ratio >= FAR_ABOVE_AVERAGE - 0.2:
-        return "Great"
-    if lead_ratio > ABOVE_AVERAGE:
-        return "Good"
-    if lead_ratio >= BELOW_AVERAGE:
-        # Roughly average leads - a clearly stronger secondary signal still bumps it up.
-        return "Good" if secondary_ratio > ABOVE_AVERAGE else "OK"
-    # Leads are below average. If replies (or the blended secondary signal) are still
-    # solid, this could just be luck of the draw so far - worth continuing to test,
-    # rather than writing it off as Bad.
-    if reply_ratio > ABOVE_AVERAGE or secondary_ratio > 1.0:
-        return "Not Good"
-    return "Bad"
-
-
-def _assign_tiers(results: List[ZipMetrics]) -> None:
-    eligible = [m for m in results if m.total_sms >= MIN_SMS_FOR_TIER]
+def _assign_comparisons(results: List[ZipMetrics]) -> None:
+    eligible = [m for m in results if m.total_sms >= MIN_SMS_FOR_AVERAGE]
     if not eligible:
         return
 
@@ -135,47 +126,22 @@ def _assign_tiers(results: List[ZipMetrics]) -> None:
     avg_warm_rate = avg("warm_rate")
     avg_drip_rate = avg("drip_rate")
 
-    # Every zip code gets a vs-average breakdown (useful context even below the
-    # tiering threshold) - only eligible ones get an actual tier assigned.
     for m in results:
         m.avg_lead_rate = avg_lead_rate
         m.avg_reply_rate = avg_reply_rate
         m.avg_warm_rate = avg_warm_rate
         m.avg_drip_rate = avg_drip_rate
-
-        lead_ratio = _ratio_to_average(m.lead_rate, avg_lead_rate)
-        reply_ratio = _ratio_to_average(m.reply_rate, avg_reply_rate)
-        warm_ratio = _ratio_to_average(m.warm_rate, avg_warm_rate)
-        drip_ratio = _ratio_to_average(m.drip_rate, avg_drip_rate)
-
-        m.lead_vs_avg = _label_ratio(lead_ratio)
-        m.reply_vs_avg = _label_ratio(reply_ratio)
-        m.warm_vs_avg = _label_ratio(warm_ratio)
-        m.drip_vs_avg = _label_ratio(drip_ratio)
-
-        reason = (
-            f"Leads: {m.lead_vs_avg} | Replies: {m.reply_vs_avg} | "
-            f"Warm: {m.warm_vs_avg} | Drip: {m.drip_vs_avg}"
-        )
-        if m.total_sms < MIN_SMS_FOR_TIER:
-            reason = f"Only {m.total_sms} SMS sent (min {MIN_SMS_FOR_TIER} for a tier). {reason}"
-        m.tier_reason = reason
-
-        if m.total_sms >= MIN_SMS_FOR_TIER:
-            secondary_ratio = (
-                reply_ratio * SECONDARY_WEIGHTS["reply_rate"]
-                + warm_ratio * SECONDARY_WEIGHTS["warm_rate"]
-                + drip_ratio * SECONDARY_WEIGHTS["drip_rate"]
-            )
-            m.computed_tier = _classify_tier(lead_ratio, secondary_ratio, reply_ratio)
-            m.tier = m.zip_code.tier_override or m.computed_tier
+        m.lead_vs_avg = _label_ratio(_ratio_to_average(m.lead_rate, avg_lead_rate))
+        m.reply_vs_avg = _label_ratio(_ratio_to_average(m.reply_rate, avg_reply_rate))
+        m.warm_vs_avg = _label_ratio(_ratio_to_average(m.warm_rate, avg_warm_rate))
+        m.drip_vs_avg = _label_ratio(_ratio_to_average(m.drip_rate, avg_drip_rate))
 
 
 def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipMetrics]:
     """Metrics here reflect INITIAL sends only - follow-up performance is tracked
     separately (see app.followups) and is never blended into these numbers,
-    including the tier, so a zip's grade always reflects its proven initial-send
-    performance regardless of how much follow-up activity it's had since."""
+    including the score, so a zip's score always reflects its proven
+    initial-send performance regardless of how much follow-up activity it's had."""
     run_agg = (
         select(
             CampaignRun.zip_code_id.label("zip_code_id"),
@@ -261,22 +227,12 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
             )
         )
 
-    # Score is kept as a secondary continuous reference (used for sorting) - it's
-    # always computed against the full dataset, so a single zip code (e.g. the
-    # detail page) still reflects its real standing.
-    lead_rates = _normalize([m.lead_rate for m in results])
-    reply_rates = _normalize([m.reply_rate for m in results])
-    warm_rates = _normalize([m.warm_rate for m in results])
-    drip_rates = _normalize([m.drip_rate for m in results])
-    for m, lr, rr, wr, dr in zip(results, lead_rates, reply_rates, warm_rates, drip_rates):
-        m.score = (
-            lr * SCORE_WEIGHTS["lead_rate"]
-            + rr * SCORE_WEIGHTS["reply_rate"]
-            + wr * SCORE_WEIGHTS["warm_rate"]
-            + dr * SCORE_WEIGHTS["drip_rate"]
-        ) * 100
-
-    _assign_tiers(results)
+    # Scores are always computed against the full dataset, so a single zip
+    # (e.g. the detail page) still reflects its real standing.
+    scores = score_group([(m.total_sms, m.total_leads, m.total_replies, m.total_drip) for m in results])
+    for m, score in zip(results, scores):
+        m.score = score
+    _assign_comparisons(results)
 
     if zip_code_id is not None:
         results = [m for m in results if m.zip_code.id == zip_code_id]

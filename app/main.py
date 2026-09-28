@@ -29,7 +29,7 @@ from app.weekly_import import (
     read_workbook,
     save_workbook,
 )
-from app.metrics import TIER_ORDER, get_zip_metrics
+from app.metrics import get_zip_metrics
 from app.models import (
     UNSET_DATE,
     AuditLog,
@@ -76,7 +76,6 @@ STATUS_LABELS = {
 }
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["ZipStatus"] = ZipStatus
-templates.env.globals["TIER_ORDER"] = TIER_ORDER
 templates.env.globals["UNSET_DATE"] = UNSET_DATE
 # Cache-buster for /static assets: derived from style.css's own mtime, so the
 # browser always fetches fresh CSS after a deploy instead of serving a stale
@@ -175,8 +174,7 @@ SORT_FIELDS = {
     "signed_agreements": lambda m: m.total_signed_agreements,
     "deals": lambda m: m.deal_count,
     "profit": lambda m: m.total_profit,
-    "score": lambda m: m.score,
-    "tier": lambda m: len(TIER_ORDER) - TIER_ORDER.index(m.tier) if m.tier in TIER_ORDER else 0,
+    "score": lambda m: m.score if m.score is not None else -1,
     "region": lambda m: (m.zip_code.region_override or m.zip_code.region or ""),
 }
 
@@ -186,7 +184,9 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
     metrics = get_zip_metrics(db)
     key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
     metrics.sort(key=key_fn, reverse=(dir == "desc"))
-    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
+    if sort == "score":
+        # Zips with no sends have no score - keep them last in both directions.
+        metrics.sort(key=lambda m: m.score is None)
     regions = sorted({m.zip_code.region_override or m.zip_code.region for m in metrics if (m.zip_code.region_override or m.zip_code.region)})
     return templates.TemplateResponse(
         "zip_list.html",
@@ -194,7 +194,6 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
             "request": request,
             "active": "list",
             "metrics": metrics,
-            "follow_ups": follow_ups,
             "regions": regions,
             "sort": sort,
             "dir": dir,
@@ -260,7 +259,6 @@ def zip_update(
     status: str = Form(...),
     follow_up_status: str = Form(...),
     notes: str = Form(""),
-    tier_override: str = Form(""),
     region_override: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -268,7 +266,6 @@ def zip_update(
     zc.status = status
     zc.follow_up_status = follow_up_status
     zc.notes = notes
-    zc.tier_override = tier_override or None
     zc.region_override = region_override or None
     db.commit()
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)

@@ -4,7 +4,7 @@
 {% block content %}
 
 <div class="top-actions">
-  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}" title="Initial send status">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-{{ zc.follow_up_status }}" title="Follow-up status">FU: {{ STATUS_LABELS[zc.follow_up_status] }}</span> <span class="badge badge-tier-{{ m.tier | replace(' ', '-') }}">{{ m.tier }}{{ " ✎ manual" if zc.tier_override else "" }}</span> <span class="muted" style="font-size:14px;">{{ zc.region_override or zc.region or "" }}{{ " (manual)" if zc.region_override else "" }}</span></h2>
+  <h2 style="margin:0;">{{ zc.zip_code }} <span class="badge badge-{{ zc.status }}" title="Initial send status">{{ STATUS_LABELS[zc.status] }}</span> <span class="badge badge-{{ zc.follow_up_status }}" title="Follow-up status">FU: {{ STATUS_LABELS[zc.follow_up_status] }}</span> <span class="muted" style="font-size:14px;">{{ zc.region_override or zc.region or "" }}{{ " (manual)" if zc.region_override else "" }}</span></h2>
   <a class="btn secondary" href="/">Back to list</a>
 </div>
 
@@ -25,15 +25,6 @@
         <select name="follow_up_status">
           {% for key, label in STATUS_LABELS.items() %}
           <option value="{{ key }}" {{ "selected" if zc.follow_up_status == key else "" }}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Tier Override (leave on Auto to use the computed tier)</label>
-        <select name="tier_override">
-          <option value="">Auto (computed: {{ m.computed_tier }})</option>
-          {% for t in TIER_ORDER %}
-          <option value="{{ t }}" {{ "selected" if zc.tier_override == t else "" }}>{{ t }}</option>
           {% endfor %}
         </select>
       </div>
@@ -90,7 +81,7 @@
     <div class="stat-row" style="margin-bottom:16px;">
       <div class="stat"><div class="value">{{ m.total_sms }}</div><div class="label">SMS Sent</div></div>
       <div class="stat"><div class="value">{{ m.total_replies }}</div><div class="label">Replies</div></div>
-      <div class="stat"><div class="value">{{ "%.0f"|format(m.score) }}</div><div class="label">Score</div></div>
+      <div class="stat" title="100 = an average zip. Above 100 is better, below is weaker. Based on leads (60%), replies (30%) and drips (10%) per message sent."><div class="value">{{ "%.0f"|format(m.score) if m.score is not none else "—" }}</div><div class="label">Score (100 = avg)</div></div>
     </div>
     <div class="stat-row" style="margin-bottom:16px;">
       <div class="stat" title="{{ macros.pct_title(m.reply_rate, m.reply_vs_avg, m.avg_reply_rate) }}"><div class="value">{{ "%.2f"|format(m.reply_rate*100) }}%</div><div class="label">% Replies</div></div>
@@ -114,7 +105,7 @@
 
 <div class="card">
   <h3>Follow-up Performance</h3>
-  <p class="muted" style="margin-top:-8px;">Kept separate from initial send performance and from the tier - shown here so you can judge follow-ups on their own results.</p>
+  <p class="muted" style="margin-top:-8px;">Kept separate from initial send performance and its score - shown here so you can judge follow-ups on their own results.</p>
   {% if follow_up and follow_up.rounds %}
   <div class="stat-row" style="margin-bottom:16px;">
     <div class="stat"><div class="value">{{ follow_up.rounds|length }}</div><div class="label">Follow-up Rounds</div></div>

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.metrics import _label_ratio, _ratio_to_average
+from app.metrics import score_group
 from app.models import UNSET_DATE, CampaignRun, Deal, RunType
 
 
@@ -29,6 +30,7 @@ class FollowUpRound:
     lead_vs_avg: str = "n/a"
     warm_vs_avg: str = "n/a"
     drip_vs_avg: str = "n/a"
+    score: Optional[float] = None
 
     @property
     def reply_rate(self) -> float:
@@ -66,6 +68,7 @@ class FollowUpSummary:
     lead_vs_avg: str = "n/a"
     warm_vs_avg: str = "n/a"
     drip_vs_avg: str = "n/a"
+    score: Optional[float] = None
 
     @property
     def reply_rate(self) -> float:
@@ -228,9 +231,16 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
             rounds_by_number[rnd.round_number].append(rnd)
     for rounds in rounds_by_number.values():
         _apply_vs_average(rounds)
+        scores = score_group([(r.run.sms_sent, r.run.leads, r.run.replies, r.run.drip) for r in rounds])
+        for rnd, score in zip(rounds, scores):
+            rnd.score = score
 
     # Compare each zip's all-rounds-combined total to other zips' totals.
     _apply_vs_average(result.values())
+    combined = list(result.values())
+    scores = score_group([(c.total_sms, c.total_leads, c.total_replies, c.total_drip) for c in combined])
+    for c, score in zip(combined, scores):
+        c.score = score
 
     if zip_ids is not None:
         result = {zid: s for zid, s in result.items() if zid in set(zip_ids)}
@@ -252,15 +262,12 @@ def get_rounds_overview(db: Session) -> Tuple[
         for rnd in summary.rounds:
             rounds_by_number[rnd.round_number].append(rnd)
     for rounds in rounds_by_number.values():
-        rounds.sort(key=lambda r: r.run.zip_code.zip_code)
+        rounds.sort(key=lambda r: -(r.score if r.score is not None else -1))
     round_numbers = sorted(rounds_by_number.keys())
 
     round_summaries = {num: _round_group_summary(rounds_by_number[num]) for num in round_numbers}
 
-    summaries_sorted = sorted(
-        summaries.values(),
-        key=lambda s: s.rounds[0].run.zip_code.zip_code if s.rounds else "",
-    )
+    summaries_sorted = sorted(summaries.values(), key=lambda s: -(s.score if s.score is not None else -1))
     combined_summary = _summary_group_summary(summaries_sorted)
 
     return round_numbers, dict(rounds_by_number), round_summaries, summaries_sorted, combined_summary

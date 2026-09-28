@@ -23,6 +23,7 @@
       <label><input type="checkbox" data-col="warm" checked> Warm</label>
       <label><input type="checkbox" data-col="drip" checked> Drip</label>
       <label><input type="checkbox" data-col="signed" checked> Signed</label>
+      <label><input type="checkbox" data-col="score" checked> Score</label>
       <label><input type="checkbox" data-col="rounds" checked> Rounds (combined table)</label>
       <label><input type="checkbox" data-col="deals" checked> Deals (combined table)</label>
       <label><input type="checkbox" data-col="profit" checked> Profit (combined table)</label>
@@ -101,6 +102,7 @@
         <th data-col="warm">Warm</th>
         <th data-col="drip">Drip</th>
         <th data-col="signed">Signed</th>
+        <th data-col="score" title="100 = an average zip for this round. Above 100 is better, below is weaker. Based on leads (60%), replies (30%) and drips (10%) per message sent. Zips with few messages are pulled toward 100.">Score</th>
       </tr>
     </thead>
     <tbody>
@@ -121,6 +123,7 @@
         <td data-col="warm">{{ rnd.run.warm }}</td>
         <td data-col="drip">{{ rnd.run.drip }}</td>
         <td data-col="signed">{{ rnd.run.signed_agreements }}</td>
+        <td data-col="score" class="score-cell" data-sort="{{ rnd.score if rnd.score is not none else '' }}">{{ "%.0f"|format(rnd.score) if rnd.score is not none else "—" }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -139,6 +142,7 @@
         <td data-col="warm">{{ rs.total_warm }}</td>
         <td data-col="drip">{{ rs.total_drip }}</td>
         <td data-col="signed">{{ rs.total_signed_agreements }}</td>
+        <td data-col="score"></td>
       </tr>
     </tfoot>
   </table>
@@ -168,6 +172,7 @@
         <th data-col="signed">Signed</th>
         <th data-col="deals">Deals</th>
         <th data-col="profit">Profit</th>
+        <th data-col="score" title="100 = an average zip across all follow-ups. Above 100 is better, below is weaker. Based on leads (60%), replies (30%) and drips (10%) per message sent. Zips with few messages are pulled toward 100.">Score</th>
       </tr>
     </thead>
     <tbody>
@@ -189,6 +194,7 @@
         <td data-col="signed">{{ s.total_signed_agreements }}</td>
         <td data-col="deals">{{ s.deal_count }}</td>
         <td data-col="profit">${{ "%.0f"|format(s.total_profit) }}</td>
+        <td data-col="score" class="score-cell" data-sort="{{ s.score if s.score is not none else '' }}">{{ "%.0f"|format(s.score) if s.score is not none else "—" }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -208,6 +214,7 @@
         <td data-col="signed">{{ combined_summary.total_signed_agreements }}</td>
         <td data-col="deals">{{ combined_summary.deal_count }}</td>
         <td data-col="profit">${{ "%.0f"|format(combined_summary.total_profit) }}</td>
+        <td data-col="score"></td>
       </tr>
     </tfoot>
   </table>
