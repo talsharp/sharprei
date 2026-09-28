@@ -55,6 +55,7 @@
         <label><input type="checkbox" data-col="region" checked> Region</label>
         <label><input type="checkbox" data-col="neighborhood" checked> Neighborhood</label>
         <label><input type="checkbox" data-col="status" checked> Status</label>
+        <label><input type="checkbox" data-col="followups" checked> Follow-ups</label>
         <label><input type="checkbox" data-col="sms" checked> SMS Sent</label>
         <label><input type="checkbox" data-col="reply_rate" checked> % Replies</label>
         <label><input type="checkbox" data-col="drip_rate" checked> % Drips</label>
@@ -82,7 +83,7 @@
   </a>
 {% endmacro %}
 
-<p class="muted" style="margin-bottom:8px; font-size:13px;">All columns reflect <strong>initial sends only</strong> - follow-up results are on the <a href="/followups">Follow-ups</a> page. <strong>Score:</strong> 100 = an average zip; higher is better (leads count most, then replies, then a little drips).</p>
+<p class="muted" style="margin-bottom:8px; font-size:13px;">All columns reflect <strong>initial sends only</strong> - click a zip's Follow-ups count to see its follow-up results. <strong>Score:</strong> 100 = an average zip; higher is better (leads count most, then replies, then a little drips).</p>
 
 <div class="table-scroll-y">
 <table id="zip-table">
@@ -92,6 +93,7 @@
       <th data-col="region">{{ sort_link('region', 'Region') }}</th>
       <th data-col="neighborhood">Neighborhood</th>
       <th data-col="status">{{ sort_link('status', 'Status') }}</th>
+      <th data-col="followups">Follow-ups</th>
       <th data-col="sms">{{ sort_link('sms', 'SMS Sent') }}</th>
       <th data-col="reply_rate">{{ sort_link('reply_rate', '% Replies') }}</th>
       <th data-col="drip_rate">{{ sort_link('drip_rate', '% Drips') }}</th>
@@ -106,6 +108,7 @@
   </thead>
   <tbody>
     {% for m in metrics %}
+    {% set fu = follow_ups.get(m.zip_code.id) %}
     {% set effective_region = m.zip_code.region_override or m.zip_code.region %}
     <tr data-status="{{ m.zip_code.status }}" data-region="{{ effective_region or '' }}">
       <td><a class="zip-link" href="/zip/{{ m.zip_code.id }}">{{ m.zip_code.zip_code }}</a></td>
@@ -118,6 +121,13 @@
         {% else %}—{% endif %}
       </td>
       <td data-col="status"><span class="badge badge-{{ m.zip_code.status }}">{{ STATUS_LABELS[m.zip_code.status] }}</span></td>
+      <td data-col="followups">
+        {% if fu and fu.rounds %}
+        <button type="button" class="followup-toggle secondary" data-target="fu-{{ m.zip_code.id }}" style="font-size:12px;">{{ fu.rounds|length }} ▾</button>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
       <td data-col="sms">{{ m.total_sms }}</td>
       <td data-col="reply_rate" title="{{ macros.pct_title(m.reply_rate, m.reply_vs_avg, m.avg_reply_rate) }}">{{ "%.2f"|format(m.reply_rate * 100) }}%</td>
       <td data-col="drip_rate" title="{{ macros.pct_title(m.drip_rate, m.drip_vs_avg, m.avg_drip_rate) }}">{{ "%.2f"|format(m.drip_rate * 100) }}%</td>
@@ -129,8 +139,65 @@
       <td data-col="profit">${{ "%.0f"|format(m.total_profit) }}</td>
       <td data-col="score" data-sort="{{ m.score if m.score is not none else "" }}">{{ "%.0f"|format(m.score) if m.score is not none else "—" }}</td>
     </tr>
+    {% if fu and fu.rounds %}
+    <tr class="followup-detail-row" id="fu-{{ m.zip_code.id }}" style="display:none;">
+      <td colspan="15" style="padding:12px 16px; background:var(--panel-soft);">
+        <table style="width:auto; min-width:900px; background:transparent; border:1px solid var(--border);">
+          <thead>
+            <tr>
+              <th style="font-size:12px;">Round</th>
+              <th style="font-size:12px;">Date</th>
+              <th style="font-size:12px;">Days since initial</th>
+              <th style="font-size:12px;">SMS</th>
+              <th style="font-size:12px;">Replies</th>
+              <th style="font-size:12px;">% Replies</th>
+              <th style="font-size:12px;">% Leads</th>
+              <th style="font-size:12px;">% Warm</th>
+              <th style="font-size:12px;">% Drip</th>
+              <th style="font-size:12px;">Leads</th>
+              <th style="font-size:12px;">Warm</th>
+              <th style="font-size:12px;">Drip</th>
+              <th style="font-size:12px;">Signed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rnd in fu.rounds %}
+            <tr>
+              <td>Follow-up {{ rnd.round_number }}</td>
+              <td>{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
+              <td>{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
+              <td>{{ rnd.run.sms_sent }}</td>
+              <td>{{ rnd.run.replies }}</td>
+              <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.lead_rate, rnd.lead_vs_avg, rnd.avg_lead_rate) }}">{{ "%.2f"|format(rnd.lead_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.warm_rate, rnd.warm_vs_avg, rnd.avg_warm_rate) }}">{{ "%.2f"|format(rnd.warm_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(rnd.drip_rate, rnd.drip_vs_avg, rnd.avg_drip_rate) }}">{{ "%.2f"|format(rnd.drip_rate*100) }}%</td>
+              <td>{{ rnd.run.leads }}</td>
+              <td>{{ rnd.run.warm }}</td>
+              <td>{{ rnd.run.drip }}</td>
+              <td>{{ rnd.run.signed_agreements }}</td>
+            </tr>
+            {% endfor %}
+            <tr style="font-weight:600; border-top:1px solid var(--border);">
+              <td colspan="3">Total follow-ups</td>
+              <td>{{ fu.total_sms }}</td>
+              <td>{{ fu.total_replies }}</td>
+              <td title="{{ macros.pct_title(fu.reply_rate, fu.reply_vs_avg, fu.avg_reply_rate) }}">{{ "%.2f"|format(fu.reply_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.lead_rate, fu.lead_vs_avg, fu.avg_lead_rate) }}">{{ "%.2f"|format(fu.lead_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.warm_rate, fu.warm_vs_avg, fu.avg_warm_rate) }}">{{ "%.2f"|format(fu.warm_rate*100) }}%</td>
+              <td title="{{ macros.pct_title(fu.drip_rate, fu.drip_vs_avg, fu.avg_drip_rate) }}">{{ "%.2f"|format(fu.drip_rate*100) }}%</td>
+              <td>{{ fu.total_leads }}</td>
+              <td>{{ fu.total_warm }}</td>
+              <td>{{ fu.total_drip }}</td>
+              <td>{{ fu.total_signed_agreements }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+    {% endif %}
     {% else %}
-    <tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or upload a weekly update.</td></tr>
+    <tr><td colspan="15" class="muted" style="text-align:center; padding:24px;">No zip codes yet. Add one above or upload a weekly update.</td></tr>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -139,6 +206,7 @@
       <td data-col="region"></td>
       <td data-col="neighborhood"></td>
       <td data-col="status"></td>
+      <td data-col="followups"></td>
       <td data-col="sms">0</td>
       <td data-col="reply_rate">0.00%</td>
       <td data-col="drip_rate">0.00%</td>
@@ -310,7 +378,12 @@
       var matchesSearch = !q || zip.indexOf(q) !== -1;
       var matchesStatus = allowedStatuses.indexOf(tr.dataset.status) !== -1;
       var matchesRegion = allowedRegions.indexOf(tr.dataset.region) !== -1;
-      tr.classList.toggle('hidden-row', !(matchesSearch && matchesStatus && matchesRegion));
+      var hide = !(matchesSearch && matchesStatus && matchesRegion);
+      tr.classList.toggle('hidden-row', hide);
+      var detailRow = tr.nextElementSibling;
+      if (detailRow && detailRow.classList.contains('followup-detail-row')) {
+        detailRow.classList.toggle('hidden-row', hide);
+      }
     });
     recomputeFooter();
   }
@@ -328,6 +401,17 @@
   applyFilters();
 })();
 
+(function() {
+  document.querySelectorAll('.followup-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = document.getElementById(btn.dataset.target);
+      if (!row) return;
+      var isOpen = row.style.display !== 'none';
+      row.style.display = isOpen ? 'none' : '';
+      btn.textContent = btn.textContent.replace(isOpen ? '▴' : '▾', isOpen ? '▾' : '▴');
+    });
+  });
+})();
 </script>
 
 {% endblock %}

@@ -187,6 +187,7 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
     if sort == "score":
         # Zips with no sends have no score - keep them last in both directions.
         metrics.sort(key=lambda m: m.score is None)
+    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
     regions = sorted({m.zip_code.region_override or m.zip_code.region for m in metrics if (m.zip_code.region_override or m.zip_code.region)})
     return templates.TemplateResponse(
         "zip_list.html",
@@ -194,6 +195,7 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
             "request": request,
             "active": "list",
             "metrics": metrics,
+            "follow_ups": follow_ups,
             "regions": regions,
             "sort": sort,
             "dir": dir,
