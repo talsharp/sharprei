@@ -205,11 +205,11 @@
 </div>
 
 <div class="card">
-  <h3>Run History</h3>
-  <p class="muted">Every field below is editable in place - change a value and press Save on that row.</p>
-  {% for run in runs %}
-  <form id="run-edit-{{ run.id }}" method="post" action="/zip/{{ zc.id }}/runs/{{ run.id }}/update" style="display:none;"></form>
-  {% endfor %}
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <h3 style="margin:0;">Run History</h3>
+    <button type="button" id="save-all-runs" style="display:none;" onclick="saveAllRuns()">Save all changes</button>
+  </div>
+  <p class="muted">Every field below is editable in place. Changed rows are highlighted - save them one by one, or all at once with "Save all changes". Saving doesn't reload the page.</p>
   <div style="overflow-x:auto;">
   <table>
     <thead>
@@ -219,28 +219,30 @@
     </thead>
     <tbody>
       {% for run in runs %}
-      <tr>
-        <td><input type="month" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date.strftime('%Y-%m') }}" placeholder="--" form="run-edit-{{ run.id }}" style="width:130px;"></td>
+      <tr class="run-row" id="run-{{ run.id }}">
+        <td><input type="month" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date.strftime('%Y-%m') }}" placeholder="--" style="width:130px;"></td>
         <td>
-          <select name="run_type" form="run-edit-{{ run.id }}">
+          <select name="run_type">
             <option value="initial" {{ "selected" if run.run_type == "initial" else "" }}>Initial</option>
             <option value="follow_up" {{ "selected" if run.run_type == "follow_up" else "" }}>Follow-up</option>
           </select>
         </td>
-        <td><input type="number" name="sms_sent" value="{{ run.sms_sent }}" form="run-edit-{{ run.id }}" style="width:65px;"></td>
-        <td><input type="number" name="replies" value="{{ run.replies }}" form="run-edit-{{ run.id }}" style="width:55px;"></td>
-        <td><input type="number" name="leads" value="{{ run.leads }}" form="run-edit-{{ run.id }}" style="width:50px;"></td>
-        <td><input type="number" name="warm" value="{{ run.warm }}" form="run-edit-{{ run.id }}" style="width:50px;"></td>
-        <td><input type="number" name="drip" value="{{ run.drip }}" form="run-edit-{{ run.id }}" style="width:50px;"></td>
-        <td><input type="number" name="signed_agreements" value="{{ run.signed_agreements }}" form="run-edit-{{ run.id }}" style="width:50px;"></td>
-        <td><input type="number" name="opt_out" value="{{ run.opt_out if run.opt_out is not none else '' }}" form="run-edit-{{ run.id }}" style="width:50px;"></td>
+        <td><input type="number" name="sms_sent" value="{{ run.sms_sent }}" style="width:65px;"></td>
+        <td><input type="number" name="replies" value="{{ run.replies }}" style="width:55px;"></td>
+        <td><input type="number" name="leads" value="{{ run.leads }}" style="width:50px;"></td>
+        <td><input type="number" name="warm" value="{{ run.warm }}" style="width:50px;"></td>
+        <td><input type="number" name="drip" value="{{ run.drip }}" style="width:50px;"></td>
+        <td><input type="number" name="signed_agreements" value="{{ run.signed_agreements }}" style="width:50px;"></td>
+        <td><input type="number" name="opt_out" value="{{ run.opt_out if run.opt_out is not none else '' }}" style="width:50px;"></td>
         <td>
           {% for deal in run.deals %}
             ${{ "%.0f"|format(deal.profit) }}{% if not loop.last %}, {% endif %}
           {% else %}—{% endfor %}
         </td>
         <td style="display:flex; flex-direction:column; gap:6px;">
-          <button type="submit" form="run-edit-{{ run.id }}" style="font-size:12px;">Save</button>
+          <button type="button" class="run-save" style="font-size:12px;"
+                  hx-post="/zip/{{ zc.id }}/runs/{{ run.id }}/update" hx-include="closest tr" hx-swap="none">Save</button>
+          <span class="run-status muted" style="font-size:12px;"></span>
           <form method="post" action="/zip/{{ zc.id }}/runs/{{ run.id }}/deals/new" style="display:flex; gap:4px;">
             <input type="number" step="0.01" name="profit" placeholder="Profit $" style="width:70px;" required>
             <input type="date" name="closed_date" value="{{ today }}" required style="width:120px;">
@@ -258,5 +260,55 @@
   </table>
   </div>
 </div>
+
+<script>
+(function() {
+  var saveAll = document.getElementById('save-all-runs');
+
+  function dirtyRows() { return document.querySelectorAll('tr.run-row.dirty'); }
+  function refreshSaveAll() {
+    var n = dirtyRows().length;
+    saveAll.style.display = n ? '' : 'none';
+    saveAll.textContent = 'Save all changes (' + n + ')';
+  }
+
+  document.querySelectorAll('tr.run-row').forEach(function(tr) {
+    tr.querySelectorAll('input, select').forEach(function(el) {
+      if (el.closest('form')) return;  // the per-run "Add Deal" form isn't part of the row's data
+      ['input', 'change'].forEach(function(evt) {
+        el.addEventListener(evt, function() {
+          tr.classList.add('dirty');
+          tr.querySelector('.run-status').textContent = '';
+          refreshSaveAll();
+        });
+      });
+    });
+  });
+
+  window.saveAllRuns = function() {
+    dirtyRows().forEach(function(tr) { tr.querySelector('.run-save').click(); });
+  };
+
+  document.body.addEventListener('htmx:afterRequest', function(e) {
+    var btn = e.detail.elt;
+    if (!btn.classList || !btn.classList.contains('run-save')) return;
+    var tr = btn.closest('tr');
+    var status = tr.querySelector('.run-status');
+    if (e.detail.successful) {
+      tr.classList.remove('dirty');
+      status.textContent = 'Saved \u2713';
+      status.className = 'run-status profit-up';
+    } else {
+      status.textContent = 'Not saved - check the numbers';
+      status.className = 'run-status profit-down';
+    }
+    refreshSaveAll();
+  });
+
+  window.addEventListener('beforeunload', function(e) {
+    if (dirtyRows().length) { e.preventDefault(); e.returnValue = ''; }
+  });
+})();
+</script>
 
 {% endblock %}

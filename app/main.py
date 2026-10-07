@@ -369,6 +369,7 @@ def create_run(
 
 @app.post("/zip/{zip_id}/runs/{run_id}/update")
 def update_run(
+    request: Request,
     zip_id: int,
     run_id: int,
     run_date: str = Form(""),
@@ -394,6 +395,8 @@ def update_run(
         run.signed_agreements = signed_agreements
         run.opt_out = int(opt_out) if opt_out.strip() else None
         db.commit()
+    if _is_htmx(request):
+        return Response(status_code=204)
     return RedirectResponse(f"/zip/{zip_id}", status_code=303)
 
 
