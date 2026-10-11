@@ -1,25 +1,15 @@
-<div class="task-row{{ ' is-done' if t.status and t.status.is_done }}" data-id="{{ t.id }}" data-label="{{ t.label_id or '' }}">
+<div class="task-row{{ ' is-done' if t.status and t.status.is_done }}" data-id="{{ t.id }}" data-label="{{ t.label_id or '' }}" data-created="{{ t.created_at.strftime('%b %d, %Y') if t.created_at else '' }}">
   <div class="task-main">
     <span class="task-handle" title="Drag to reorder or move to another day">⋮⋮</span>
-    <button type="button" class="task-expand" title="Description">{% if t.description %}<span class="task-has-desc" title="Has a description"></span>{% endif %}▸</button>
-    <input type="text" class="task-title" value="{{ t.title }}" maxlength="255" aria-label="Task">
-    <button type="button" class="task-pill label-pill" data-kind="label"
-            style="background:{{ t.label.color if t.label else 'transparent' }};"
-            data-value="{{ t.label_id or '' }}">{{ t.label.name if t.label else '' }}</button>
-    <button type="button" class="task-pill status-pill" data-kind="status"
-            style="background:{{ t.status.color if t.status else '#C4C4C4' }};"
-            data-value="{{ t.status_id or '' }}">{{ t.status.name if t.status else '' }}</button>
+    <button type="button" class="task-open" title="Open task">
+      <span class="task-title-text">{{ t.title }}</span>
+      <svg class="task-desc-icon" viewBox="0 0 24 24" aria-label="Has a description" {{ 'hidden' if not t.description }}><path d="M5 7h14M5 12h14M5 17h9"/></svg>
+    </button>
+    <button type="button" class="task-pill status-pill" data-kind="status" data-value="{{ t.status_id or '' }}"
+            style="background:{{ t.status.color if t.status else '#C4C4C4' }};">{{ t.status.name if t.status else '' }}</button>
+    <button type="button" class="task-pill label-pill{{ ' empty' if not t.label }}" data-kind="label" data-value="{{ t.label_id or '' }}"
+            {% if t.label %}style="background:{{ t.label.color }};"{% endif %}>{{ t.label.name if t.label else '' }}</button>
     <button type="button" class="task-delete" title="Delete task">×</button>
   </div>
-  <div class="task-detail" hidden>
-    <textarea class="task-description" rows="4" placeholder="Add a description, notes, links...">{{ t.description or '' }}</textarea>
-    <div class="task-detail-footer">
-      <label class="muted">Move to
-        <select class="task-day">
-          {% for key, name in days.items() %}<option value="{{ key }}" {{ 'selected' if key == t.day }}>{{ name }}</option>{% endfor %}
-        </select>
-      </label>
-      <span class="muted task-saved" hidden>Saved</span>
-    </div>
-  </div>
+  <textarea class="task-description-data" hidden>{{ t.description or '' }}</textarea>
 </div>

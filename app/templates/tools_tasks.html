@@ -5,7 +5,7 @@
 <div class="top-actions">
   <div>
     <h2 class="page-title">Tasks</h2>
-    <p class="page-subtitle">Click a task to open its description. Drag by ⋮⋮ to reorder or move it to another day.</p>
+    <p class="page-subtitle">Click a task to open it. Drag by ⋮⋮ to reorder or move it to another day.</p>
   </div>
   <button type="button" class="secondary" id="clear-done" {{ 'disabled' if not done_count }}>Clear done (<span id="done-count">{{ done_count }}</span>)</button>
 </div>
@@ -26,7 +26,7 @@
     <span class="muted task-count">{{ groups[key]|length }}</span>
   </div>
   <div class="task-group-body">
-    <div class="task-columns"><span></span><span>Task</span><span>Label</span><span>Status</span><span></span></div>
+    <div class="task-columns"><span></span><span>Task</span><span>Status</span><span>Label</span><span></span></div>
     <div class="task-list" data-day="{{ key }}">
       {% for t in groups[key] %}{% include "_task_row.html" %}{% endfor %}
     </div>
@@ -62,7 +62,32 @@
   </div>
 </div>
 
+
 <div class="pill-menu" id="pill-menu" hidden></div>
+
+{# ---------- Task panel (opens when a task is clicked) ---------- #}
+<div class="drawer-overlay" id="drawer-overlay" hidden></div>
+<aside class="task-drawer" id="task-drawer" aria-label="Task" hidden>
+  <div class="drawer-top">
+    <label class="muted drawer-day">Day
+      <select id="drawer-day">
+        {% for key, name in days.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button type="button" class="danger small" id="drawer-delete">Delete</button>
+      <button type="button" class="drawer-close" id="drawer-close" aria-label="Close">×</button>
+    </div>
+  </div>
+  <input type="text" id="drawer-title" class="drawer-title" maxlength="255" aria-label="Task name">
+  <div class="drawer-fields">
+    <div><div class="drawer-label">Status</div><button type="button" class="task-pill drawer-pill" id="drawer-status" data-kind="status"></button></div>
+    <div><div class="drawer-label">Label</div><button type="button" class="task-pill drawer-pill" id="drawer-label" data-kind="label"></button></div>
+  </div>
+  <div class="drawer-label">Description</div>
+  <textarea id="drawer-description" class="drawer-description" placeholder="Write anything here - names to follow up with, notes, links..."></textarea>
+  <div class="drawer-footer muted"><span id="drawer-created"></span><span id="drawer-saved" hidden>✓ Saved</span></div>
+</aside>
 
 <script>
 (function() {
@@ -78,6 +103,8 @@
       .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
   }
   function save(row, data) { return post('/tools/tasks/' + row.dataset.id, data); }
+  function option(kind, id) { return OPTIONS[kind].filter(function(o) { return String(o.id) === String(id); })[0]; }
+  function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   function refreshCounts() {
     document.querySelectorAll('.task-group').forEach(function(g) {
@@ -93,62 +120,43 @@
     });
   }
 
+  // Paints a status/label pill (in the list or in the panel).
+  function paintPill(pill, kind, id) {
+    var o = option(kind, id);
+    pill.dataset.value = id || '';
+    pill.textContent = o ? o.name : '';
+    pill.classList.toggle('empty', !o && kind === 'label');
+    pill.style.background = o ? o.color : (kind === 'status' ? '#C4C4C4' : '');
+  }
+  // Saves a status/label choice and updates the row, plus the panel if it shows this task.
+  function setOption(row, kind, id) {
+    var data = {}; data[kind + '_id'] = id;
+    return save(row, data).then(function() {
+      paintPill(row.querySelector('.' + kind + '-pill'), kind, id);
+      if (kind === 'status') { var o = option(kind, id); row.classList.toggle('is-done', !!(o && o.done)); }
+      if (kind === 'label') { row.dataset.label = id; applyFilter(); }
+      if (openRow === row) paintPill(document.getElementById('drawer-' + kind), kind, id);
+      refreshCounts();
+    });
+  }
+  function deleteRow(row) {
+    var title = row.querySelector('.task-title-text').textContent;
+    if (!confirm('Delete “' + title + '”?')) return;
+    post('/tools/tasks/' + row.dataset.id + '/delete').then(function() {
+      if (openRow === row) closeDrawer(true);
+      row.remove(); refreshCounts();
+    });
+  }
+
   // ----- one row -----
   function wireRow(row) {
-    var title = row.querySelector('.task-title');
-    // Enter in the name jumps to the description, like Monday's task panel.
-    title.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); setOpen(true); row.querySelector('.task-description').focus(); } });
-    title.addEventListener('focus', function() { setOpen(true); });
-    title.addEventListener('change', function() {
-      if (!title.value.trim()) { title.value = title.defaultValue; return; }
-      save(row, {title: title.value}).then(function() { title.defaultValue = title.value; });
-    });
-
-    var detail = row.querySelector('.task-detail'), expand = row.querySelector('.task-expand');
-    function setOpen(open) {
-      if (open) document.querySelectorAll('.task-row.open').forEach(function(r) {
-        if (r !== row) { r.classList.remove('open'); r.querySelector('.task-detail').hidden = true; }
-      });
-      detail.hidden = !open; row.classList.toggle('open', open);
-    }
-    expand.addEventListener('click', function() {
-      setOpen(detail.hidden);
-      if (!detail.hidden) row.querySelector('.task-description').focus();
-    });
-    var desc = row.querySelector('.task-description'), saved = row.querySelector('.task-saved'), timer;
-    function saveDesc() {
-      clearTimeout(timer);
-      if (desc.value === desc.defaultValue) return;
-      var value = desc.value;
-      save(row, {description: value}).then(function() {
-        desc.defaultValue = value;
-        var dot = expand.querySelector('.task-has-desc');
-        if (value.trim() && !dot) expand.insertAdjacentHTML('afterbegin', '<span class="task-has-desc" title="Has a description"></span>');
-        if (!value.trim() && dot) dot.remove();
-        saved.hidden = false; setTimeout(function() { saved.hidden = true; }, 1500);
-      });
-    }
-    desc.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(saveDesc, 800); });
-    desc.addEventListener('blur', saveDesc);
-
-    row.querySelector('.task-day').addEventListener('change', function() {
-      var day = this.value;
-      save(row, {day: day}).then(function() {
-        document.querySelector('.task-list[data-day="' + day + '"]').appendChild(row);
-        refreshCounts();
-      });
-    });
-
+    row.querySelector('.task-open').addEventListener('click', function() { openDrawer(row); });
     row.querySelectorAll('.task-pill').forEach(function(pill) {
       pill.addEventListener('click', function(e) { e.stopPropagation(); openMenu(pill, row); });
     });
+    row.querySelector('.task-delete').addEventListener('click', function() { deleteRow(row); });
 
-    row.querySelector('.task-delete').addEventListener('click', function() {
-      if (!confirm('Delete “' + title.value + '”?')) return;
-      post('/tools/tasks/' + row.dataset.id + '/delete').then(function() { row.remove(); refreshCounts(); });
-    });
-
-    // Drag only from the handle, so typing in the row still works normally.
+    // Drag only from the handle.
     var handle = row.querySelector('.task-handle');
     handle.addEventListener('mousedown', function() { row.draggable = true; });
     handle.addEventListener('mouseup', function() { row.draggable = false; });
@@ -163,6 +171,76 @@
     });
   }
 
+  // ----- task panel -----
+  var drawer = document.getElementById('task-drawer'), overlay = document.getElementById('drawer-overlay');
+  var dTitle = document.getElementById('drawer-title'), dDesc = document.getElementById('drawer-description');
+  var dDay = document.getElementById('drawer-day'), dSaved = document.getElementById('drawer-saved');
+  var openRow = null, descTimer = null;
+
+  function flashSaved() { dSaved.hidden = false; clearTimeout(flashSaved.t); flashSaved.t = setTimeout(function() { dSaved.hidden = true; }, 1500); }
+
+  function openDrawer(row) {
+    if (openRow && openRow !== row) saveDescription();
+    document.querySelectorAll('.task-row.selected').forEach(function(r) { r.classList.remove('selected'); });
+    openRow = row; row.classList.add('selected');
+    dTitle.value = dTitle.defaultValue = row.querySelector('.task-title-text').textContent;
+    dDesc.value = dDesc.defaultValue = row.querySelector('.task-description-data').value;
+    dDay.value = row.closest('.task-list').dataset.day;
+    paintPill(document.getElementById('drawer-status'), 'status', row.querySelector('.status-pill').dataset.value);
+    paintPill(document.getElementById('drawer-label'), 'label', row.querySelector('.label-pill').dataset.value);
+    document.getElementById('drawer-created').textContent = row.dataset.created ? 'Created ' + row.dataset.created : '';
+    dSaved.hidden = true;
+    drawer.hidden = overlay.hidden = false;
+    requestAnimationFrame(function() { drawer.classList.add('open'); });
+    dDesc.focus();
+    dDesc.setSelectionRange(dDesc.value.length, dDesc.value.length);
+  }
+  function closeDrawer(skipSave) {
+    if (!openRow) return;
+    if (!skipSave) { saveTitle(); saveDescription(); }
+    openRow.classList.remove('selected');
+    openRow = null;
+    drawer.classList.remove('open');
+    overlay.hidden = true;
+    setTimeout(function() { if (!openRow) drawer.hidden = true; }, 200);
+  }
+  function saveTitle() {
+    var row = openRow, value = dTitle.value.trim();
+    if (!row) return;
+    if (!value) { dTitle.value = dTitle.defaultValue; return; }
+    if (value === dTitle.defaultValue) return;
+    dTitle.defaultValue = value;
+    save(row, {title: value}).then(function() { row.querySelector('.task-title-text').textContent = value; flashSaved(); });
+  }
+  function saveDescription() {
+    clearTimeout(descTimer);
+    var row = openRow, value = dDesc.value;
+    if (!row || value === dDesc.defaultValue) return;
+    dDesc.defaultValue = value;
+    save(row, {description: value}).then(function() {
+      row.querySelector('.task-description-data').value = value;
+      row.querySelector('.task-desc-icon').hidden = !value.trim();
+      if (openRow === row) flashSaved();
+    });
+  }
+  dTitle.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); saveTitle(); dDesc.focus(); } });
+  dTitle.addEventListener('change', saveTitle);
+  dDesc.addEventListener('input', function() { clearTimeout(descTimer); descTimer = setTimeout(saveDescription, 700); });
+  dDesc.addEventListener('blur', saveDescription);
+  dDay.addEventListener('change', function() {
+    var row = openRow, day = dDay.value;
+    save(row, {day: day}).then(function() {
+      document.querySelector('.task-list[data-day="' + day + '"]').appendChild(row);
+      refreshCounts(); flashSaved();
+    });
+  });
+  document.querySelectorAll('.drawer-pill').forEach(function(pill) {
+    pill.addEventListener('click', function(e) { e.stopPropagation(); if (openRow) openMenu(pill, openRow); });
+  });
+  document.getElementById('drawer-delete').addEventListener('click', function() { if (openRow) deleteRow(openRow); });
+  document.getElementById('drawer-close').addEventListener('click', function() { closeDrawer(); });
+  overlay.addEventListener('click', function() { closeDrawer(); });
+
   // ----- status / label menu -----
   var menu = document.getElementById('pill-menu');
   function openMenu(pill, row) {
@@ -176,27 +254,17 @@
     menu.hidden = false;
     var r = pill.getBoundingClientRect();
     menu.style.top = (window.scrollY + r.bottom + 4) + 'px';
-    menu.style.left = Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 12) + 'px';
+    menu.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 12)) + 'px';
     menu.querySelectorAll('button').forEach(function(b) {
-      b.addEventListener('click', function() {
-        var id = b.dataset.id, o = OPTIONS[kind].filter(function(x) { return String(x.id) === id; })[0];
-        var data = {}; data[kind + '_id'] = id;
-        save(row, data).then(function() {
-          pill.dataset.value = id;
-          pill.textContent = o ? o.name : '';
-          pill.style.background = o ? o.color : (kind === 'status' ? '#C4C4C4' : 'transparent');
-          if (kind === 'status') row.classList.toggle('is-done', !!(o && o.done));
-          if (kind === 'label') { row.dataset.label = id; applyFilter(); }
-          refreshCounts();
-        });
-        menu.hidden = true;
-      });
+      b.addEventListener('click', function() { setOption(row, kind, b.dataset.id); menu.hidden = true; });
     });
-    menu.querySelector('.menu-edit').addEventListener('click', function() { menu.hidden = true; });
+    menu.querySelector('.menu-edit').addEventListener('click', function() { menu.hidden = true; closeDrawer(); });
   }
   document.addEventListener('click', function(e) { if (!menu.contains(e.target)) menu.hidden = true; });
-  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') menu.hidden = true; });
-  function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    if (!menu.hidden) menu.hidden = true; else closeDrawer();
+  });
 
   // ----- drag and drop between days -----
   var dragging = null;
@@ -231,7 +299,7 @@
     fetch('/tools/tasks/move', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({day: list.dataset.day, ids: ids})})
       .then(function(r) { if (!r.ok) throw new Error(r.status); })
       .catch(function() { alert('Could not save the move - reload the page and try again.'); });
-    row.querySelector('.task-day').value = list.dataset.day;
+    if (openRow === row) dDay.value = list.dataset.day;
     refreshCounts();
   }
 
@@ -247,13 +315,8 @@
         list.insertAdjacentHTML('beforeend', html);
         var row = list.lastElementChild;
         wireRow(row);
-        if (labelFilter !== 'all' && labelFilter !== '') {
-          // Adding while filtered by a label: give the new task that label.
-          var pill = row.querySelector('.label-pill'), o = OPTIONS.label.filter(function(x) { return String(x.id) === labelFilter; })[0];
-          save(row, {label_id: labelFilter}).then(function() {
-            pill.dataset.value = labelFilter; pill.textContent = o.name; pill.style.background = o.color; row.dataset.label = labelFilter;
-          });
-        }
+        // Adding while filtered by a label: give the new task that label.
+        if (labelFilter !== 'all' && labelFilter !== '') setOption(row, 'label', labelFilter);
         refreshCounts();
       }).catch(function() { input.value = title; });
     });
@@ -266,10 +329,7 @@
   document.querySelectorAll('.task-group').forEach(function(group) {
     var day = group.dataset.day, toggle = group.querySelector('.task-group-toggle');
     if (day === today) { group.classList.add('is-today'); group.querySelector('.today-badge').hidden = false; }
-    function set(c) {
-      group.classList.toggle('collapsed', c);
-      toggle.textContent = c ? '▸' : '▾';
-    }
+    function set(c) { group.classList.toggle('collapsed', c); toggle.textContent = c ? '▸' : '▾'; }
     set(!!collapsed[day]);
     group.querySelector('.task-group-header').addEventListener('click', function() {
       collapsed[day] = !group.classList.contains('collapsed');
@@ -292,12 +352,14 @@
     var n = document.querySelectorAll('.task-row.is-done').length;
     if (!n || !confirm('Delete ' + n + ' done task' + (n === 1 ? '' : 's') + ' for good?')) return;
     post('/tools/tasks/clear-done').then(function() {
+      if (openRow && openRow.classList.contains('is-done')) closeDrawer(true);
       document.querySelectorAll('.task-row.is-done').forEach(function(r) { r.remove(); });
       refreshCounts();
     });
   });
 
   document.querySelectorAll('.task-row').forEach(wireRow);
+  window.addEventListener('beforeunload', function() { if (openRow) { saveTitle(); saveDescription(); } });
 })();
 </script>
 
