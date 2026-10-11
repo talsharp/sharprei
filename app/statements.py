@@ -188,6 +188,13 @@ def suggest_pattern(merchant: str) -> str:
     return " ".join(tokens)[:120]
 
 
+def suggest_vendor_name(merchant: str) -> str:
+    """A readable vendor name for a new merchant: 'PAYPAL *ACME 123' -> 'Paypal *acme' -> 'Acme'."""
+    name = suggest_pattern(merchant)
+    name = re.sub(r"^(PAYPAL|SQ|TST|SP|PP)\s*\*\s*", "", name)
+    return name.strip(" *").title()[:120] or merchant[:120]
+
+
 def create_import(db: Session, filename: str, stored_name: str, path: str) -> StatementImport:
     rows = parse_workbook(path)
     for row in rows:

@@ -85,16 +85,18 @@
   <tbody>
     {% set ns = namespace(section=None) %}
     {% for c in charges %}
-    {% if c.decision != ns.section %}
-      {% set ns.section = c.decision %}
+    {% set section = 'problem' if c.id in problem_ids else c.decision %}
+    {% if section != ns.section %}
+      {% set ns.section = section %}
       <tr class="section-row"><td colspan="10">
-        {% if c.decision == 'new' %}Needs your decision · {{ counts.new }}
+        {% if section == 'problem' %}Needs your attention · {{ problem_ids|length }}
+        {% elif c.decision == 'new' %}Needs your decision · {{ counts.new }}
         {% elif c.decision == 'vendor' %}Recognized · {{ counts.vendor }}
         {% else %}Skipped · {{ counts.skip }}{% endif %}
       </td></tr>
     {% endif %}
     {% set rule = rules.get(c.matched_rule_id) %}
-    <tr class="charge-row {{ 'charge-skipped' if c.decision == 'skip' else '' }} {{ 'charge-new' if c.decision == 'new' else '' }}">
+    <tr class="charge-row {{ 'charge-skipped' if c.decision == 'skip' else '' }} {{ 'charge-new' if c.decision == 'new' else '' }} {{ 'charge-problem' if c.id in problem_ids else '' }}" data-vendor-suggestion="{{ suggest_vendor_name(c.merchant) }}">
       <td class="muted" style="white-space:nowrap;">{{ c.txn_date.strftime('%d/%m') if c.txn_date else '' }}</td>
       <td style="min-width:170px;">
         {{ c.merchant }}
@@ -173,7 +175,14 @@
       (open ? '<div class="profit-down" style="font-size:12px;">' + open + ' still need a decision</div>' : '');
   }
   document.querySelectorAll('tr.charge-row').forEach(function(tr) {
-    tr.querySelector('.decision').addEventListener('change', function() { refreshRow(tr); refreshTotals(); });
+    tr.querySelector('.decision').addEventListener('change', function() {
+      var vendor = tr.querySelector('.vendor-input');
+      if (this.value === 'vendor' && !vendor.value) {
+        vendor.value = tr.dataset.vendorSuggestion;
+        vendor.dispatchEvent(new Event('change'));
+      }
+      refreshRow(tr); refreshTotals();
+    });
     tr.querySelector('.vendor-input').addEventListener('change', function() {
       var opt = document.querySelector('#vendor-list option[value="' + CSS.escape(this.value) + '"]');
       if (opt) tr.querySelector('.channel-select').value = opt.dataset.channel;

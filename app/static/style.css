@@ -400,3 +400,5 @@ tr.run-row.dirty td { background: #FFF8E6; }
 .review-table tr.charge-skipped td { opacity: 0.55; }
 .review-table tr.charge-skipped td:nth-child(4) { opacity: 1; }
 .review-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.review-table tr.charge-problem td { background: #FDECEC; }
+.review-table tr.charge-problem td:first-child { box-shadow: inset 3px 0 0 #D64545; }

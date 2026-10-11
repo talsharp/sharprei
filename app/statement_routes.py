@@ -15,6 +15,7 @@ from app.statements import (
     implied_rate,
     usd_amount,
     suggest_pattern,
+    suggest_vendor_name,
 )
 
 STATEMENTS_DIR = UPLOAD_ROOT / "statements"
@@ -58,9 +59,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         db.commit()
         return RedirectResponse(f"/finance/statements/{imp.id}", status_code=303)
 
-    def _review(request: Request, db: Session, imp: StatementImport, errors=None, result=None):
+    def _review(request: Request, db: Session, imp: StatementImport, errors=None, result=None, problem_ids=()):
         order = {"new": 0, "vendor": 1, "skip": 2}
-        charges = sorted(imp.charges, key=lambda c: (order.get(c.decision, 3), c.row_index))
+        charges = sorted(imp.charges, key=lambda c: (c.id not in problem_ids, order.get(c.decision, 3), c.row_index))
         fm = db.query(FinanceMonth).filter(FinanceMonth.month == imp.statement_month).first()
         existing = [e for e in (fm.expenses if fm else []) if e.statement_import_id != imp.id]
         rules = {r.id: r for r in db.query(MatchRule).all()}
@@ -78,7 +79,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 "rules": rules,
                 "kind_labels": KIND_LABELS,
                 "suggest_pattern": suggest_pattern,
+                "suggest_vendor_name": suggest_vendor_name,
                 "errors": errors or [],
+                "problem_ids": set(problem_ids),
                 "result": result,
             },
         )
@@ -111,6 +114,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             decision = form.get(f"decision_{key}", c.decision)
             c.decision = decision if decision in ("vendor", "skip", "new") else c.decision
             c.vendor_name = (form.get(f"vendor_{key}") or "").strip() or None
+            if c.decision == "vendor" and not c.vendor_name:
+                c.vendor_name = suggest_vendor_name(c.merchant)
             c.channel = form.get(f"channel_{key}") if form.get(f"channel_{key}") in CHANNELS else None
             c.note = (form.get(f"note_{key}") or "").strip()[:255] or None
             try:
@@ -132,16 +137,21 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             db.commit()
             return RedirectResponse(f"/finance/statements/{import_id}#top", status_code=303)
 
-        errors = []
+        errors, problem_ids = [], []
         undecided = [c for c in imp.charges if c.decision == "new"]
         if undecided:
             errors.append(f"{len(undecided)} new charge(s) still need a decision - choose Add or Skip for each.")
+            problem_ids += [c.id for c in undecided]
         for c in imp.charges:
-            if c.decision == "vendor" and (not c.vendor_name or not c.channel or c.usd_amount is None):
-                errors.append(f"{c.merchant}: choose a vendor, a campaign and an amount, or skip it.")
+            if c.decision != "vendor":
+                continue
+            missing = [label for label, ok in (("a campaign", c.channel), ("an amount", c.usd_amount is not None)) if not ok]
+            if missing:
+                errors.append(f"{c.merchant}: choose {' and '.join(missing)} (or Skip it).")
+                problem_ids.append(c.id)
         if errors:
             db.commit()
-            return _review(request, db, imp, errors=errors)
+            return _review(request, db, imp, errors=errors, problem_ids=problem_ids)
 
         result = commit_import(db, imp, remember)
         db.commit()
