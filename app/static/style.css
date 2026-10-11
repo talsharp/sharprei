@@ -412,3 +412,4 @@ tr.run-row.dirty td { background: #FFF8E6; }
 .charges-detail-row > td { background: var(--panel-soft); padding: 10px 14px; }
 .charges-detail { width: 100%; background: var(--panel); border: 1px solid var(--border); margin-bottom: 6px; }
 .charges-detail th, .charges-detail td { font-size: 12px; padding: 6px 10px; }
+a.filter-chip { display: inline-block; text-decoration: none; }

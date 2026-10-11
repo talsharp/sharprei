@@ -17,6 +17,7 @@ from app.finance import (
     MonthSummary,
     build_month_summaries,
     build_totals,
+    channel_vendors,
     copy_recurring,
     get_or_create_vendor,
     next_month,
@@ -79,20 +80,28 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     # ---------- Overview ----------
 
     @router.get("")
-    def finance_overview(request: Request, db: Session = Depends(get_db)):
+    def finance_overview(request: Request, channel: str = "", db: Session = Depends(get_db)):
         summaries = build_month_summaries(db)
         totals = build_totals(db, summaries)
-        return templates.TemplateResponse(
-            "finance_overview.html",
-            {
-                "request": request,
-                "active": "fin_overview",
-                "summaries": list(summaries.values()),
-                "totals": totals,
-                "lead_channels": LEAD_CHANNELS,
-                "wholesale_channels": WHOLESALE_CHANNELS,
-            },
-        )
+        channel = channel if channel in LEAD_CHANNELS else ""
+        context = {
+            "request": request,
+            "active": "fin_overview",
+            "summaries": list(summaries.values()),
+            "totals": totals,
+            "lead_channels": LEAD_CHANNELS,
+            "wholesale_channels": WHOLESALE_CHANNELS,
+            "channel": channel,
+        }
+        if channel:
+            context["cs"] = totals.channels[channel]
+            context["vendors"] = channel_vendors(db, channel)
+            context["deals"] = sorted(
+                (d for d in db.query(WholesaleDeal).all() if d.channel == channel),
+                key=lambda d: d.agreement_date or date.min, reverse=True,
+            )
+            context["shared_expenses"] = totals.channels["shared"].expenses
+        return templates.TemplateResponse("finance_overview.html", context)
 
     # ---------- Monthly expenses ----------
 

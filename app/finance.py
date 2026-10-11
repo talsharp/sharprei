@@ -59,16 +59,36 @@ def parse_month_key(value: str) -> Optional[date]:
 class ChannelStats:
     expenses: float = 0.0
     leads: int = 0
-    closed_deals: int = 0
-    profit: float = 0.0
+    agreements: int = 0      # deals signed (by agreement date), any status
+    closed_deals: int = 0    # closed or kept, by close date
+    under_contract: int = 0
+    dead: int = 0
+    profit: float = 0.0      # profit of this channel's closed deals (its revenue)
 
     @property
     def cpl(self) -> Optional[float]:
         return self.expenses / self.leads if self.leads else None
 
     @property
+    def net(self) -> float:
+        return self.profit - self.expenses
+
+    @property
     def roi(self) -> Optional[float]:
-        return self.profit / self.expenses if self.expenses else None
+        # Same definition as the overall ROI: (deal profit - spend) / spend.
+        return self.net / self.expenses if self.expenses else None
+
+    @property
+    def lead_to_agreement(self) -> Optional[float]:
+        return self.agreements / self.leads if self.leads else None
+
+    @property
+    def agreement_to_deal(self) -> Optional[float]:
+        return self.closed_deals / self.agreements if self.agreements else None
+
+    @property
+    def lead_to_deal(self) -> Optional[float]:
+        return self.closed_deals / self.leads if self.leads else None
 
 
 @dataclass
@@ -83,6 +103,7 @@ class MonthSummary:
     channels: Dict[str, ChannelStats] = field(default_factory=lambda: {c: ChannelStats() for c in CHANNELS})
     closed_deals: List[WholesaleDeal] = field(default_factory=list)
     kept_deals: List[WholesaleDeal] = field(default_factory=list)
+    signed_deals: List[WholesaleDeal] = field(default_factory=list)  # agreement signed this month
 
     @property
     def profit(self) -> float:
@@ -128,10 +149,18 @@ def build_month_summaries(db: Session) -> "OrderedDict[date, MonthSummary]":
         s.leads = fm.total_leads
 
     for d in deals:
+        if d.agreement_date:
+            s = get(month_start(d.agreement_date))
+            s.signed_deals.append(d)
+            if d.channel in s.channels:
+                s.channels[d.channel].agreements += 1
         if not d.closed_date or d.status not in ("closed", "kept"):
             continue
         s = get(month_start(d.closed_date))
         s.revenue += d.profit or 0
+        if d.channel in s.channels:
+            s.channels[d.channel].closed_deals += 1
+            s.channels[d.channel].profit += d.profit or 0
         if d.status == "closed":
             s.closed_deals.append(d)
         else:
@@ -153,6 +182,7 @@ class FinanceTotals:
     closed_deals: int = 0
     under_contract: int = 0
     closed_without_channel: int = 0
+    deals_without_channel: int = 0
 
     @property
     def profit(self) -> float:
@@ -195,13 +225,42 @@ def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]") -> F
     t.closed_deals = sum(1 for d in deals if d.status in ("closed", "kept"))
     t.under_contract = sum(1 for d in deals if d.status == "under_contract")
     for d in deals:
-        if d.status in ("closed", "kept"):
-            if d.channel in LEAD_CHANNELS:
-                t.channels[d.channel].closed_deals += 1
-                t.channels[d.channel].profit += d.profit or 0
-            else:
+        cs = t.channels.get(d.channel) if d.channel in LEAD_CHANNELS else None
+        if cs is None:
+            t.deals_without_channel += 1
+            if d.status in ("closed", "kept"):
                 t.closed_without_channel += 1
+            continue
+        cs.agreements += 1
+        if d.status in ("closed", "kept"):
+            cs.closed_deals += 1
+            cs.profit += d.profit or 0
+        elif d.status == "under_contract":
+            cs.under_contract += 1
+        elif d.status == "cancelled":
+            cs.dead += 1
     return t
+
+
+def channel_vendors(db: Session, channel: str) -> List[dict]:
+    """All-time spend per vendor on one channel, biggest first."""
+    rows: Dict[int, dict] = {}
+    expenses = (
+        db.query(FinanceExpense)
+        .options(selectinload(FinanceExpense.vendor), selectinload(FinanceExpense.finance_month))
+        .filter(FinanceExpense.channel == channel)
+        .all()
+    )
+    for e in expenses:
+        r = rows.setdefault(e.vendor_id, {"vendor": e.vendor, "total": 0.0, "months": set()})
+        r["total"] += float(e.amount or 0)
+        r["months"].add(e.finance_month.month)
+    result = []
+    for r in rows.values():
+        months = sorted(r["months"])
+        result.append({"vendor": r["vendor"], "total": r["total"], "months": len(months),
+                       "first": months[0], "last": months[-1], "per_month": r["total"] / len(months)})
+    return sorted(result, key=lambda r: -r["total"])
 
 
 def get_or_create_vendor(db: Session, name: str, channel: Optional[str] = None) -> Vendor:

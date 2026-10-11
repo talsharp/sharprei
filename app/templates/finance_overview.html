@@ -3,11 +3,38 @@
 {% block title %}Finance{% endblock %}
 {% block content %}
 
+{% macro kpi(label, value, icon, cls="", title="") %}
+<div class="kpi" title="{{ title }}"><div class="kpi-icon {{ icon }}">{{ caller() }}</div><div><div class="label">{{ label }}</div><div class="value {{ cls }}">{{ value }}</div></div></div>
+{% endmacro %}
+{% set ICON_SPEND %}<svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM4 11h16M8 15h3"/></svg>{% endset %}
+{% set ICON_REV %}<svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg>{% endset %}
+{% set ICON_PROFIT %}<svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>{% endset %}
+{% set ICON_ROI %}<svg viewBox="0 0 24 24"><path d="M5 19L19 5M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>{% endset %}
+{% set ICON_LEADS %}<svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0"/></svg>{% endset %}
+
 <div class="top-actions">
-  {{ fm.page_header("Finance Overview", "Wholesale profit and loss, all months") }}
+  {{ fm.page_header("Finance Overview", "Wholesale profit and loss" ~ (" · " ~ CHANNELS[channel] ~ " only" if channel else ", all channels")) }}
   <a class="btn" href="/finance/month">Monthly expenses</a>
 </div>
 
+<div class="channel-filter">
+  <a class="filter-chip {{ 'active' if not channel }}" href="/finance">All channels</a>
+  {% for ch in lead_channels %}<a class="filter-chip {{ 'active' if ch == channel }}" href="/finance?channel={{ ch }}">{{ CHANNELS[ch] }}</a>{% endfor %}
+</div>
+
+{% macro funnel(leads, agreements, closed, l2a, a2d, l2d, under_contract, dead=none) %}
+<div class="funnel">
+  <div class="funnel-step"><div class="value">{{ leads }}</div><div class="label">Leads</div></div>
+  <div class="funnel-arrow" title="Leads that became signed agreements">{{ fm.pct(l2a) }} →</div>
+  <div class="funnel-step"><div class="value">{{ agreements }}</div><div class="label">Signed agreements</div></div>
+  <div class="funnel-arrow" title="Signed agreements that closed (wholesale or kept)">{{ fm.pct(a2d) }} →</div>
+  <div class="funnel-step"><div class="value">{{ closed }}</div><div class="label">Closed deals</div></div>
+</div>
+<p class="muted" style="font-size:12px; margin:14px 0 0;">Lead to deal: <strong>{{ fm.pct(l2d) }}</strong> · {{ under_contract }} under contract now{% if dead is not none %} · {{ dead }} dead{% endif %}. Signed agreements and closed deals come from the <a href="/finance/deals">Deals</a> list; leads from the monthly lead boxes.</p>
+{% endmacro %}
+
+{% if not channel %}
+{# ================= All channels ================= #}
 <div class="kpi-row">
   <div class="kpi" title="All wholesale expenses (every channel except General)."><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM4 11h16M8 15h3"/></svg></div><div><div class="label">Wholesale expenses</div><div class="value">{{ fm.money(totals.wholesale_expenses) }}</div></div></div>
   <div class="kpi" title="Profit of closed deals (after commissions and closing costs), counted in the month they closed. Houses kept for the portfolio count at their estimated wholesale profit."><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg></div><div><div class="label">Wholesale revenue</div><div class="value">{{ fm.money(totals.revenue) }}</div></div></div>
@@ -25,40 +52,47 @@
   </div>
 </div>
 
-<div class="grid-2" style="margin-bottom:20px;">
-  <div class="card" style="margin-bottom:0;">
-    <h3>Performance by channel</h3>
-    <table>
-      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Closed and kept deals whose lead source is this channel">Closed deals</th><th>Profit</th><th title="Profit ÷ spent on this channel">ROI</th></tr></thead>
-      <tbody>
-        {% for ch in lead_channels %}
-        {% set cs = totals.channels[ch] %}
-        <tr>
-          <td>{{ fm.channel_badge(ch) }}</td>
-          <td>{{ fm.money(cs.expenses) }}</td>
-          <td>{{ cs.leads }}</td>
-          <td>{{ fm.cpl(cs.cpl) }}</td>
-          <td>{{ cs.closed_deals }}</td>
-          <td class="{{ fm.signed_class(cs.profit) }}">{{ fm.money(cs.profit) }}</td>
-          <td class="{{ fm.signed_class(cs.roi) }}">{{ fm.pct(cs.roi) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p class="muted" style="font-size:12px; margin:10px 0 0;">Tools used by every channel (ChatGPT, Gsuite...) aren't assigned to a channel; they still count in total expenses and profit above.{% if totals.closed_without_channel %} <strong class="profit-down">{{ totals.closed_without_channel }} closed deal{{ "s" if totals.closed_without_channel != 1 else "" }} ha{{ "ve" if totals.closed_without_channel != 1 else "s" }} no lead source yet</strong> - set it on the <a href="/finance/deals">Deals</a> page.{% endif %}</p>
+<div class="card">
+  <h3>Performance by channel <span class="muted" style="font-weight:400; font-size:13px;">· click a channel to dive in</span></h3>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr>
+      <th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th>
+      <th title="Deals signed from this channel (any status)">Signed agreements</th>
+      <th title="Closed and kept deals from this channel">Closed deals</th>
+      <th title="Signed agreements ÷ leads">Lead → agreement</th>
+      <th title="Closed deals ÷ signed agreements">Agreement → close</th>
+      <th title="Profit of this channel's closed deals">Deal profit</th>
+      <th title="Deal profit − spent on this channel">Net</th>
+      <th title="Net ÷ spent">ROI</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for ch in lead_channels %}
+      {% set cs = totals.channels[ch] %}
+      <tr class="clickable-row" onclick="window.location='/finance?channel={{ ch }}'">
+        <td>{{ fm.channel_badge(ch) }}</td>
+        <td>{{ fm.money(cs.expenses) }}</td>
+        <td>{{ cs.leads }}</td>
+        <td>{{ fm.cpl(cs.cpl) }}</td>
+        <td>{{ cs.agreements }}</td>
+        <td>{{ cs.closed_deals }}</td>
+        <td>{{ fm.pct(cs.lead_to_agreement) }}</td>
+        <td>{{ fm.pct(cs.agreement_to_deal) }}</td>
+        <td>{{ fm.money(cs.profit) }}</td>
+        <td class="{{ fm.signed_class(cs.net) }}">{{ fm.money(cs.net) }}</td>
+        <td class="{{ fm.signed_class(cs.roi) }}">{{ fm.pct(cs.roi) }}</td>
+        <td style="text-align:right;"><a class="zip-link" href="/finance?channel={{ ch }}">View →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   </div>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Tools used by every channel (ChatGPT, Gsuite...) are "Wholesale - Shared" ({{ fm.money(totals.channels['shared'].expenses) }}) and aren't in any one channel's spend; they still count in total expenses and profit above.{% if totals.deals_without_channel %} <strong class="profit-down">{{ totals.deals_without_channel }} deal{{ "s" if totals.deals_without_channel != 1 else "" }} ha{{ "ve" if totals.deals_without_channel != 1 else "s" }} no lead source yet</strong> - set it on the <a href="/finance/deals">Deals</a> page.{% endif %}</p>
+</div>
 
-  <div class="card" style="margin-bottom:0;">
-    <h3>Deal funnel</h3>
-    <div class="funnel">
-      <div class="funnel-step"><div class="value">{{ totals.leads }}</div><div class="label">Leads</div></div>
-      <div class="funnel-arrow" title="Leads that became signed agreements">{{ fm.pct(totals.lead_to_agreement) }} →</div>
-      <div class="funnel-step"><div class="value">{{ totals.signed_agreements }}</div><div class="label">Signed agreements</div></div>
-      <div class="funnel-arrow" title="Signed agreements that closed (wholesale or kept)">{{ fm.pct(totals.agreement_to_deal) }} →</div>
-      <div class="funnel-step"><div class="value">{{ totals.closed_deals }}</div><div class="label">Closed deals</div></div>
-    </div>
-    <p class="muted" style="font-size:12px; margin:14px 0 0;">Lead to deal: <strong>{{ fm.pct(totals.lead_to_deal) }}</strong> · {{ totals.under_contract }} under contract now. Signed agreements and closed deals come from the <a href="/finance/deals">Deals</a> list.</p>
-  </div>
+<div class="card">
+  <h3>Deal funnel · all channels</h3>
+  {{ funnel(totals.leads, totals.signed_agreements, totals.closed_deals, totals.lead_to_agreement, totals.agreement_to_deal, totals.lead_to_deal, totals.under_contract) }}
 </div>
 
 <div class="card">
@@ -67,7 +101,7 @@
   <table>
     <thead>
       <tr>
-        <th>Month</th><th>Wholesale expenses</th><th>Revenue</th><th>Profit</th><th>Leads</th><th>CPL</th><th>General</th><th>Of which kept (est.)</th>
+        <th>Month</th><th>Wholesale expenses</th><th>Revenue</th><th>Profit</th><th>Leads</th><th>CPL</th><th title="Agreements signed this month (by agreement date)">Signed</th><th title="Deals closed this month">Closed</th><th>General</th><th>Of which kept (est.)</th>
       </tr>
     </thead>
     <tbody>
@@ -79,11 +113,13 @@
         <td class="{{ fm.signed_class(s.profit) }}">{{ fm.money(s.profit) }}</td>
         <td>{{ s.leads }}</td>
         <td>{{ fm.cpl(s.cpl) }}</td>
+        <td title="{% for d in s.signed_deals %}{{ d.address }}&#10;{% endfor %}">{{ s.signed_deals|length or "—" }}</td>
+        <td>{{ (s.closed_deals|length + s.kept_deals|length) or "—" }}</td>
         <td class="muted">{{ fm.money(s.general_expenses) if s.general_expenses else "—" }}</td>
         <td class="muted" title="{% for d in s.kept_deals %}{{ d.address }}: {{ fm.money(d.profit) }}&#10;{% endfor %}">{{ fm.money(s.kept_value) if s.kept_value else "—" }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted" style="text-align:center; padding:24px;">No months yet. Start one from Monthly expenses.</td></tr>
+      <tr><td colspan="10" class="muted" style="text-align:center; padding:24px;">No months yet. Start one from Monthly expenses.</td></tr>
       {% endfor %}
     </tbody>
     <tfoot>
@@ -94,6 +130,8 @@
         <td class="{{ fm.signed_class(totals.profit) }}">{{ fm.money(totals.profit) }}</td>
         <td>{{ totals.leads }}</td>
         <td>{{ fm.cpl(totals.cpl) }}</td>
+        <td>{{ totals.signed_agreements }}</td>
+        <td>{{ totals.closed_deals }}</td>
         <td>{{ fm.money(totals.general_expenses) }}</td>
         <td>{{ fm.money(totals.kept_value) }}</td>
       </tr>
@@ -102,5 +140,101 @@
   </div>
   <p class="muted" style="font-size:12px; margin:10px 0 0;">Hover a revenue amount to see which deals it came from. Houses kept for the portfolio are included at their estimated wholesale profit.</p>
 </div>
+
+
+
+{% else %}
+{# ================= One channel ================= #}
+{% set label = CHANNELS[channel] %}
+<div class="kpi-row">
+  {% call kpi("Spent on " ~ label, fm.money(cs.expenses), "purple", title="All expenses on the " ~ label ~ " channel. Shared tools aren't included.") %}{{ ICON_SPEND }}{% endcall %}
+  {% call kpi("Deal profit", fm.money(cs.profit), "blue", title="Profit of closed deals from " ~ label ~ " (kept houses at est. wholesale profit).") %}{{ ICON_REV }}{% endcall %}
+  {% call kpi("Net", fm.money(cs.net), "teal", fm.signed_class(cs.net), "Deal profit − spent on " ~ label ~ ".") %}{{ ICON_PROFIT }}{% endcall %}
+  {% call kpi("ROI", fm.pct(cs.roi), "coral", fm.signed_class(cs.roi), "Net ÷ spent.") %}{{ ICON_ROI }}{% endcall %}
+  {% call kpi("Leads · CPL", cs.leads ~ " · " ~ fm.cpl(cs.cpl), "blue", title="Spent ÷ leads.") %}{{ ICON_LEADS }}{% endcall %}
+</div>
+
+<div class="card">
+  <h3>{{ label }} funnel</h3>
+  {{ funnel(cs.leads, cs.agreements, cs.closed_deals, cs.lead_to_agreement, cs.agreement_to_deal, cs.lead_to_deal, cs.under_contract, cs.dead) }}
+</div>
+
+<div class="card">
+  <h3>{{ label }} by month</h3>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th>Month</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Agreements signed this month (by agreement date)">Signed agreements</th><th title="Deals closed this month">Closed deals</th><th>Deal profit</th><th>Net</th></tr></thead>
+    <tbody>
+      {% for s in summaries %}
+      {% set m = s.channels[channel] %}
+      {% if m.expenses or m.leads or m.agreements or m.closed_deals %}
+      {% set signed = s.signed_deals|selectattr("channel", "equalto", channel)|list %}
+      {% set closed = (s.closed_deals + s.kept_deals)|selectattr("channel", "equalto", channel)|list %}
+      <tr>
+        <td><a class="zip-link" href="/finance/month/{{ s.month.strftime('%Y-%m') }}">{{ s.month.strftime('%b %Y') }}</a></td>
+        <td>{{ fm.money(m.expenses) }}</td>
+        <td>{{ m.leads }}</td>
+        <td>{{ fm.cpl(m.cpl) }}</td>
+        <td title="{% for d in signed %}{{ d.address }}&#10;{% endfor %}">{{ m.agreements or "—" }}</td>
+        <td title="{% for d in closed %}{{ d.address }}: {{ fm.money(d.profit) }}&#10;{% endfor %}">{{ m.closed_deals or "—" }}</td>
+        <td>{{ fm.money(m.profit) if m.profit else "—" }}</td>
+        <td class="{{ fm.signed_class(m.net) }}">{{ fm.money(m.net) }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="font-weight:600;">
+        <td>Total</td><td>{{ fm.money(cs.expenses) }}</td><td>{{ cs.leads }}</td><td>{{ fm.cpl(cs.cpl) }}</td>
+        <td>{{ cs.agreements }}</td><td>{{ cs.closed_deals }}</td><td>{{ fm.money(cs.profit) }}</td>
+        <td class="{{ fm.signed_class(cs.net) }}">{{ fm.money(cs.net) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Hover the signed or closed numbers to see which deals.</p>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card" style="margin-bottom:0;">
+    <h3>Vendors · {{ label }}</h3>
+    <table>
+      <thead><tr><th>Vendor</th><th>Total spent</th><th>Months</th><th>Avg / month</th></tr></thead>
+      <tbody>
+        {% for v in vendors %}
+        <tr>
+          <td><strong>{{ v.vendor.name }}</strong><div class="muted" style="font-size:11px;">{{ v.first.strftime('%b %Y') }}{% if v.last != v.first %} – {{ v.last.strftime('%b %Y') }}{% endif %}</div></td>
+          <td>{{ fm.money(v.total) }}</td>
+          <td>{{ v.months }}</td>
+          <td>{{ fm.money(v.per_month) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="muted">No expenses on this channel yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:12px; margin:10px 0 0;">Shared tools ({{ fm.money(shared_expenses) }} all-time) serve every channel and aren't included here.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <h3>Deals · {{ label }}</h3>
+    <table>
+      <thead><tr><th>Address</th><th>Signed</th><th>Status</th><th>Profit</th></tr></thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td><a class="zip-link" href="/finance/deals/{{ d.id }}">{{ d.address.split(',')[0] }}</a></td>
+          <td class="muted" style="white-space:nowrap;">{{ d.agreement_date.strftime('%b %d, %Y') if d.agreement_date else "—" }}</td>
+          <td>{{ fm.status_badge(d.status) }}{% if d.closed_date %}<div class="muted" style="font-size:11px;">closed {{ d.closed_date.strftime('%b %d, %Y') }}</div>{% endif %}</td>
+          <td class="{{ fm.signed_class(d.profit) }}">{% if d.status in ('closed', 'kept') %}{{ fm.money(d.profit) }}{% if d.status == 'kept' %} <span class="muted">(est.)</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="muted">No deals from this channel yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 {% endblock %}
