@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Tasks{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Tasks</h2>
+    <p class="page-subtitle">Drag tasks by ⋮⋮ to reorder or move them to another day. Click ▸ for the description.</p>
+  </div>
+  <button type="button" class="secondary" id="clear-done" {{ 'disabled' if not done_count }}>Clear done (<span id="done-count">{{ done_count }}</span>)</button>
+</div>
+
+<div class="channel-filter" id="label-filter">
+  <span class="muted" style="font-size:13px;">Show:</span>
+  <button type="button" class="filter-chip active" data-label="all">All</button>
+  {% for l in labels %}<button type="button" class="filter-chip" data-label="{{ l.id }}"><span class="chip-dot" style="background:{{ l.color }};"></span>{{ l.name }}</button>{% endfor %}
+  <button type="button" class="filter-chip" data-label="">No label</button>
+</div>
+
+{% for key, name in days.items() %}
+<section class="task-group" data-day="{{ key }}">
+  <div class="task-group-header">
+    <button type="button" class="task-group-toggle" aria-label="Collapse">▾</button>
+    <h3>{{ name }}</h3>
+    <span class="today-badge" hidden>Today</span>
+    <span class="muted task-count">{{ groups[key]|length }}</span>
+  </div>
+  <div class="task-group-body">
+    <div class="task-columns"><span></span><span>Task</span><span>Label</span><span>Status</span><span></span></div>
+    <div class="task-list" data-day="{{ key }}">
+      {% for t in groups[key] %}{% include "_task_row.html" %}{% endfor %}
+    </div>
+    <form class="task-add" data-day="{{ key }}" autocomplete="off">
+      <input type="text" name="title" placeholder="+ Add task" maxlength="255">
+    </form>
+  </div>
+</section>
+{% endfor %}
+
+<div class="card" id="settings" style="margin-top:28px;">
+  <h3>Statuses and labels</h3>
+  <div class="grid-2">
+    {% for kind, title, options in [("status", "Statuses", statuses), ("label", "Labels", labels)] %}
+    <div>
+      <h4 style="margin:0 0 8px;">{{ title }}</h4>
+      {% for o in options %}
+      <form method="post" action="/tools/tasks/options/{{ kind }}/{{ o.id }}" class="option-row">
+        <input type="color" name="color" value="{{ o.color }}" title="Color">
+        <input type="text" name="name" value="{{ o.name }}" maxlength="60" required>
+        {% if kind == "status" %}<label class="muted" title="Tasks with this status are crossed out and removed by 'Clear done'"><input type="checkbox" name="is_done" value="1" {{ 'checked' if o.is_done }}> means done</label>{% endif %}
+        <button type="submit" class="secondary small">Save</button>
+        <button type="submit" class="danger small" formaction="/tools/tasks/options/{{ kind }}/{{ o.id }}/delete" onclick="return confirm('Remove “{{ o.name }}”? Tasks using it will be left blank.');">Remove</button>
+      </form>
+      {% endfor %}
+      <form method="post" action="/tools/tasks/options/{{ kind }}/new" class="option-row">
+        <input type="color" name="color" value="#579BFC" title="Color">
+        <input type="text" name="name" placeholder="New {{ kind }}" maxlength="60" required>
+        <button type="submit" class="small">Add</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pill-menu" id="pill-menu" hidden></div>
+
+<script>
+(function() {
+  var OPTIONS = {{ options_json|tojson }};
+  var DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  var labelFilter = 'all';
+
+  function post(url, data) {
+    var body = new URLSearchParams();
+    Object.keys(data || {}).forEach(function(k) { body.append(k, data[k]); });
+    return fetch(url, {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r; })
+      .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
+  }
+  function save(row, data) { return post('/tools/tasks/' + row.dataset.id, data); }
+
+  function refreshCounts() {
+    document.querySelectorAll('.task-group').forEach(function(g) {
+      g.querySelector('.task-count').textContent = g.querySelectorAll('.task-row').length;
+    });
+    var done = document.querySelectorAll('.task-row.is-done').length;
+    document.getElementById('done-count').textContent = done;
+    document.getElementById('clear-done').disabled = !done;
+  }
+  function applyFilter() {
+    document.querySelectorAll('.task-row').forEach(function(row) {
+      row.style.display = (labelFilter === 'all' || row.dataset.label === labelFilter) ? '' : 'none';
+    });
+  }
+
+  // ----- one row -----
+  function wireRow(row) {
+    var title = row.querySelector('.task-title');
+    title.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } });
+    title.addEventListener('change', function() {
+      if (!title.value.trim()) { title.value = title.defaultValue; return; }
+      save(row, {title: title.value}).then(function() { title.defaultValue = title.value; });
+    });
+
+    var detail = row.querySelector('.task-detail'), expand = row.querySelector('.task-expand');
+    expand.addEventListener('click', function() {
+      detail.hidden = !detail.hidden;
+      row.classList.toggle('open', !detail.hidden);
+      if (!detail.hidden) row.querySelector('.task-description').focus();
+    });
+    var desc = row.querySelector('.task-description'), saved = row.querySelector('.task-saved'), timer;
+    function saveDesc() {
+      clearTimeout(timer);
+      if (desc.value === desc.defaultValue) return;
+      var value = desc.value;
+      save(row, {description: value}).then(function() {
+        desc.defaultValue = value;
+        var dot = expand.querySelector('.task-has-desc');
+        if (value.trim() && !dot) expand.insertAdjacentHTML('afterbegin', '<span class="task-has-desc" title="Has a description"></span>');
+        if (!value.trim() && dot) dot.remove();
+        saved.hidden = false; setTimeout(function() { saved.hidden = true; }, 1500);
+      });
+    }
+    desc.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(saveDesc, 800); });
+    desc.addEventListener('blur', saveDesc);
+
+    row.querySelector('.task-day').addEventListener('change', function() {
+      var day = this.value;
+      save(row, {day: day}).then(function() {
+        document.querySelector('.task-list[data-day="' + day + '"]').appendChild(row);
+        refreshCounts();
+      });
+    });
+
+    row.querySelectorAll('.task-pill').forEach(function(pill) {
+      pill.addEventListener('click', function(e) { e.stopPropagation(); openMenu(pill, row); });
+    });
+
+    row.querySelector('.task-delete').addEventListener('click', function() {
+      if (!confirm('Delete “' + title.value + '”?')) return;
+      post('/tools/tasks/' + row.dataset.id + '/delete').then(function() { row.remove(); refreshCounts(); });
+    });
+
+    // Drag only from the handle, so typing in the row still works normally.
+    var handle = row.querySelector('.task-handle');
+    handle.addEventListener('mousedown', function() { row.draggable = true; });
+    handle.addEventListener('mouseup', function() { row.draggable = false; });
+    row.addEventListener('dragstart', function(e) {
+      dragging = row; row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.id);
+    });
+    row.addEventListener('dragend', function() {
+      row.draggable = false; row.classList.remove('dragging');
+      document.querySelectorAll('.drop-target').forEach(function(el) { el.classList.remove('drop-target'); });
+      if (dragging) finishDrag();
+    });
+  }
+
+  // ----- status / label menu -----
+  var menu = document.getElementById('pill-menu');
+  function openMenu(pill, row) {
+    var kind = pill.dataset.kind, html = '';
+    OPTIONS[kind].forEach(function(o) {
+      html += '<button type="button" data-id="' + o.id + '" style="background:' + o.color + ';">' + escapeHtml(o.name) + '</button>';
+    });
+    if (kind === 'label') html += '<button type="button" data-id="" class="menu-clear">No label</button>';
+    html += '<a href="#settings" class="menu-edit">Edit ' + (kind === 'status' ? 'statuses' : 'labels') + '</a>';
+    menu.innerHTML = html;
+    menu.hidden = false;
+    var r = pill.getBoundingClientRect();
+    menu.style.top = (window.scrollY + r.bottom + 4) + 'px';
+    menu.style.left = Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 12) + 'px';
+    menu.querySelectorAll('button').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var id = b.dataset.id, o = OPTIONS[kind].filter(function(x) { return String(x.id) === id; })[0];
+        var data = {}; data[kind + '_id'] = id;
+        save(row, data).then(function() {
+          pill.dataset.value = id;
+          pill.textContent = o ? o.name : '';
+          pill.style.background = o ? o.color : (kind === 'status' ? '#C4C4C4' : 'transparent');
+          if (kind === 'status') row.classList.toggle('is-done', !!(o && o.done));
+          if (kind === 'label') { row.dataset.label = id; applyFilter(); }
+          refreshCounts();
+        });
+        menu.hidden = true;
+      });
+    });
+    menu.querySelector('.menu-edit').addEventListener('click', function() { menu.hidden = true; });
+  }
+  document.addEventListener('click', function(e) { if (!menu.contains(e.target)) menu.hidden = true; });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') menu.hidden = true; });
+  function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // ----- drag and drop between days -----
+  var dragging = null;
+  function rowAfter(list, y) {
+    var rows = Array.prototype.filter.call(list.querySelectorAll('.task-row:not(.dragging)'), function(r) { return r.style.display !== 'none'; });
+    for (var i = 0; i < rows.length; i++) {
+      var box = rows[i].getBoundingClientRect();
+      if (y < box.top + box.height / 2) return rows[i];
+    }
+    return null;
+  }
+  document.querySelectorAll('.task-group').forEach(function(group) {
+    var list = group.querySelector('.task-list');
+    group.addEventListener('dragover', function(e) {
+      if (!dragging) return;
+      e.preventDefault();
+      group.classList.add('drop-target');
+      if (group.classList.contains('collapsed')) return;
+      var after = rowAfter(list, e.clientY);
+      if (after) list.insertBefore(dragging, after); else list.appendChild(dragging);
+    });
+    group.addEventListener('dragleave', function(e) { if (!group.contains(e.relatedTarget)) group.classList.remove('drop-target'); });
+    group.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (dragging && group.classList.contains('collapsed')) list.appendChild(dragging);
+    });
+  });
+  function finishDrag() {
+    var row = dragging, list = row.parentElement;
+    dragging = null;
+    var ids = Array.prototype.map.call(list.querySelectorAll('.task-row'), function(r) { return r.dataset.id; });
+    fetch('/tools/tasks/move', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({day: list.dataset.day, ids: ids})})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); })
+      .catch(function() { alert('Could not save the move - reload the page and try again.'); });
+    row.querySelector('.task-day').value = list.dataset.day;
+    refreshCounts();
+  }
+
+  // ----- add a task -----
+  document.querySelectorAll('.task-add').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var input = form.querySelector('input'), title = input.value.trim();
+      if (!title) return;
+      input.value = '';
+      post('/tools/tasks/new', {title: title, day: form.dataset.day}).then(function(r) { return r.text(); }).then(function(html) {
+        var list = document.querySelector('.task-list[data-day="' + form.dataset.day + '"]');
+        list.insertAdjacentHTML('beforeend', html);
+        var row = list.lastElementChild;
+        wireRow(row);
+        if (labelFilter !== 'all' && labelFilter !== '') {
+          // Adding while filtered by a label: give the new task that label.
+          var pill = row.querySelector('.label-pill'), o = OPTIONS.label.filter(function(x) { return String(x.id) === labelFilter; })[0];
+          save(row, {label_id: labelFilter}).then(function() {
+            pill.dataset.value = labelFilter; pill.textContent = o.name; pill.style.background = o.color; row.dataset.label = labelFilter;
+          });
+        }
+        refreshCounts();
+      }).catch(function() { input.value = title; });
+    });
+  });
+
+  // ----- groups: collapse, today -----
+  var collapsed = {};
+  try { collapsed = JSON.parse(localStorage.getItem('tasks.collapsed') || '{}'); } catch (e) {}
+  var today = DAY_KEYS[new Date().getDay()];
+  document.querySelectorAll('.task-group').forEach(function(group) {
+    var day = group.dataset.day, toggle = group.querySelector('.task-group-toggle');
+    if (day === today) { group.classList.add('is-today'); group.querySelector('.today-badge').hidden = false; }
+    function set(c) {
+      group.classList.toggle('collapsed', c);
+      toggle.textContent = c ? '▸' : '▾';
+    }
+    set(!!collapsed[day]);
+    group.querySelector('.task-group-header').addEventListener('click', function() {
+      collapsed[day] = !group.classList.contains('collapsed');
+      set(collapsed[day]);
+      try { localStorage.setItem('tasks.collapsed', JSON.stringify(collapsed)); } catch (e) {}
+    });
+  });
+
+  // ----- label filter -----
+  document.querySelectorAll('#label-filter .filter-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      labelFilter = chip.dataset.label;
+      document.querySelectorAll('#label-filter .filter-chip').forEach(function(c) { c.classList.toggle('active', c === chip); });
+      applyFilter();
+    });
+  });
+
+  // ----- clear done -----
+  document.getElementById('clear-done').addEventListener('click', function() {
+    var n = document.querySelectorAll('.task-row.is-done').length;
+    if (!n || !confirm('Delete ' + n + ' done task' + (n === 1 ? '' : 's') + ' for good?')) return;
+    post('/tools/tasks/clear-done').then(function() {
+      document.querySelectorAll('.task-row.is-done').forEach(function(r) { r.remove(); });
+      refreshCounts();
+    });
+  });
+
+  document.querySelectorAll('.task-row').forEach(wireRow);
+})();
+</script>
+
+{% endblock %}

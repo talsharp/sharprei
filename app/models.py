@@ -506,5 +506,44 @@ class AuditLog(Base):
     changes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class TaskStatus(Base):
+    """A status option on the Tasks board (Working on it, Done...). Tal manages the list."""
+    __tablename__ = "task_statuses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    color: Mapped[str] = mapped_column(String(9), default="#C4C4C4")
+    position: Mapped[int] = mapped_column(default=0)
+    # Tasks with this status look finished and are removed by "Clear done".
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class TaskLabel(Base):
+    """What a task relates to (Dispo, Acquisition, General...). Tal manages the list."""
+    __tablename__ = "task_labels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    color: Mapped[str] = mapped_column(String(9), default="#579BFC")
+    position: Mapped[int] = mapped_column(default=0)
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Fixed weekday groups, not dates: "sun".."sat" or "later".
+    day: Mapped[str] = mapped_column(String(10), default="later", index=True)
+    position: Mapped[int] = mapped_column(default=0)
+    status_id: Mapped[Optional[int]] = mapped_column(ForeignKey("task_statuses.id", ondelete="SET NULL"), nullable=True)
+    label_id: Mapped[Optional[int]] = mapped_column(ForeignKey("task_labels.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    status: Mapped[Optional[TaskStatus]] = relationship()
+    label: Mapped[Optional[TaskLabel]] = relationship()
+
+
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401

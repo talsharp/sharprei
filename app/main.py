@@ -19,6 +19,7 @@ from app.database import backup_db, get_db
 from app.documents import MAX_FILE_MB, folder_for, save_uploads, serve, too_big_suffix
 from app.finance_routes import build_router as build_finance_router
 from app.statement_routes import build_router as build_statement_router
+from app.task_routes import build_router as build_task_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -87,6 +88,7 @@ templates.env.globals["STATIC_VERSION"] = int(
 
 app.include_router(build_finance_router(templates))
 app.include_router(build_statement_router(templates))
+app.include_router(build_task_router(templates))
 auth.install(app, templates)
 
 
