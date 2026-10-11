@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}{{ imp.filename }} · Card Statements{% endblock %}
+{% block content %}
+
+{% macro original(c) -%}
+  {%- if c.kind == "usd" -%}${{ "{:,.2f}".format(c.txn_amount|float) }} <span class="muted">(₪{{ "{:,.2f}".format(c.charged_amount|float) }} charged)</span>
+  {%- elif c.kind == "ils_installment" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }} <span class="muted">installment of ₪{{ "{:,.2f}".format(c.txn_amount|float) }}</span>
+  {%- elif c.kind == "usd_billed" -%}${{ "{:,.2f}".format((c.charged_amount if c.charged_amount is not none else c.txn_amount)|float) }}
+  {%- elif c.kind == "ils" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }}
+  {%- else -%}{{ c.charged_amount if c.charged_amount is not none else c.txn_amount }} <span class="muted">(other currency - enter $)</span>
+  {%- endif -%}
+{%- endmacro %}
+
+<div class="top-actions" id="top">
+  <div>
+    <h2 class="page-title">{{ imp.filename }}</h2>
+    <p class="page-subtitle">{{ charges|length }} charges · {% if imp.committed_at %}added to Finance on {{ imp.committed_at.strftime('%b %d, %Y') }}{% else %}{{ counts.new }} need your decision · {{ counts.vendor }} recognized · {{ counts.skip }} skipped{% endif %}</p>
+  </div>
+  <a class="btn secondary" href="/finance/statements">All statements</a>
+</div>
+
+{% if request.query_params.get('added') %}
+<div class="card" style="border-color:#A8D5B0; background:#EAF6EC;">
+  <strong>Added to Finance:</strong> {{ request.query_params.get('added') }} expense line{{ "s" if request.query_params.get('added') != "1" else "" }}, {{ fx.money(request.query_params.get('total')|float) }} in total. {{ request.query_params.get('skipped') }} charges skipped.
+  <a href="/finance/month/{{ imp.statement_month.strftime('%Y-%m') }}">Open {{ imp.statement_month.strftime('%B %Y') }} →</a>
+</div>
+{% endif %}
+
+{% if errors %}
+<div class="card login-error">
+  <strong>Not added yet:</strong>
+  <ul style="margin:6px 0 0; padding-left:18px;">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if imp.committed_at %}
+{# ---------- Read-only view after adding ---------- #}
+<table class="sticky-table">
+  <thead><tr><th>Date</th><th>Merchant</th><th>Original</th><th>Decision</th><th>Vendor · campaign</th><th>Amount ($)</th><th>Note</th></tr></thead>
+  <tbody>
+    {% for c in charges %}
+    <tr class="{{ 'charge-skipped' if c.decision == 'skip' else '' }}">
+      <td class="muted" style="white-space:nowrap;">{{ c.txn_date.strftime('%d/%m') if c.txn_date else '' }}</td>
+      <td>{{ c.merchant }}</td>
+      <td style="white-space:nowrap;">{{ original(c) }}</td>
+      <td>{% if c.decision == 'vendor' %}<span class="badge deal-closed">Added</span>{% else %}<span class="badge deal-cancelled">Skipped</span>{% endif %}</td>
+      <td>{% if c.decision == 'vendor' %}{{ c.vendor_name }} {{ fx.channel_badge(c.channel) }}{% endif %}</td>
+      <td>{{ fx.money(c.usd_amount|float) if c.usd_amount is not none and c.decision == 'vendor' else "—" }}{% if c.split_months > 1 %} <span class="muted">÷ {{ c.split_months }} months</span>{% endif %}</td>
+      <td class="muted">{{ c.note or "" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+{# ---------- Review form ---------- #}
+<datalist id="vendor-list">
+  {% for v in vendors %}<option value="{{ v.name }}" data-channel="{{ v.default_channel }}"></option>{% endfor %}
+</datalist>
+
+<form method="post" action="/finance/statements/{{ imp.id }}" id="review-form">
+<div class="card statement-settings">
+  <div class="form-row" style="margin:0;">
+    <label>Add to month</label>
+    <input type="month" name="statement_month" value="{{ imp.statement_month.strftime('%Y-%m') }}" required>
+  </div>
+  <div class="form-row" style="margin:0;">
+    <label>Shekels per dollar{% if bank_rate %} <span class="muted">(bank's rate on this statement: {{ "%.3f"|format(bank_rate) }})</span>{% endif %}</label>
+    <input type="number" step="0.0001" min="0.1" name="rate" value="{{ '%g'|format(imp.ils_per_usd|float) }}" style="width:120px;">
+  </div>
+  <div class="statement-totals" id="totals"></div>
+  {% if existing %}
+  <p class="muted" style="font-size:12px; margin:4px 0 0; flex-basis:100%;">{{ imp.statement_month.strftime('%B %Y') }} already has: {% for e in existing %}{{ e.vendor.name }} {{ fx.money(e.amount|float) }}{% if e.source == 'recurring_copy' %} <em>(copied from last month - replaced if on this statement)</em>{% endif %}{{ ", " if not loop.last else "" }}{% endfor %}</p>
+  {% endif %}
+</div>
+
+<p class="muted" style="font-size:12px;">Shekel amounts follow the rate above. If you change the rate, click "Save draft" and they're recalculated (amounts you edited by hand are kept). <strong>Remember</strong> teaches the system to recognize that merchant next month.</p>
+
+<div style="overflow-x:auto;">
+<table class="review-table">
+  <thead>
+    <tr><th>Date</th><th>Merchant</th><th>Original</th><th>Decision</th><th>Vendor</th><th>Campaign</th><th>Amount ($)</th><th>Note</th><th>Split</th><th>Remember</th></tr>
+  </thead>
+  <tbody>
+    {% set ns = namespace(section=None) %}
+    {% for c in charges %}
+    {% if c.decision != ns.section %}
+      {% set ns.section = c.decision %}
+      <tr class="section-row"><td colspan="10">
+        {% if c.decision == 'new' %}Needs your decision · {{ counts.new }}
+        {% elif c.decision == 'vendor' %}Recognized · {{ counts.vendor }}
+        {% else %}Skipped · {{ counts.skip }}{% endif %}
+      </td></tr>
+    {% endif %}
+    {% set rule = rules.get(c.matched_rule_id) %}
+    <tr class="charge-row {{ 'charge-skipped' if c.decision == 'skip' else '' }} {{ 'charge-new' if c.decision == 'new' else '' }}">
+      <td class="muted" style="white-space:nowrap;">{{ c.txn_date.strftime('%d/%m') if c.txn_date else '' }}</td>
+      <td style="min-width:170px;">
+        {{ c.merchant }}
+        <div class="muted" style="font-size:11px;">
+          {% if c.card %}card ··{{ c.card }}{% endif %}
+          {% if c.duplicate_of_import_id %} · <span class="profit-down">already imported</span>{% elif rule %} · matched "{{ rule.pattern }}"{% endif %}
+        </div>
+      </td>
+      <td style="white-space:nowrap; font-size:13px;">{{ original(c) }}</td>
+      <td>
+        <select name="decision_{{ c.id }}" class="decision compact-select">
+          {% if c.decision == 'new' %}<option value="new" selected>Choose…</option>{% endif %}
+          <option value="vendor" {{ 'selected' if c.decision == 'vendor' }}>Add</option>
+          <option value="skip" {{ 'selected' if c.decision == 'skip' }}>Skip</option>
+        </select>
+      </td>
+      <td><input type="text" name="vendor_{{ c.id }}" value="{{ c.vendor_name or '' }}" list="vendor-list" class="vendor-input" style="width:140px;" placeholder="Vendor"></td>
+      <td>
+        <select name="channel_{{ c.id }}" class="compact-select channel-select">
+          <option value="">—</option>
+          {% for k, label in CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if k == c.channel }}>{{ label }}</option>{% endfor %}
+        </select>
+      </td>
+      <td><input type="number" step="0.01" name="amount_{{ c.id }}" value="{{ '%.2f'|format(c.usd_amount|float) if c.usd_amount is not none else '' }}" class="amount-input" style="width:95px;"></td>
+      <td><input type="text" name="note_{{ c.id }}" value="{{ c.note or '' }}" placeholder="{{ 'e.g. Personal, Mom\'s shop' if c.decision != 'vendor' else 'Optional' }}" style="width:140px;"></td>
+      <td>
+        <select name="split_{{ c.id }}" class="compact-select" title="Prepaid for several months? Spread it evenly from this month on, with a note that it was already paid.">
+          {% for n in range(1, 13) %}<option value="{{ n }}" {{ 'selected' if n == c.split_months }}>{{ "No" if n == 1 else n ~ " mo" }}</option>{% endfor %}
+        </select>
+      </td>
+      <td style="white-space:nowrap;">
+        {% set default_remember = not c.matched_rule_id and not c.duplicate_of_import_id %}
+        <label style="display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" name="remember_{{ c.id }}" value="1" class="remember-cb" {{ 'checked' if default_remember }}>
+          <input type="text" name="pattern_{{ c.id }}" value="{{ suggest_pattern(c.merchant) }}" class="pattern-input" style="width:120px; {{ '' if default_remember else 'display:none;' }}" title="Next month, any merchant containing this text is recognized the same way">
+        </label>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="review-actions">
+  <button type="submit" form="review-form" name="action" value="save" class="secondary">Save draft</button>
+  <button type="submit" form="review-form" name="action" value="commit">Add to Finance</button>
+</div>
+</form>
+
+<form method="post" action="/finance/statements/{{ imp.id }}/delete" onsubmit="return confirm('Discard this upload? Nothing has been added to Finance.');" style="margin-top:18px;">
+  <button type="submit" class="danger small">Discard this upload</button>
+</form>
+
+<script>
+(function() {
+  var labels = {{ CHANNELS|tojson }};
+  function refreshRow(tr) {
+    var decision = tr.querySelector('.decision').value;
+    tr.classList.toggle('charge-skipped', decision === 'skip');
+    tr.classList.toggle('charge-new', decision === 'new');
+  }
+  function refreshTotals() {
+    var byChannel = {}, total = 0, adds = 0, open = 0;
+    document.querySelectorAll('tr.charge-row').forEach(function(tr) {
+      var d = tr.querySelector('.decision').value;
+      if (d === 'new') open++;
+      if (d !== 'vendor') return;
+      var amt = parseFloat(tr.querySelector('.amount-input').value) || 0;
+      var ch = tr.querySelector('.channel-select').value || '';
+      byChannel[ch] = (byChannel[ch] || 0) + amt; total += amt; adds++;
+    });
+    var fmt = function(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+    var parts = Object.keys(byChannel).map(function(k) { return (labels[k] || 'No campaign') + ' ' + fmt(byChannel[k]); });
+    document.getElementById('totals').innerHTML = '<strong>To add: ' + fmt(total) + '</strong> (' + adds + ' charges)' +
+      (parts.length ? '<div class="muted" style="font-size:12px;">' + parts.join(' · ') + '</div>' : '') +
+      (open ? '<div class="profit-down" style="font-size:12px;">' + open + ' still need a decision</div>' : '');
+  }
+  document.querySelectorAll('tr.charge-row').forEach(function(tr) {
+    tr.querySelector('.decision').addEventListener('change', function() { refreshRow(tr); refreshTotals(); });
+    tr.querySelector('.vendor-input').addEventListener('change', function() {
+      var opt = document.querySelector('#vendor-list option[value="' + CSS.escape(this.value) + '"]');
+      if (opt) tr.querySelector('.channel-select').value = opt.dataset.channel;
+      var dec = tr.querySelector('.decision');
+      if (dec.value === 'new' && this.value) { dec.value = 'vendor'; refreshRow(tr); }
+      refreshTotals();
+    });
+    tr.querySelector('.channel-select').addEventListener('change', refreshTotals);
+    tr.querySelector('.amount-input').addEventListener('input', refreshTotals);
+    tr.querySelector('.remember-cb').addEventListener('change', function() {
+      tr.querySelector('.pattern-input').style.display = this.checked ? '' : 'none';
+    });
+  });
+  refreshTotals();
+})();
+</script>
+{% endif %}
+
+{% endblock %}

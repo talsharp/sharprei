@@ -238,6 +238,7 @@ def copy_recurring(db: Session, fm: FinanceMonth) -> Optional[FinanceMonth]:
                     amount=e.amount,
                     channel=e.channel,
                     description=e.description,
+                    source="recurring_copy",
                 )
             )
     return source

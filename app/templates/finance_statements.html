@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}Card Statements · Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  {{ fx.page_header("Card Statements", "Upload your monthly credit card file - known charges are labeled automatically, new ones are left for you") }}
+  <a class="btn secondary" href="/finance/rules">What the system recognizes ({{ rule_count }})</a>
+</div>
+
+{% if error %}
+<div class="card login-error" style="margin-bottom:16px;">
+  {% if error == "unreadable" %}That file couldn't be read. Upload the Excel file exactly as downloaded from the bank.
+  {% elif error == "no_rows" %}No charges were found in that file.
+  {% elif error == "too_big" %}That file is over 25 MB.
+  {% else %}Choose a file to upload.{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Upload a statement</h3>
+  <form method="post" action="/finance/statements/upload" enctype="multipart/form-data" class="file-upload-form">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button type="submit">Upload and review</button>
+  </form>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Nothing is added to Finance until you review the charges and click "Add to Finance". Name the file after the month (e.g. "October 2026") and the month is picked automatically - you can change it on the next screen.</p>
+</div>
+
+<table class="sticky-table">
+  <thead><tr><th>File</th><th>Month</th><th>Uploaded</th><th>Charges</th><th>Added to Finance</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for imp in imports %}
+    {% set s = summary[imp.id] %}
+    <tr>
+      <td><a class="zip-link" href="/finance/statements/{{ imp.id }}">{{ imp.filename }}</a></td>
+      <td>{{ imp.statement_month.strftime('%B %Y') }}</td>
+      <td class="muted">{{ imp.uploaded_at.strftime('%b %d, %Y') }}</td>
+      <td>{{ s.charges }}</td>
+      <td>{% if imp.committed_at %}{{ s.added }} charges · {{ fx.money(s.added_usd) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if imp.committed_at %}<span class="badge deal-closed">Added</span>{% else %}<span class="badge deal-under_contract">Draft{% if s.new %} · {{ s.new }} to review{% endif %}</span>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">No statements uploaded yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

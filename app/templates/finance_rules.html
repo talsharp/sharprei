@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}Recognized merchants · Finance{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  {{ fx.page_header("Recognized merchants", "How card-statement charges are labeled automatically - learned from your choices") }}
+  <a class="btn secondary" href="/finance/statements">Card Statements</a>
+</div>
+
+<table class="sticky-table">
+  <thead><tr><th>If the merchant contains</th><th>Then</th><th>Vendor</th><th>Campaign</th><th>Note</th><th></th></tr></thead>
+  <tbody>
+    {% for r in rules %}
+    <tr>
+      <td><code>{{ r.pattern }}</code></td>
+      <td>{% if r.action == 'skip' %}<span class="badge deal-cancelled">Skip</span>{% else %}<span class="badge deal-closed">Add</span>{% endif %}</td>
+      <td>{{ r.vendor.name if r.vendor else "—" }}</td>
+      <td>{{ fx.channel_badge(r.channel or r.vendor.default_channel) if r.vendor else "—" }}</td>
+      <td class="muted">{{ r.label or "" }}</td>
+      <td style="text-align:right;">
+        <form method="post" action="/finance/rules/{{ r.id }}/delete" onsubmit="return confirm('Stop recognizing &quot;{{ r.pattern }}&quot;? Charges from it will show as new next time.');">
+          <button type="submit" class="danger small">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">Nothing yet - the system learns when you tick "Remember" on a statement.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="muted" style="font-size:12px;">To change how a merchant is labeled, remove it here and choose again (with "Remember") on your next statement. The longest matching text wins, so "LAUNCH CONTROL - SC" can be labeled differently from "LAUNCH CONTROL" if you want.</p>
+
+{% endblock %}

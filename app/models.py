@@ -336,10 +336,75 @@ class FinanceExpense(Base):
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     channel: Mapped[str] = mapped_column(String(20))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # "manual", "recurring_copy" (pre-filled from last month - replaced when a
+    # card statement brings the real amount) or "statement".
+    source: Mapped[str] = mapped_column(String(20), default="manual", server_default="manual")
+    statement_import_id: Mapped[Optional[int]] = mapped_column(ForeignKey("statement_imports.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     finance_month: Mapped[FinanceMonth] = relationship(back_populates="expenses")
     vendor: Mapped[Vendor] = relationship(back_populates="expenses")
+
+
+class MatchRule(Base):
+    """Recognizes card-statement charges: if `pattern` appears in the merchant
+    name, the charge goes to `vendor_id` (on `channel`, or the vendor's default),
+    or - with action "skip" - is shown but never added (e.g. personal, or the
+    Google Ads for the shop)."""
+
+    __tablename__ = "match_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pattern: Mapped[str] = mapped_column(String(120))
+    action: Mapped[str] = mapped_column(String(10), default="vendor")
+    vendor_id: Mapped[Optional[int]] = mapped_column(ForeignKey("finance_vendors.id"), nullable=True)
+    channel: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    vendor: Mapped[Optional[Vendor]] = relationship()
+
+
+class StatementImport(Base):
+    __tablename__ = "statement_imports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    stored_name: Mapped[str] = mapped_column(String(255))
+    statement_month: Mapped[date] = mapped_column(Date)
+    ils_per_usd: Mapped[float] = mapped_column(Numeric(8, 4))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    committed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    charges: Mapped[list["StatementCharge"]] = relationship(
+        back_populates="statement_import", cascade="all, delete-orphan", order_by="StatementCharge.row_index"
+    )
+
+
+class StatementCharge(Base):
+    __tablename__ = "statement_charges"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    statement_import_id: Mapped[int] = mapped_column(ForeignKey("statement_imports.id"), index=True)
+    row_index: Mapped[int] = mapped_column(default=0)
+    card: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    txn_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    merchant: Mapped[str] = mapped_column(String(255))
+    txn_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    charged_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    # "usd" (foreign charge - txn_amount is dollars), "ils", "ils_installment", "usd_billed", "other"
+    kind: Mapped[str] = mapped_column(String(20))
+    usd_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    decision: Mapped[str] = mapped_column(String(10), default="new")  # "vendor", "skip", "new"
+    vendor_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    channel: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    split_months: Mapped[int] = mapped_column(default=1)
+    matched_rule_id: Mapped[Optional[int]] = mapped_column(ForeignKey("match_rules.id"), nullable=True)
+    duplicate_of_import_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    statement_import: Mapped[StatementImport] = relationship(back_populates="charges")
 
 
 class WholesaleDeal(Base):

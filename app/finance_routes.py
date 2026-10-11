@@ -221,6 +221,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         if channel in CHANNELS:
             expense.channel = channel
         expense.description = description.strip() or None
+        expense.source = "manual"
         db.commit()
         return _month_body(request, db, month)
 
