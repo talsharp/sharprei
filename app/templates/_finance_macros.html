@@ -16,3 +16,12 @@
   {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
 </div>
 {% endmacro %}
+
+{% macro charge_original(c) -%}
+  {%- if c.kind == "usd" -%}${{ "{:,.2f}".format(c.txn_amount|float) }} <span class="muted">(₪{{ "{:,.2f}".format(c.charged_amount|float) }} charged)</span>
+  {%- elif c.kind == "ils_installment" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }} <span class="muted">installment of ₪{{ "{:,.2f}".format(c.txn_amount|float) }}</span>
+  {%- elif c.kind == "usd_billed" -%}${{ "{:,.2f}".format((c.charged_amount if c.charged_amount is not none else c.txn_amount)|float) }}
+  {%- elif c.kind == "ils" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }}
+  {%- else -%}{{ c.charged_amount if c.charged_amount is not none else c.txn_amount }} <span class="muted">(other currency - enter $)</span>
+  {%- endif -%}
+{%- endmacro %}

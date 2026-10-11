@@ -402,3 +402,13 @@ tr.run-row.dirty td { background: #FFF8E6; }
 .review-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 .review-table tr.charge-problem td { background: #FDECEC; }
 .review-table tr.charge-problem td:first-child { box-shadow: inset 3px 0 0 #D64545; }
+.channel-filter { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; scroll-margin-top: 16px; }
+.filter-chip { background: var(--panel); color: var(--navy); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+.filter-chip:hover { background: var(--panel-soft); }
+.filter-chip.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover td { background: var(--panel-soft); }
+.charges-toggle { margin-left: 8px; font-size: 11px; padding: 2px 8px; }
+.charges-detail-row > td { background: var(--panel-soft); padding: 10px 14px; }
+.charges-detail { width: 100%; background: var(--panel); border: 1px solid var(--border); margin-bottom: 6px; }
+.charges-detail th, .charges-detail td { font-size: 12px; padding: 6px 10px; }

@@ -23,6 +23,7 @@ from app.finance import (
     parse_month_key,
     start_month,
 )
+from app.statements import charges_by_expense
 from app.models import DealFile, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
@@ -111,6 +112,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             "fm": fm,
             "wholesale_expenses": [e for e in expenses if e.channel != "general"],
             "general_expenses": [e for e in expenses if e.channel == "general"],
+            "statement_charges": charges_by_expense(expenses),
             "vendors": db.query(Vendor).order_by(Vendor.name).all(),
             "all_months": all_months,
             "next_new_month": next_month(latest) if latest else date.today().replace(day=1),

@@ -343,6 +343,7 @@ class FinanceExpense(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     finance_month: Mapped[FinanceMonth] = relationship(back_populates="expenses")
+    statement_import: Mapped[Optional["StatementImport"]] = relationship()
     vendor: Mapped[Vendor] = relationship(back_populates="expenses")
 
 

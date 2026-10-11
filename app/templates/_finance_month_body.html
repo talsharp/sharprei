@@ -26,7 +26,7 @@
       <tbody>
         {% for ch in wholesale_channels %}
         {% set cs = summary.channels[ch] %}
-        <tr>
+        <tr class="clickable-row" onclick="filterExpenses('{{ ch }}', true)" title="Show only {{ CHANNELS[ch] }} expenses">
           <td>{{ fx.channel_badge(ch) }}</td>
           <td>{{ fx.money(cs.expenses) }}</td>
           <td>{{ cs.leads if ch in lead_channels else "—" }}</td>
@@ -55,9 +55,10 @@
 
 {% macro expense_rows(rows) %}
   {% for e in rows %}
-  <tr id="exp-{{ e.id }}">
+  {% set charges = statement_charges.get(e.id) %}
+  <tr id="exp-{{ e.id }}" class="expense-row" data-channel="{{ e.channel }}" data-amount="{{ e.amount|float }}">
     <td>
-      <span class="row-view"><strong>{{ e.vendor.name }}</strong></span>
+      <span class="row-view"><strong>{{ e.vendor.name }}</strong>{% if charges %} <button type="button" class="charges-toggle secondary small" data-target="charges-{{ e.id }}" title="Show the card charges behind this line">{{ charges|length }} charge{{ "s" if charges|length != 1 else "" }} ▾</button>{% endif %}</span>
       <input class="row-edit" type="text" name="vendor_name" value="{{ e.vendor.name }}" list="vendor-list" style="width:150px;">
     </td>
     <td>
@@ -85,6 +86,28 @@
       </span>
     </td>
   </tr>
+  {% if charges %}
+  <tr class="charges-detail-row" id="charges-{{ e.id }}" data-channel="{{ e.channel }}" style="display:none;">
+    <td colspan="5">
+      <table class="charges-detail">
+        <thead><tr><th>Date</th><th>Charge on the card</th><th>Card</th><th>Original</th><th>Amount ($)</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for c in charges %}
+          <tr>
+            <td style="white-space:nowrap;">{{ c.txn_date.strftime('%b %d, %Y') if c.txn_date else "" }}</td>
+            <td>{{ c.merchant }}</td>
+            <td class="muted">{{ "··" ~ c.card if c.card else "" }}</td>
+            <td style="white-space:nowrap;">{{ fx.charge_original(c) }}</td>
+            <td>${{ "{:,.2f}".format(c.usd_amount|float) }}{% if c.split_months > 1 %} <span class="muted">÷ {{ c.split_months }} months</span>{% endif %}</td>
+            <td class="muted">{{ c.note or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a class="muted" style="font-size:12px;" href="/finance/statements/{{ e.statement_import_id }}">From {{ e.statement_import.filename }} →</a>
+    </td>
+  </tr>
+  {% endif %}
   {% endfor %}
 {% endmacro %}
 
@@ -97,7 +120,14 @@
 </div>
 {% endif %}
 
-<div class="card">
+<div class="channel-filter" id="channel-filter">
+  <span class="muted" style="font-size:13px;">Show:</span>
+  <button type="button" class="filter-chip active" data-channel="">All</button>
+  {% for k, label in CHANNELS.items() %}<button type="button" class="filter-chip" data-channel="{{ k }}">{{ label }}</button>{% endfor %}
+  <span class="muted" id="channel-filter-total" style="font-size:13px;"></span>
+</div>
+
+<div class="card" id="wholesale-card">
   <h3>Wholesale expenses <span class="muted" style="font-weight:400;">· {{ fx.money(summary.wholesale_expenses) }}</span></h3>
   <table class="expense-table">
     <thead><tr><th>Vendor</th><th>Channel</th><th>Amount</th><th>Description</th><th></th></tr></thead>
@@ -119,7 +149,7 @@
   <p class="muted" style="font-size:12px; margin:10px 0 0;">Pick a vendor from the list and its usual channel fills in. A new vendor name is saved automatically. Choose "General" for costs that aren't wholesale - they'll move to the section below.</p>
 </div>
 
-<div class="card">
+<div class="card" id="general-card">
   <h3>General expenses <span class="muted" style="font-weight:400;">· {{ fx.money(summary.general_expenses) }} · not counted in wholesale profit</span></h3>
   {% if general_expenses %}
   <table class="expense-table">

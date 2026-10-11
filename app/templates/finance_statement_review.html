@@ -3,14 +3,6 @@
 {% block title %}{{ imp.filename }} · Card Statements{% endblock %}
 {% block content %}
 
-{% macro original(c) -%}
-  {%- if c.kind == "usd" -%}${{ "{:,.2f}".format(c.txn_amount|float) }} <span class="muted">(₪{{ "{:,.2f}".format(c.charged_amount|float) }} charged)</span>
-  {%- elif c.kind == "ils_installment" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }} <span class="muted">installment of ₪{{ "{:,.2f}".format(c.txn_amount|float) }}</span>
-  {%- elif c.kind == "usd_billed" -%}${{ "{:,.2f}".format((c.charged_amount if c.charged_amount is not none else c.txn_amount)|float) }}
-  {%- elif c.kind == "ils" -%}₪{{ "{:,.2f}".format(c.charged_amount|float) }}
-  {%- else -%}{{ c.charged_amount if c.charged_amount is not none else c.txn_amount }} <span class="muted">(other currency - enter $)</span>
-  {%- endif -%}
-{%- endmacro %}
 
 <div class="top-actions" id="top">
   <div>
@@ -43,7 +35,7 @@
     <tr class="{{ 'charge-skipped' if c.decision == 'skip' else '' }}">
       <td class="muted" style="white-space:nowrap;">{{ c.txn_date.strftime('%d/%m') if c.txn_date else '' }}</td>
       <td>{{ c.merchant }}</td>
-      <td style="white-space:nowrap;">{{ original(c) }}</td>
+      <td style="white-space:nowrap;">{{ fx.charge_original(c) }}</td>
       <td>{% if c.decision == 'vendor' %}<span class="badge deal-closed">Added</span>{% else %}<span class="badge deal-cancelled">Skipped</span>{% endif %}</td>
       <td>{% if c.decision == 'vendor' %}{{ c.vendor_name }} {{ fx.channel_badge(c.channel) }}{% endif %}</td>
       <td>{{ fx.money(c.usd_amount|float) if c.usd_amount is not none and c.decision == 'vendor' else "—" }}{% if c.split_months > 1 %} <span class="muted">÷ {{ c.split_months }} months</span>{% endif %}</td>
@@ -105,7 +97,7 @@
           {% if c.duplicate_of_import_id %} · <span class="profit-down">already imported</span>{% elif rule %} · matched "{{ rule.pattern }}"{% endif %}
         </div>
       </td>
-      <td style="white-space:nowrap; font-size:13px;">{{ original(c) }}</td>
+      <td style="white-space:nowrap; font-size:13px;">{{ fx.charge_original(c) }}</td>
       <td>
         <select name="decision_{{ c.id }}" class="decision compact-select">
           {% if c.decision == 'new' %}<option value="new" selected>Choose…</option>{% endif %}

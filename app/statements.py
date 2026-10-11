@@ -345,5 +345,23 @@ def commit_import(db: Session, imp: StatementImport, remember: Dict[int, str]) -
     return {"lines": added_lines, "total": round(added_total, 2), "skipped": skipped}
 
 
+def charges_by_expense(expenses) -> Dict[int, List[StatementCharge]]:
+    """The statement charges behind each card-statement expense line, matched
+    the same way commit_import grouped them (vendor + campaign, prepaid apart)."""
+    result: Dict[int, List[StatementCharge]] = {}
+    for e in expenses:
+        if not e.statement_import_id or not e.statement_import:
+            continue
+        prepaid = (e.description or "").startswith("Prepaid")
+        result[e.id] = [
+            c for c in e.statement_import.charges
+            if c.decision == "vendor"
+            and (c.vendor_name or "").strip() == e.vendor.name
+            and c.channel == e.channel
+            and ((c.split_months or 1) > 1) == prepaid
+        ]
+    return result
+
+
 def valid_channel(value: str) -> Optional[str]:
     return value if value in CHANNELS else None

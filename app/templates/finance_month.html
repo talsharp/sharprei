@@ -28,6 +28,43 @@ function fillVendorChannel(input) {
   var select = input.closest('tr').querySelector('select[name=channel]');
   if (opt && select) select.value = opt.dataset.channel;
 }
+
+// Channel filter - kept when the page body reloads after a save.
+var expenseFilter = '';
+function filterExpenses(channel, scroll) {
+  expenseFilter = channel;
+  var total = 0, vendors = {};
+  document.querySelectorAll('#month-body tr.expense-row').forEach(function(tr) {
+    var show = !channel || tr.dataset.channel === channel;
+    tr.style.display = show ? '' : 'none';
+    if (show && channel) { total += parseFloat(tr.dataset.amount) || 0; vendors[tr.querySelector('.row-view strong').textContent] = 1; }
+    var detail = document.getElementById('charges-' + tr.id.slice(4));
+    if (detail && !show) detail.style.display = 'none';
+  });
+  document.querySelectorAll('#channel-filter .filter-chip').forEach(function(b) { b.classList.toggle('active', b.dataset.channel === channel); });
+  var general = document.getElementById('general-card'), wholesale = document.getElementById('wholesale-card');
+  if (general) general.style.display = (!channel || channel === 'general') ? '' : 'none';
+  if (wholesale) wholesale.style.display = channel === 'general' ? 'none' : '';
+  var label = document.getElementById('channel-filter-total');
+  if (label) label.textContent = channel ? '$' + total.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' · ' + Object.keys(vendors).length + ' vendor' + (Object.keys(vendors).length === 1 ? '' : 's') : '';
+  if (scroll) document.getElementById('channel-filter').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+function wireMonthBody() {
+  document.querySelectorAll('#channel-filter .filter-chip').forEach(function(b) {
+    b.addEventListener('click', function() { filterExpenses(b.dataset.channel); });
+  });
+  document.querySelectorAll('.charges-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = document.getElementById(btn.dataset.target);
+      var open = row.style.display !== 'none';
+      row.style.display = open ? 'none' : '';
+      btn.textContent = btn.textContent.replace(open ? '▴' : '▾', open ? '▾' : '▴');
+    });
+  });
+  filterExpenses(expenseFilter);
+}
+wireMonthBody();
+document.body.addEventListener('htmx:afterSettle', function(e) { if (document.getElementById('channel-filter')) wireMonthBody(); });
 </script>
 
 {% endblock %}
