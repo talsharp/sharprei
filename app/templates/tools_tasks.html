@@ -140,8 +140,6 @@
     });
   }
   function deleteRow(row) {
-    var title = row.querySelector('.task-title-text').textContent;
-    if (!confirm('Delete “' + title + '”?')) return;
     post('/tools/tasks/' + row.dataset.id + '/delete').then(function() {
       if (openRow === row) closeDrawer(true);
       row.remove(); refreshCounts();
