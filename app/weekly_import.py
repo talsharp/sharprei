@@ -44,7 +44,8 @@ ROUND_LABELS = {
 
 COLUMN_ALIASES = {
     "zip_code": ["zip", "zip_code", "zipcode", "zip code"],
-    "sms_sent": ["sms", "sms_sent", "sms sent", "total messages", "total sent", "messages sent"],
+    "sms_sent": ["sms", "sms_sent", "sms sent", "total messages", "total sent", "messages sent",
+                 "total delivery", "total delivered", "total deliveries", "delivered", "delivery"],
     "replies": ["replies", "reply", "total response", "response", "total replies"],
     "leads": ["leads", "lead", "hot lead", "hot leads", "hot"],
     "warm": ["warm", "warm lead", "warm leads"],

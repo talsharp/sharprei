@@ -19,7 +19,7 @@ def _real_date(d: date) -> Optional[date]:
 class FollowUpRound:
     round_number: int
     run: CampaignRun
-    days_since_initial: Optional[int]
+    days_since_last_sms: Optional[int]  # same for every round of a zip
     deal_count: int = 0
     total_profit: float = 0.0
     avg_reply_rate: Optional[float] = None
@@ -171,16 +171,15 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
         for deal in db.execute(deal_stmt).scalars().all():
             deals_by_run[deal.campaign_run_id].append(deal)
 
-    # Reference date per zip: the earliest INITIAL run with a real (non-placeholder)
-    # date. If none exists, "days since initial" can't be computed - shown as "--".
-    initial_dates_by_zip: Dict[int, date] = {}
-    for run in db.query(CampaignRun).filter(CampaignRun.run_type == RunType.initial).all():
+    # Days since the zip was last texted (initial or follow-up), up to today. Runs
+    # are recorded by month only, so each month counts as its 15th. Zips with no
+    # dated run show "--".
+    today = date.today()
+    last_sms_by_zip: Dict[int, date] = {}
+    for run in db.query(CampaignRun).all():
         real = _real_date(run.run_date)
-        if real is None:
-            continue
-        current = initial_dates_by_zip.get(run.zip_code_id)
-        if current is None or real < current:
-            initial_dates_by_zip[run.zip_code_id] = real
+        if real is not None and real > last_sms_by_zip.get(run.zip_code_id, date.min):
+            last_sms_by_zip[run.zip_code_id] = real
 
     runs_by_zip = defaultdict(list)
     for run in followup_runs:
@@ -188,26 +187,21 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
 
     result: Dict[int, FollowUpSummary] = {}
     for zip_id, runs in runs_by_zip.items():
-        reference_date = initial_dates_by_zip.get(zip_id)
+        last_sms = last_sms_by_zip.get(zip_id)
+        days_since_last = max(0, (today - last_sms.replace(day=15)).days) if last_sms else None
         # Tie-break same/unset dates by id, so round order stays stable and sane
         # even when none of the runs have a real date yet.
         runs.sort(key=lambda r: (r.run_date, r.id))
 
         summary = FollowUpSummary()
         for i, run in enumerate(runs, start=1):
-            run_real_date = _real_date(run.run_date)
-            days_since = (
-                (run_real_date - reference_date).days
-                if (reference_date is not None and run_real_date is not None)
-                else None
-            )
             round_deals = deals_by_run.get(run.id, [])
             round_profit = sum(float(d.profit) for d in round_deals)
             summary.rounds.append(
                 FollowUpRound(
                     round_number=i,
                     run=run,
-                    days_since_initial=days_since,
+                    days_since_last_sms=days_since_last,
                     deal_count=len(round_deals),
                     total_profit=round_profit,
                 )

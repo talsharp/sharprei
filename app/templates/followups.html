@@ -12,7 +12,7 @@
     <button type="button" class="secondary" onclick="document.getElementById('fu-columns-panel').classList.toggle('open')">Columns</button>
     <div class="columns-panel" id="fu-columns-panel">
       <label><input type="checkbox" data-col="date" checked> Date</label>
-      <label><input type="checkbox" data-col="days_since" checked> Days since initial</label>
+      <label><input type="checkbox" data-col="days_since" checked> Days since last SMS</label>
       <label><input type="checkbox" data-col="sms" checked> SMS</label>
       <label><input type="checkbox" data-col="replies" checked> Replies</label>
       <label><input type="checkbox" data-col="reply_rate" checked> % Replies</label>
@@ -91,7 +91,7 @@
       <tr>
         <th>Zip Code</th>
         <th data-col="date">Date</th>
-        <th data-col="days_since">Days since initial</th>
+        <th data-col="days_since" title="Days from this zip's most recent SMS (initial or follow-up) until today. Runs are saved by month, so each month counts as the 15th.">Days since last SMS</th>
         <th data-col="sms">SMS</th>
         <th data-col="replies">Replies</th>
         <th data-col="reply_rate">% Replies</th>
@@ -112,7 +112,7 @@
       <tr class="fu-data-row" data-status="{{ rzc.status }}" data-fustatus="{{ rzc.follow_up_status }}" data-region="{{ r_effective_region or '' }}">
         <td><a class="zip-link" href="/zip/{{ rnd.run.zip_code_id }}">{{ rnd.run.zip_code.zip_code }}</a></td>
         <td data-col="date" data-sort="{{ rnd.run.run_date.strftime('%Y%m%d') if rnd.run.run_date != UNSET_DATE else '' }}">{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
-        <td data-col="days_since" data-sort="{{ rnd.days_since_initial if rnd.days_since_initial is not none else '' }}">{{ (rnd.days_since_initial ~ " days") if rnd.days_since_initial is not none else "--" }}</td>
+        <td data-col="days_since" data-sort="{{ rnd.days_since_last_sms if rnd.days_since_last_sms is not none else '' }}">{{ (rnd.days_since_last_sms ~ " days") if rnd.days_since_last_sms is not none else "--" }}</td>
         <td data-col="sms">{{ rnd.run.sms_sent }}</td>
         <td data-col="replies">{{ rnd.run.replies }}</td>
         <td data-col="reply_rate" title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate * 100) }}%</td>
