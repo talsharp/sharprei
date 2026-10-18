@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import config
-from app.comps import RENTCAST_FREE_CALLS, calls_this_month, fill_from_rentcast, parse_input, split_links
+from app.comps import RENTCAST_FREE_CALLS, calls_this_month, fill_house, parse_input, split_links
 from app.database import get_db
 from app.models import CompAnalysis, CompHouse
 
@@ -67,8 +67,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         house = CompHouse(analysis=analysis, is_subject=True, address=address, zillow_url=url)
         db.add(house)
         db.flush()
-        fill_from_rentcast(db, house)
-        # My house isn't sold - a "last sale" from public records would only confuse the table.
+        fill_house(db, house)
+        # My house isn't sold - a "last sale" from records would only confuse the table.
         house.sold_price = house.sold_date = house.listed_date = house.days_on_market_manual = None
         db.commit()
         return RedirectResponse(f"/tools/comps/{analysis.id}", status_code=303)
@@ -117,7 +117,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             house = CompHouse(analysis=analysis, address=address, zillow_url=url, position=last)
             db.add(house)
             db.flush()
-            fill_from_rentcast(db, house)
+            fill_house(db, house)
             if url:
                 existing.add(url)
             added += 1
@@ -155,7 +155,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         house = db.get(CompHouse, house_id)
         if not house:
             return RedirectResponse("/tools/comps", status_code=303)
-        fill_from_rentcast(db, house, overwrite=True)
+        fill_house(db, house, overwrite=True)
         if house.is_subject:
             house.sold_price = house.sold_date = house.listed_date = house.days_on_market_manual = None
         db.commit()

@@ -1,8 +1,5 @@
 <p class="muted" style="font-size:12px; margin:10px 0 0;">
-{% if usage.configured %}
-  Details are looked up automatically from RentCast (Zillow doesn't allow automatic reading) - check them against Zillow and edit anything.
-  Lookups this month: <strong>{{ usage.calls }}</strong> of {{ usage.free }} free · each house uses 2.
-{% else %}
-  Automatic lookup isn't set up yet, so the details are entered by hand for now. The Zillow link is kept so you can open the house in one click.
-{% endif %}
+  Beds, baths, sqft, year built and the last recorded sale fill in from Allegheny County's public property records (free).
+  Zillow doesn't allow automatic reading, so type <strong>days on market</strong> yourself, and check the numbers against Zillow - very recent sales can take a month or two to reach the county records.
+  {% if usage.configured %}RentCast is used only for houses the county doesn't have · lookups this month: {{ usage.calls }} of {{ usage.free }} free.{% endif %}
 </p>

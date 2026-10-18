@@ -32,7 +32,7 @@
         {% if h.zillow_url %}<a class="comp-zillow" href="{{ h.zillow_url }}" target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>{% endif %}
         {% if editable %}
         <div class="comp-actions">
-          <form method="post" action="/tools/comps/houses/{{ h.id }}/refresh" title="Look up this address again in RentCast and replace the details (uses 2 lookups)">
+          <form method="post" action="/tools/comps/houses/{{ h.id }}/refresh" title="Look this address up again in the county records and replace the details">
             <button type="submit" class="secondary small">Refresh data</button>
           </form>
           {% if not h.is_subject %}
