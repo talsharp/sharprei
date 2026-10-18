@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "_comps_table.html" as ct %}
+{% block title %}Comps{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Comps</h2>
+    <p class="page-subtitle">Compare your house with sold comps and settle on an ARV</p>
+  </div>
+</div>
+
+{% if error == "address" %}
+<div class="card login-error" style="margin-bottom:16px;">Couldn't find an address in that. Paste the Zillow link of the house (zillow.com/homedetails/...) or type the address.</div>
+{% endif %}
+
+<div class="card">
+  <h3>New comp analysis</h3>
+  <form method="post" action="/tools/comps/new" class="comps-paste-form">
+    <input type="text" name="link" placeholder="Paste the Zillow link of your house (or type its address)" required autofocus>
+    <button type="submit">Start</button>
+  </form>
+  {% include "_comps_usage.html" %}
+</div>
+
+<table class="sticky-table">
+  <thead><tr><th>My house</th><th>Comps</th><th>Low ARV</th><th>Avg. ARV</th><th>High ARV</th><th>Updated</th><th>Share link</th></tr></thead>
+  <tbody>
+    {% for a in analyses %}
+    <tr>
+      <td><a class="zip-link" href="/tools/comps/{{ a.id }}">{{ a.subject.address if a.subject else "(no address)" }}</a></td>
+      <td>{{ a.comps|length }}</td>
+      <td>{{ ct.money(a.arv_low) }}</td>
+      <td><strong>{{ ct.money(a.arv_avg) }}</strong></td>
+      <td>{{ ct.money(a.arv_high) }}</td>
+      <td class="muted">{{ a.updated_at.strftime('%b %d, %Y') }}</td>
+      <td>{% if a.share_token %}<span class="badge deal-closed">On</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="muted" style="text-align:center; padding:24px;">No comp analyses yet. Paste your house's Zillow link above to start.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

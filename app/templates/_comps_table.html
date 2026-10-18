@@ -1,0 +1,118 @@
+{# The comparison table: my house + comps as columns. `editable` = inputs that autosave. #}
+{% macro money(v) %}{% if v is none %}—{% else %}${{ "{:,.0f}".format(v|float) }}{% endif %}{% endmacro %}
+{% macro num(v) %}{% if v is none %}—{% else %}{{ "{:g}".format(v|float) }}{% endif %}{% endmacro %}
+
+{% macro diff(h, s, field, kind="count") %}
+  {%- if s and not h.is_subject and h[field] is not none and s[field] is not none -%}
+    {%- set d = (h[field]|float) - (s[field]|float) -%}
+    {%- if kind == "pct" and (s[field]|float) > 0 -%}
+      {%- set p = d / (s[field]|float) * 100 -%}
+      {%- if p|abs >= 5 %}<span class="comp-diff {{ 'up' if p > 0 else 'down' }}">{{ "%+.0f"|format(p) }}%</span>{% endif -%}
+    {%- elif kind == "count" and d != 0 -%}
+      <span class="comp-diff {{ 'up' if d > 0 else 'down' }}">{{ "%+g"|format(d) }}</span>
+    {%- endif -%}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro comps_table(a, editable) %}
+{% set s = a.subject %}
+<div class="comps-scroll">
+<table class="comps-table">
+  <thead>
+    <tr>
+      <th class="comps-rowhead"></th>
+      {% for h in a.houses %}
+      <th class="{{ 'comp-subject' if h.is_subject }}" data-house="{{ h.id }}">
+        <div class="comp-tag">{{ "My house" if h.is_subject else "Comp " ~ loop.index0 }}</div>
+        {% if editable %}
+        <textarea class="comp-address" data-field="address" rows="2" aria-label="Address">{{ h.address }}</textarea>
+        {% else %}
+        <div class="comp-address-text">{{ h.address }}</div>
+        {% endif %}
+        {% if h.zillow_url %}<a class="comp-zillow" href="{{ h.zillow_url }}" target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>{% endif %}
+        {% if editable %}
+        <div class="comp-actions">
+          <form method="post" action="/tools/comps/houses/{{ h.id }}/refresh" title="Look up this address again in RentCast and replace the details (uses 2 lookups)">
+            <button type="submit" class="secondary small">Refresh data</button>
+          </form>
+          {% if not h.is_subject %}
+          <form method="post" action="/tools/comps/houses/{{ h.id }}/delete">
+            <button type="submit" class="secondary small">Remove</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if h.lookup_note %}<div class="comp-note">{{ h.lookup_note }}</div>{% endif %}
+        {% endif %}
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% set rows = [
+      ("bedrooms", "Bedrooms", "number", "count"),
+      ("bathrooms", "Bathrooms", "number", "count"),
+      ("sqft", "Sqft", "number", "pct"),
+      ("year_built", "Year built", "number", "none"),
+      ("sold_price", "Sold price", "money", "none"),
+      ("sold_date", "Sold date", "date", "none"),
+      ("listed_date", "Listed date", "date", "none"),
+      ("days_on_market", "Days on market", "dom", "none"),
+    ] %}
+    {% for field, label, kind, diffkind in rows %}
+    <tr class="{{ 'comp-sale-row' if kind in ('money', 'date', 'dom') }}">
+      <th class="comps-rowhead">{{ label }}</th>
+      {% for h in a.houses %}
+      <td class="{{ 'comp-subject' if h.is_subject }}" data-house="{{ h.id }}">
+        {% if h.is_subject and kind in ("money", "date", "dom") %}
+          <span class="muted">—</span>
+        {% elif kind == "dom" %}
+          {% set auto = h.listed_date and h.sold_date %}
+          {% if editable %}
+          <span class="comp-dom" {{ 'hidden' if not auto }}>{{ h.days_on_market if auto else '' }} days</span>
+          <input type="number" min="0" class="comp-input comp-dom-input" data-field="days_on_market_manual" value="{{ h.days_on_market_manual if h.days_on_market_manual is not none else '' }}" placeholder="days" {{ 'hidden' if auto }} title="Fill in the listed and sold dates and this is counted for you">
+          {% else %}
+          {{ (h.days_on_market ~ " days") if h.days_on_market is not none else "—" }}
+          {% endif %}
+        {% elif editable %}
+          {% if kind == "date" %}
+          <input type="date" class="comp-input" data-field="{{ field }}" value="{{ h[field].isoformat() if h[field] else '' }}">
+          {% else %}
+          <input type="text" inputmode="decimal" class="comp-input{{ ' comp-money' if kind == 'money' }}" data-field="{{ field }}"
+                 value="{% if h[field] is not none %}{{ '{:,.0f}'.format(h[field]|float) if kind == 'money' else '{:g}'.format(h[field]|float) }}{% endif %}"
+                 placeholder="{{ '$' if kind == 'money' else '' }}">
+          {% endif %}
+          {{ diff(h, s, field, diffkind) }}
+        {% else %}
+          {% if kind == "money" %}{{ money(h[field]) }}{% elif kind == "date" %}{{ h[field].strftime('%b %d, %Y') if h[field] else "—" }}{% elif field == "year_built" %}{{ h[field] or "—" }}{% elif field == "sqft" %}{{ "{:,}".format(h[field]) if h[field] else "—" }}{% else %}{{ num(h[field]) }}{% endif %}
+          {{ diff(h, s, field, diffkind) }}
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% for field, label in [("pros", "Pros"), ("cons", "Cons")] %}
+    <tr>
+      <th class="comps-rowhead">{{ label }}</th>
+      {% for h in a.houses %}
+      <td class="{{ 'comp-subject' if h.is_subject }} comp-text-cell" data-house="{{ h.id }}">
+        {% if editable %}
+        <textarea class="comp-input comp-text" data-field="{{ field }}" rows="3" placeholder="{{ 'e.g. garage, updated kitchen' if field == 'pros' else 'e.g. no basement, busy street' }}">{{ h[field] or '' }}</textarea>
+        {% else %}
+        <div class="comp-text-view">{{ h[field] or "—" }}</div>
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{% macro arv_view(a) %}
+<div class="arv-boxes">
+  <div class="arv-box"><div class="label">Low ARV</div><div class="value">{{ money(a.arv_low) }}</div></div>
+  <div class="arv-box main"><div class="label">Avg. ARV</div><div class="value">{{ money(a.arv_avg) }}</div></div>
+  <div class="arv-box"><div class="label">High ARV</div><div class="value">{{ money(a.arv_high) }}</div></div>
+</div>
+{% endmacro %}

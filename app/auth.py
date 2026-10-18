@@ -12,7 +12,8 @@ from app.audit import current_user_email, log_event
 from app.database import SessionLocal
 from app.models import User
 
-PUBLIC_PATHS = ("/login", "/auth/", "/static/", "/health", "/favicon.ico")
+# "/c/" = read-only comp analyses shared by link (unguessable token).
+PUBLIC_PATHS = ("/login", "/auth/", "/static/", "/health", "/favicon.ico", "/c/")
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 oauth = OAuth()

@@ -1,0 +1,8 @@
+<p class="muted" style="font-size:12px; margin:10px 0 0;">
+{% if usage.configured %}
+  Details are looked up automatically from RentCast (Zillow doesn't allow automatic reading) - check them against Zillow and edit anything.
+  Lookups this month: <strong>{{ usage.calls }}</strong> of {{ usage.free }} free · each house uses 2.
+{% else %}
+  Automatic lookup isn't set up yet, so the details are entered by hand for now. The Zillow link is kept so you can open the house in one click.
+{% endif %}
+</p>

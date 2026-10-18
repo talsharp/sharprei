@@ -11,6 +11,8 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 OWNER_EMAILS = {e.strip().lower() for e in os.environ.get("OWNER_EMAIL", "").split(",") if e.strip()}
 BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")
+# Property data lookups for Tools › Comps (rentcast.io). Without it, comps are entered by hand.
+RENTCAST_API_KEY = os.environ.get("RENTCAST_API_KEY", "").strip()
 
 if len(SECRET_KEY) < 32:
     raise RuntimeError("SECRET_KEY is missing or too short - set it in .env (or the host's environment settings).")

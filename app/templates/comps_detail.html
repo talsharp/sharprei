@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% import "_comps_table.html" as ct %}
+{% block title %}Comps · {{ a.subject.address if a.subject else '' }}{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">{{ a.subject.address if a.subject else "Comp analysis" }}</h2>
+    <p class="page-subtitle">{{ a.comps|length }} comp{{ "s" if a.comps|length != 1 else "" }} · everything saves as you type</p>
+  </div>
+  <a class="btn secondary" href="/tools/comps">All comps</a>
+</div>
+
+{% if error == "address" %}
+<div class="card login-error" style="margin-bottom:16px;">Couldn't find an address in that. Paste the comp's Zillow link (zillow.com/homedetails/...) or type the address.</div>
+{% endif %}
+
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card" style="margin-bottom:0;">
+    <h3>ARV</h3>
+    <form id="arv-form" class="arv-form" data-url="/tools/comps/{{ a.id }}">
+      <label>Low ARV<input type="text" inputmode="decimal" name="arv_low" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_low|float) if a.arv_low is not none else '' }}" placeholder="$"></label>
+      <label class="main">Avg. ARV<input type="text" inputmode="decimal" name="arv_avg" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_avg|float) if a.arv_avg is not none else '' }}" placeholder="$"></label>
+      <label>High ARV<input type="text" inputmode="decimal" name="arv_high" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_high|float) if a.arv_high is not none else '' }}" placeholder="$"></label>
+      <label class="wide">Notes<textarea name="notes" rows="2" placeholder="Anything about the ARV or the area">{{ a.notes or '' }}</textarea></label>
+    </form>
+    <span class="muted save-flash" id="arv-saved" hidden>✓ Saved</span>
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <h3>Share link</h3>
+    {% if share_url %}
+    <p class="muted" style="font-size:13px; margin-top:0;">Anyone with this link can view this comp analysis (read-only, no login). Paste it into your other system.</p>
+    <div class="share-row">
+      <input type="text" id="share-url" value="{{ share_url }}" readonly onclick="this.select()">
+      <button type="button" id="copy-share">Copy</button>
+      <a class="btn secondary" href="{{ share_url }}" target="_blank" rel="noopener">Open</a>
+    </div>
+    <form method="post" action="/tools/comps/{{ a.id }}/share" style="margin-top:10px;">
+      <input type="hidden" name="on" value="0">
+      <button type="submit" class="secondary small">Turn link off</button>
+    </form>
+    {% else %}
+    <p class="muted" style="font-size:13px; margin-top:0;">Create a read-only link to this analysis that opens without logging in - for saving in your other system. You can turn it off anytime.</p>
+    <form method="post" action="/tools/comps/{{ a.id }}/share"><button type="submit">Create share link</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" id="table">
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+    <h3 style="margin:0;">Comparison</h3>
+    <form method="post" action="/tools/comps/{{ a.id }}/houses/new" class="comps-paste-form" style="flex:1; max-width:620px;">
+      <input type="text" name="link" placeholder="Paste a comp's Zillow link (or type its address)" required>
+      <button type="submit">Add comp</button>
+    </form>
+  </div>
+  {{ ct.comps_table(a, True) }}
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Green / red tags compare each comp with your house. Days on market = sold date − listed date.</p>
+  {% include "_comps_usage.html" %}
+</div>
+
+<form method="post" action="/tools/comps/{{ a.id }}/delete" onsubmit="return confirm('Delete this whole comp analysis?');" style="margin-top:8px;">
+  <button type="submit" class="danger small">Delete analysis</button>
+</form>
+
+<script>
+(function() {
+  function post(url, data) {
+    var body = new URLSearchParams();
+    Object.keys(data).forEach(function(k) { body.append(k, data[k]); });
+    return fetch(url, {method: 'POST', body: body})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r; })
+      .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
+  }
+  function flash(el) { el.classList.add('saved'); setTimeout(function() { el.classList.remove('saved'); }, 900); }
+
+  // Table cells: save the field when it changes.
+  document.querySelectorAll('.comps-table [data-field]').forEach(function(input) {
+    var cell = input.closest('[data-house]');
+    input.addEventListener('change', function() {
+      var data = {}; data[input.dataset.field] = input.value;
+      post('/tools/comps/houses/' + cell.dataset.house, data).then(function(r) { return r.json(); }).then(function(res) {
+        flash(input);
+        // Recount days on market for this house when its dates change.
+        var col = document.querySelectorAll('.comps-table [data-house="' + cell.dataset.house + '"]');
+        col.forEach(function(c) {
+          var dom = c.querySelector('.comp-dom'), domInput = c.querySelector('.comp-dom-input');
+          if (!dom) return;
+          var listed = document.querySelector('.comps-table [data-house="' + cell.dataset.house + '"] [data-field="listed_date"]');
+          var sold = document.querySelector('.comps-table [data-house="' + cell.dataset.house + '"] [data-field="sold_date"]');
+          var auto = listed && sold && listed.value && sold.value;
+          dom.hidden = !auto; domInput.hidden = !!auto;
+          if (auto) dom.textContent = (res.days_on_market != null ? res.days_on_market : '—') + ' days';
+        });
+      });
+    });
+  });
+
+  // ARV + notes.
+  var arv = document.getElementById('arv-form'), saved = document.getElementById('arv-saved');
+  arv.querySelectorAll('input, textarea').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var data = {}; data[input.name] = input.value;
+      post(arv.dataset.url, data).then(function() {
+        flash(input); saved.hidden = false; setTimeout(function() { saved.hidden = true; }, 1500);
+      });
+    });
+  });
+
+  // Money fields: show 185,000 while typing stays free-form.
+  document.querySelectorAll('.comp-money').forEach(function(input) {
+    input.addEventListener('blur', function() {
+      var n = parseFloat(input.value.replace(/[$,\s]/g, ''));
+      if (!isNaN(n)) input.value = n.toLocaleString('en-US', {maximumFractionDigits: 0});
+    });
+  });
+
+  var copy = document.getElementById('copy-share');
+  if (copy) copy.addEventListener('click', function() {
+    var field = document.getElementById('share-url');
+    field.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(field.value) : Promise.reject()).catch(function() { document.execCommand('copy'); });
+    copy.textContent = 'Copied ✓'; setTimeout(function() { copy.textContent = 'Copy'; }, 1500);
+  });
+})();
+</script>
+
+{% endblock %}

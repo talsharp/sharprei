@@ -552,5 +552,78 @@ class Task(Base):
     label: Mapped[Optional[TaskLabel]] = relationship()
 
 
+class CompAnalysis(Base):
+    """Tools › Comps: one house being valued ("my house") and the comps for it."""
+    __tablename__ = "comp_analyses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    arv_low: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    arv_avg: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    arv_high: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Read-only public page at /c/<token>; None = link turned off.
+    share_token: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    houses: Mapped[list["CompHouse"]] = relationship(
+        back_populates="analysis", cascade="all, delete-orphan",
+        order_by="(CompHouse.is_subject.desc(), CompHouse.position, CompHouse.id)",
+    )
+
+    @property
+    def subject(self) -> Optional["CompHouse"]:
+        return next((h for h in self.houses if h.is_subject), None)
+
+    @property
+    def comps(self) -> list["CompHouse"]:
+        return [h for h in self.houses if not h.is_subject]
+
+
+class CompHouse(Base):
+    """A house in a comp analysis - the subject ("my house") or one comp."""
+    __tablename__ = "comp_houses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("comp_analyses.id"), index=True)
+    is_subject: Mapped[bool] = mapped_column(Boolean, default=False)
+    position: Mapped[int] = mapped_column(default=0)
+    address: Mapped[str] = mapped_column(String(255))
+    zillow_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    bedrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
+    bathrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
+    sqft: Mapped[Optional[int]] = mapped_column(nullable=True)
+    year_built: Mapped[Optional[int]] = mapped_column(nullable=True)
+    sold_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    sold_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    listed_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Used only when the listed or sold date is unknown; otherwise days on
+    # market is sold date - listed date.
+    days_on_market_manual: Mapped[Optional[int]] = mapped_column(nullable=True)
+    pros: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cons: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    lookup_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    analysis: Mapped[CompAnalysis] = relationship(back_populates="houses")
+
+    @property
+    def days_on_market(self) -> Optional[int]:
+        if self.listed_date and self.sold_date and self.sold_date >= self.listed_date:
+            return (self.sold_date - self.listed_date).days
+        return self.days_on_market_manual
+
+
+class ApiUsage(Base):
+    """Paid API calls per month (e.g. RentCast lookups), to keep an eye on cost."""
+    __tablename__ = "api_usage"
+    __table_args__ = (UniqueConstraint("service", "month"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    service: Mapped[str] = mapped_column(String(40))
+    month: Mapped[date] = mapped_column(Date)
+    calls: Mapped[int] = mapped_column(default=0)
+
+
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401

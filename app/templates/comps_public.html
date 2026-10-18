@@ -1,0 +1,28 @@
+{% import "_comps_table.html" as ct %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Comps · {{ a.subject.address if a.subject else '' }}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ STATIC_VERSION }}">
+  <link rel="stylesheet" href="/static/style.css?v={{ STATIC_VERSION }}">
+</head>
+<body class="public-page">
+  <main class="public-main">
+    <div class="public-brand"><span class="logo-sharp">Sharp</span><span class="logo-rei">REI</span> <span class="muted">· Comp analysis</span></div>
+    <h1 class="page-title" style="margin:6px 0 2px;">{{ a.subject.address if a.subject else "Comp analysis" }}</h1>
+    <p class="page-subtitle">{{ a.comps|length }} comp{{ "s" if a.comps|length != 1 else "" }} · updated {{ a.updated_at.strftime('%b %d, %Y') }}</p>
+
+    <div class="card">{{ ct.arv_view(a) }}
+      {% if a.notes %}<p class="public-notes">{{ a.notes }}</p>{% endif %}
+    </div>
+
+    <div class="card">
+      {{ ct.comps_table(a, False) }}
+      <p class="muted" style="font-size:12px; margin:10px 0 0;">Days on market = sold date − listed date. Tags compare each comp with the subject house.</p>
+    </div>
+  </main>
+</body>
+</html>
