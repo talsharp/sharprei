@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import config
-from app.comps import RENTCAST_FREE_CALLS, calls_this_month, fill_from_rentcast, parse_input
+from app.comps import RENTCAST_FREE_CALLS, calls_this_month, fill_from_rentcast, parse_input, split_links
 from app.database import get_db
 from app.models import CompAnalysis, CompHouse
 
@@ -100,21 +100,33 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         return Response(status_code=204)
 
     @router.post("/tools/comps/{analysis_id}/houses/new")
-    def comps_add_house(analysis_id: int, link: str = Form(""), db: Session = Depends(get_db)):
+    def comps_add_houses(analysis_id: int, links: str = Form(""), db: Session = Depends(get_db)):
+        """Adds every comp pasted at once (Zillow links, or one address per line)."""
         analysis = db.get(CompAnalysis, analysis_id)
         if not analysis:
             return RedirectResponse("/tools/comps", status_code=303)
-        address, url = parse_input(link)
-        if not address:
-            return RedirectResponse(f"/tools/comps/{analysis_id}?error=address#table", status_code=303)
-        last = db.query(func.max(CompHouse.position)).filter(CompHouse.analysis_id == analysis_id).scalar()
-        house = CompHouse(analysis=analysis, address=address, zillow_url=url, position=(last or 0) + 1)
-        db.add(house)
-        db.flush()
-        fill_from_rentcast(db, house)
-        analysis.updated_at = datetime.utcnow()
+        last = db.query(func.max(CompHouse.position)).filter(CompHouse.analysis_id == analysis_id).scalar() or 0
+        existing = {h.zillow_url for h in analysis.houses if h.zillow_url}
+        added = skipped = 0
+        for item in split_links(links)[:20]:
+            address, url = parse_input(item)
+            if not address or (url and url in existing):
+                skipped += 1
+                continue
+            last += 1
+            house = CompHouse(analysis=analysis, address=address, zillow_url=url, position=last)
+            db.add(house)
+            db.flush()
+            fill_from_rentcast(db, house)
+            if url:
+                existing.add(url)
+            added += 1
+        if added:
+            analysis.updated_at = datetime.utcnow()
         db.commit()
-        return RedirectResponse(f"/tools/comps/{analysis_id}#table", status_code=303)
+        if not added:
+            return RedirectResponse(f"/tools/comps/{analysis_id}?error=address#table", status_code=303)
+        return RedirectResponse(f"/tools/comps/{analysis_id}?added={added}&skipped={skipped}#table", status_code=303)
 
     @router.post("/tools/comps/houses/{house_id}")
     async def comps_update_house(house_id: int, request: Request, db: Session = Depends(get_db)):

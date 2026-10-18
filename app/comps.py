@@ -48,6 +48,15 @@ def parse_input(text: str) -> Tuple[str, Optional[str]]:
     return address_from_slug(match.group(1)), url.split("?")[0][:500]
 
 
+def split_links(text: str) -> list:
+    """Several pasted comps at once: every Zillow link in the text, or - if there
+    are none - one address per line."""
+    links = re.findall(r"(?:https?://)?(?:www\.)?zillow\.com/homedetails/[^\s,;\"'<>]+", text or "", flags=re.I)
+    if links:
+        return links
+    return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
 def address_from_slug(slug: str) -> str:
     tokens = [t for t in slug.split("-") if t]
     # "1319-1-2-North-Ave" is 1319 1/2 North Ave.

@@ -548,3 +548,7 @@ a.filter-chip { display: inline-block; text-decoration: none; }
   .comps-paste-form, .share-row { flex-wrap: wrap; }
   .arv-box .value { font-size: 20px; }
 }
+.comps-multi-form { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.comps-multi-form textarea { flex: 1; min-width: 0; font-size: 13px; resize: vertical; }
+.comps-multi-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+@media (max-width: 700px) { .comps-multi-form { flex-direction: column; } }
