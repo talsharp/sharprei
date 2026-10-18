@@ -170,6 +170,13 @@ class Property(Base):
     tenant_move_in_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     account_balance: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Utility providers (the tenant pays them; kept for reference).
+    electric_company: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    electric_account: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    gas_company: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    gas_account: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    water_company: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    water_account: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

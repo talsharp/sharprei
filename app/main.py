@@ -605,8 +605,37 @@ def property_detail(request: Request, property_id: int, db: Session = Depends(ge
             "this_month": date.today().replace(day=1).strftime("%Y-%m"),
             "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
             "max_mb": MAX_FILE_MB,
+            "utility_companies": _utility_companies(db),
         },
     )
+
+
+UTILITIES = [("electric", "Electric"), ("gas", "Gas"), ("water", "Water")]
+templates.env.globals["UTILITIES"] = UTILITIES
+
+
+def _utility_companies(db: Session) -> dict:
+    """Company names already used on any property, per utility - suggested as you type."""
+    names = {key: set() for key, _ in UTILITIES}
+    for prop in db.query(Property).all():
+        for key, _ in UTILITIES:
+            value = getattr(prop, f"{key}_company")
+            if value:
+                names[key].add(value)
+    return {key: sorted(values) for key, values in names.items()}
+
+
+@app.post("/rentals/{property_id}/utilities")
+async def update_utilities(property_id: int, request: Request, db: Session = Depends(get_db)):
+    prop = db.get(Property, property_id)
+    if not prop:
+        return Response(status_code=404)
+    form = await request.form()
+    for key, _ in UTILITIES:
+        setattr(prop, f"{key}_company", (form.get(f"{key}_company") or "").strip()[:120] or None)
+        setattr(prop, f"{key}_account", (form.get(f"{key}_account") or "").strip()[:80] or None)
+    db.commit()
+    return Response(status_code=204)
 
 
 @app.post("/rentals/{property_id}/files")

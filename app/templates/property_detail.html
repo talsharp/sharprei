@@ -70,6 +70,32 @@
   </form>
 </div>
 
+<div class="card">
+  <h3>Utilities <span class="muted" style="font-weight:400; font-size:13px;">· paid by the tenant</span></h3>
+  <form id="utilities-form" hx-post="/rentals/{{ prop.id }}/utilities" hx-swap="none"
+        hx-on::after-request="if(event.detail.successful){var s=document.getElementById('utilities-saved'); s.hidden=false; setTimeout(function(){s.hidden=true;}, 2000);}">
+    <table class="utilities-table">
+      <thead><tr><th>Utility</th><th>Company</th><th>Account number</th></tr></thead>
+      <tbody>
+        {% for key, label in UTILITIES %}
+        <tr>
+          <td><strong>{{ label }}</strong></td>
+          <td>
+            <input type="text" name="{{ key }}_company" value="{{ prop[key ~ '_company'] or '' }}" list="{{ key }}-companies" maxlength="120" placeholder="Company name">
+            <datalist id="{{ key }}-companies">{% for n in utility_companies[key] %}<option value="{{ n }}"></option>{% endfor %}</datalist>
+          </td>
+          <td><input type="text" name="{{ key }}_account" value="{{ prop[key ~ '_account'] or '' }}" maxlength="80" placeholder="Account #"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
+      <button type="submit">Save utilities</button>
+      <span id="utilities-saved" class="profit-up" style="font-size:13px; font-weight:600;" hidden>✓ Saved</span>
+    </div>
+  </form>
+</div>
+
 {% import "_files_macros.html" as fl %}
 {{ fl.files_card(prop.files, "/rentals/" ~ prop.id ~ "/files", too_big, max_mb, "No files yet. Upload the purchase documents, deed, insurance, leases, management agreement - anything for this property.", collapsible=True) }}
 

@@ -489,3 +489,9 @@ a.filter-chip { display: inline-block; text-decoration: none; }
   .task-pill { font-size: 12px; padding: 0 4px; }
   .task-drawer { padding: 14px 16px; }
 }
+
+/* Rentals › utilities */
+.utilities-table { width: 100%; max-width: 760px; }
+.utilities-table td { padding: 6px 10px 6px 0; }
+.utilities-table input[type=text] { width: 100%; }
+.utilities-table td:first-child { width: 90px; }
