@@ -6,7 +6,7 @@
 <div class="top-actions">
   <div>
     <h2 class="page-title">{{ a.subject.address if a.subject else "Comp analysis" }}</h2>
-    <p class="page-subtitle">{{ a.comps|length }} comp{{ "s" if a.comps|length != 1 else "" }} · everything saves as you type</p>
+    <p class="page-subtitle">{{ a.comps|length }} comp{{ "s" if a.comps|length != 1 else "" }} · {% if a.saved_at %}saved {{ a.saved_at.strftime('%b %d, %Y') }}{% else %}draft - click Save at the bottom when done{% endif %}</p>
   </div>
   <a class="btn secondary" href="/tools/comps">All comps</a>
 </div>
@@ -14,38 +14,6 @@
 {% if error == "address" %}
 <div class="card login-error" style="margin-bottom:16px;">Couldn't find an address in that. Paste the comp's Zillow link (zillow.com/homedetails/...) or type the address.</div>
 {% endif %}
-
-<div class="grid-2" style="margin-bottom:20px;">
-  <div class="card" style="margin-bottom:0;">
-    <h3>ARV</h3>
-    <form id="arv-form" class="arv-form" data-url="/tools/comps/{{ a.id }}">
-      <label>Low ARV<input type="text" inputmode="decimal" name="arv_low" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_low|float) if a.arv_low is not none else '' }}" placeholder="$"></label>
-      <label class="main">Avg. ARV<input type="text" inputmode="decimal" name="arv_avg" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_avg|float) if a.arv_avg is not none else '' }}" placeholder="$"></label>
-      <label>High ARV<input type="text" inputmode="decimal" name="arv_high" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_high|float) if a.arv_high is not none else '' }}" placeholder="$"></label>
-      <label class="wide">Notes<textarea name="notes" rows="2" placeholder="Anything about the ARV or the area">{{ a.notes or '' }}</textarea></label>
-    </form>
-    <span class="muted save-flash" id="arv-saved" hidden>✓ Saved</span>
-  </div>
-
-  <div class="card" style="margin-bottom:0;">
-    <h3>Share link</h3>
-    {% if share_url %}
-    <p class="muted" style="font-size:13px; margin-top:0;">Anyone with this link can view this comp analysis (read-only, no login). Paste it into your other system.</p>
-    <div class="share-row">
-      <input type="text" id="share-url" value="{{ share_url }}" readonly onclick="this.select()">
-      <button type="button" id="copy-share">Copy</button>
-      <a class="btn secondary" href="{{ share_url }}" target="_blank" rel="noopener">Open</a>
-    </div>
-    <form method="post" action="/tools/comps/{{ a.id }}/share" style="margin-top:10px;">
-      <input type="hidden" name="on" value="0">
-      <button type="submit" class="secondary small">Turn link off</button>
-    </form>
-    {% else %}
-    <p class="muted" style="font-size:13px; margin-top:0;">Create a read-only link to this analysis that opens without logging in - for saving in your other system. You can turn it off anytime.</p>
-    <form method="post" action="/tools/comps/{{ a.id }}/share"><button type="submit">Create share link</button></form>
-    {% endif %}
-  </div>
-</div>
 
 <div class="card" id="table">
   <h3>Comparison</h3>
@@ -64,18 +32,58 @@
   {% include "_comps_usage.html" %}
 </div>
 
-<form method="post" action="/tools/comps/{{ a.id }}/delete" onsubmit="return confirm('Delete this whole comp analysis?');" style="margin-top:8px;">
-  <button type="submit" class="danger small">Delete analysis</button>
-</form>
+
+  <div class="card">
+    <h3>ARV</h3>
+    <form id="arv-form" class="arv-form" data-url="/tools/comps/{{ a.id }}">
+      <label>Low ARV<input type="text" inputmode="decimal" name="arv_low" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_low|float) if a.arv_low is not none else '' }}" placeholder="$"></label>
+      <label class="main">Avg. ARV<input type="text" inputmode="decimal" name="arv_avg" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_avg|float) if a.arv_avg is not none else '' }}" placeholder="$"></label>
+      <label>High ARV<input type="text" inputmode="decimal" name="arv_high" class="comp-money" value="{{ '{:,.0f}'.format(a.arv_high|float) if a.arv_high is not none else '' }}" placeholder="$"></label>
+      <label class="wide">Notes<textarea name="notes" rows="2" placeholder="Anything about the ARV or the area">{{ a.notes or '' }}</textarea></label>
+    </form>
+    <span class="muted save-flash" id="arv-saved" hidden>✓ Saved</span>
+  </div>
+
+  <div class="card" id="share">
+    <h3>Share link</h3>
+    {% if share_url %}
+    <p class="muted" style="font-size:13px; margin-top:0;">Anyone with this link can view this comp analysis (read-only, no login). Paste it into your other system.</p>
+    <div class="share-row">
+      <input type="text" id="share-url" value="{{ share_url }}" readonly onclick="this.select()">
+      <button type="button" id="copy-share">Copy</button>
+      <a class="btn secondary" href="{{ share_url }}" target="_blank" rel="noopener">Open</a>
+    </div>
+    <form method="post" action="/tools/comps/{{ a.id }}/share?next=detail" style="margin-top:10px;">
+      <input type="hidden" name="on" value="0">
+      <button type="submit" class="secondary small">Turn link off</button>
+    </form>
+    {% else %}
+    <p class="muted" style="font-size:13px; margin-top:0;">Create a read-only link to this analysis that opens without logging in - for saving in your other system. You can turn it off anytime.</p>
+    <form method="post" action="/tools/comps/{{ a.id }}/share?next=detail"><button type="submit">Create share link</button></form>
+    {% endif %}
+  </div>
+
+<div class="comps-save-bar">
+  <form method="post" action="/tools/comps/{{ a.id }}/save" id="save-form">
+    <button type="submit" id="save-btn">{{ "Save changes" if a.saved_at else "Save" }}</button>
+  </form>
+  <span class="muted" style="font-size:13px;">{% if a.saved_at %}Saved {{ a.saved_at.strftime('%b %d, %Y') }} · {% endif %}Saves everything and takes you to the Comps list.</span>
+  <form method="post" action="/tools/comps/{{ a.id }}/delete" onsubmit="return confirm('Delete this whole comp analysis?');" style="margin-left:auto;">
+    <button type="submit" class="danger small">Delete analysis</button>
+  </form>
+</div>
 
 <script>
 (function() {
+  var pending = [];  // saves in flight - Save waits for them
   function post(url, data) {
     var body = new URLSearchParams();
     Object.keys(data).forEach(function(k) { body.append(k, data[k]); });
-    return fetch(url, {method: 'POST', body: body})
+    var p = fetch(url, {method: 'POST', body: body})
       .then(function(r) { if (!r.ok) throw new Error(r.status); return r; })
       .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
+    pending.push(p);
+    return p;
   }
   function flash(el) { el.classList.add('saved'); setTimeout(function() { el.classList.remove('saved'); }, 900); }
 
@@ -85,6 +93,7 @@
     input.addEventListener('change', function() {
       var data = {}; data[input.dataset.field] = input.value;
       post('/tools/comps/houses/' + cell.dataset.house, data).then(function(r) { return r.json(); }).then(function(res) {
+        input.defaultValue = input.value;
         flash(input);
         // Recount days on market for this house when its dates change.
         var col = document.querySelectorAll('.comps-table [data-house="' + cell.dataset.house + '"]');
@@ -107,6 +116,7 @@
     input.addEventListener('change', function() {
       var data = {}; data[input.name] = input.value;
       post(arv.dataset.url, data).then(function() {
+        input.defaultValue = input.value;
         flash(input); saved.hidden = false; setTimeout(function() { saved.hidden = true; }, 1500);
       });
     });
@@ -129,6 +139,21 @@
     addCount.textContent = n ? n + ' Zillow link' + (n === 1 ? '' : 's') + ' found' : '';
   });
   addForm.addEventListener('submit', function() { addBtn.disabled = true; addBtn.textContent = 'Adding…'; });
+
+  // Save: store the field being edited (if any) before leaving the page.
+  document.getElementById('save-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = this, btn = document.getElementById('save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setTimeout(function() {
+      // Anything still different from what's stored gets saved now.
+      document.querySelectorAll('.comps-table [data-field], #arv-form [name]').forEach(function(input) {
+        if (input.value !== input.defaultValue) input.dispatchEvent(new Event('change'));
+      });
+      Promise.all(pending).then(function() { form.submit(); }, function() { btn.disabled = false; btn.textContent = 'Save'; });
+    }, 50);
+  });
 
   var copy = document.getElementById('copy-share');
   if (copy) copy.addEventListener('click', function() {

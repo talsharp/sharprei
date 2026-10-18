@@ -563,6 +563,7 @@ class CompAnalysis(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Read-only public page at /c/<token>; None = link turned off.
     share_token: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    saved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # None = still a draft
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

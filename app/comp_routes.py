@@ -51,10 +51,12 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     @router.get("/tools/comps")
     def comps_list(request: Request, db: Session = Depends(get_db)):
         analyses = db.query(CompAnalysis).order_by(CompAnalysis.updated_at.desc()).all()
+        base = config.BASE_URL or str(request.base_url).rstrip("/")
         return templates.TemplateResponse(
             "comps_list.html",
             {"request": request, "active": "comps", "analyses": analyses, "usage": _usage(db),
-             "error": request.query_params.get("error")},
+             "share_base": f"{base}/c/", "error": request.query_params.get("error"),
+             "highlight": request.query_params.get("saved") or request.query_params.get("linked")},
         )
 
     @router.post("/tools/comps/new")
@@ -171,13 +173,27 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         db.commit()
         return RedirectResponse(f"/tools/comps/{analysis_id}#table", status_code=303)
 
+    @router.post("/tools/comps/{analysis_id}/save")
+    def comps_save(analysis_id: int, db: Session = Depends(get_db)):
+        analysis = db.get(CompAnalysis, analysis_id)
+        if not analysis:
+            return RedirectResponse("/tools/comps", status_code=303)
+        analysis.saved_at = analysis.updated_at = datetime.utcnow()
+        db.commit()
+        return RedirectResponse(f"/tools/comps?saved={analysis_id}", status_code=303)
+
     @router.post("/tools/comps/{analysis_id}/share")
-    def comps_share(analysis_id: int, on: str = Form("1"), db: Session = Depends(get_db)):
+    def comps_share(analysis_id: int, on: str = Form("1"), next: str = "detail", db: Session = Depends(get_db)):
         analysis = db.get(CompAnalysis, analysis_id)
         if analysis:
-            analysis.share_token = secrets.token_urlsafe(16) if on == "1" else None
+            if on == "1" and not analysis.share_token:
+                analysis.share_token = secrets.token_urlsafe(16)
+            elif on != "1":
+                analysis.share_token = None
             db.commit()
-        return RedirectResponse(f"/tools/comps/{analysis_id}", status_code=303)
+        if next == "list":
+            return RedirectResponse(f"/tools/comps?linked={analysis_id}", status_code=303)
+        return RedirectResponse(f"/tools/comps/{analysis_id}#share", status_code=303)
 
     @router.post("/tools/comps/{analysis_id}/delete")
     def comps_delete(analysis_id: int, db: Session = Depends(get_db)):

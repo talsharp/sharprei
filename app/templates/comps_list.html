@@ -23,23 +23,44 @@
   {% include "_comps_usage.html" %}
 </div>
 
-<table class="sticky-table">
-  <thead><tr><th>My house</th><th>Comps</th><th>Low ARV</th><th>Avg. ARV</th><th>High ARV</th><th>Updated</th><th>Share link</th></tr></thead>
+{% if request.query_params.get('saved') %}
+<div class="card" style="border-color:#A8D5B0; background:#EAF6EC; margin-bottom:16px;"><strong>Saved.</strong> Use <strong>Copy link</strong> to paste it into your other system{% if not (analyses|selectattr('id', 'equalto', request.query_params.get('saved')|int)|map(attribute='share_token')|first) %} - click <strong>Create link</strong> first{% endif %}.</div>
+{% endif %}
+
+<table class="sticky-table comps-list-table">
+  <thead><tr><th>My house</th><th>Comps</th><th>ARV (low · avg · high)</th><th>Status</th><th>Share link</th><th></th></tr></thead>
   <tbody>
     {% for a in analyses %}
-    <tr>
+    <tr class="{{ 'row-highlight' if highlight == a.id|string }}">
       <td><a class="zip-link" href="/tools/comps/{{ a.id }}">{{ a.subject.address if a.subject else "(no address)" }}</a></td>
       <td>{{ a.comps|length }}</td>
-      <td>{{ ct.money(a.arv_low) }}</td>
-      <td><strong>{{ ct.money(a.arv_avg) }}</strong></td>
-      <td>{{ ct.money(a.arv_high) }}</td>
-      <td class="muted">{{ a.updated_at.strftime('%b %d, %Y') }}</td>
-      <td>{% if a.share_token %}<span class="badge deal-closed">On</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if a.arv_avg or a.arv_low or a.arv_high %}<span class="muted">{{ ct.money(a.arv_low) }}</span> · <strong>{{ ct.money(a.arv_avg) }}</strong> · <span class="muted">{{ ct.money(a.arv_high) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if a.saved_at %}<span class="badge deal-closed">Saved</span> <span class="muted" style="font-size:12px;">{{ a.saved_at.strftime('%b %d, %Y') }}</span>{% else %}<span class="badge deal-under_contract">Draft</span>{% endif %}</td>
+      <td style="white-space:nowrap;">
+        {% if a.share_token %}
+        <button type="button" class="small copy-link" data-url="{{ share_base }}{{ a.share_token }}">Copy link</button>
+        <a class="btn secondary small" href="{{ share_base }}{{ a.share_token }}" target="_blank" rel="noopener">View</a>
+        {% else %}
+        <form method="post" action="/tools/comps/{{ a.id }}/share?next=list" style="display:inline;"><button type="submit" class="secondary small">Create link</button></form>
+        {% endif %}
+      </td>
+      <td style="text-align:right;"><a class="btn secondary small" href="/tools/comps/{{ a.id }}">Open</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="7" class="muted" style="text-align:center; padding:24px;">No comp analyses yet. Paste your house's Zillow link above to start.</td></tr>
+    <tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">No comp analyses yet. Paste your house's Zillow link above to start.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+document.querySelectorAll('.copy-link').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var url = btn.dataset.url;
+    function done() { btn.textContent = 'Copied ✓'; setTimeout(function() { btn.textContent = 'Copy link'; }, 1500); }
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function() { window.prompt('Copy this link:', url); });
+    else window.prompt('Copy this link:', url);
+  });
+});
+</script>
 
 {% endblock %}
