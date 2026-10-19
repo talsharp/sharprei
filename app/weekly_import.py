@@ -6,6 +6,14 @@ for that zip's round (confirmed with the user), so this UPSERTS - it
 overwrites the matching CampaignRun's metrics rather than adding a new row
 every week, and creates the round if it doesn't exist yet.
 
+Each tab may also have a "Month Finished" column: a month (date cell or text
+like "March 2026"; with several months, the latest counts) becomes the run's
+date, and "ONGOING" marks the run as still sending - its zip goes on
+Watchlist until every campaign has a finished month, then back to Used
+(Tal: "ongoing" and Watchlist mean the same thing). The file wins over
+months typed by hand; the preview shows every change. "Started month" is
+ignored on purpose.
+
 A zip's follow-up "round number" isn't a stored column anywhere else in the
 app (see app/followups.py) - it's purely "the Nth follow-up CampaignRun for
 that zip, in (run_date, id) order". "Follow up 2" in the workbook means "the
@@ -16,14 +24,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from app.database import UPLOAD_ROOT
-from app.models import CampaignRun, RunType, ZipCode, ZipStatus
+from app.models import UNSET_DATE, CampaignRun, RunType, ZipCode, ZipStatus
 
 UPLOAD_DIR = UPLOAD_ROOT
 
@@ -50,6 +58,7 @@ COLUMN_ALIASES = {
     "leads": ["leads", "lead", "hot lead", "hot leads", "hot"],
     "warm": ["warm", "warm lead", "warm leads"],
     "drip": ["drip", "drips"],
+    "finished": ["month finished", "finished month", "finished", "month ended", "end month", "finish month"],
 }
 
 METRIC_FIELDS = ["sms_sent", "replies", "leads", "warm", "drip"]
@@ -60,6 +69,34 @@ METRIC_LABELS = {
     "warm": "Warm Leads",
     "drip": "Drips",
 }
+
+
+MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], start=1)}
+
+
+def parse_finished(value) -> Tuple[Optional[date], bool]:
+    """The "Month Finished" cell -> (finished month, ongoing).
+    (None, False) = blank or unreadable: leave the run's date alone."""
+    text = str(value or "").strip()
+    if not text or text.lower() in ("nan", "none", "nat"):
+        return None, False
+    if "ongoing" in text.lower():
+        return None, True
+    found = []
+    # Date cells arrive as "2026-03-01 00:00:00"; also accept 3/2026 and 2026-03.
+    for y, m in re.findall(r"(20\d\d)-(\d{1,2})-\d{1,2}", text):
+        found.append(date(int(y), int(m), 1))
+    for m, y in re.findall(r"\b(\d{1,2})/(?:\d{1,2}/)?(20\d\d)\b", text):
+        if 1 <= int(m) <= 12:
+            found.append(date(int(y), int(m), 1))
+    # Month names, typos included ("Februrary 2026"): the first three letters decide.
+    for word, y in re.findall(r"([A-Za-z]{3,})\.?[\s,\-/']*(20\d\d|\d\d)\b", text):
+        month = MONTHS.get(word[:3].lower())
+        if month:
+            year = int(y) if len(y) == 4 else 2000 + int(y)
+            found.append(date(year, month, 1))
+    return (max(found), False) if found else (None, False)
 
 
 def _norm(s: str) -> str:
@@ -127,6 +164,25 @@ class RowChange:
     zip_is_new: bool = False
     campaign_run_id: Optional[int] = None
     warning: Optional[str] = None
+    # From "Month Finished": a month, or ongoing. Both empty = column blank/missing.
+    finished: Optional[date] = None
+    ongoing: bool = False
+    old_date: Optional[date] = None
+    old_ongoing: bool = False
+
+    @property
+    def date_given(self) -> bool:
+        return self.finished is not None or self.ongoing
+
+    @property
+    def date_changes(self) -> bool:
+        if not self.date_given:
+            return False
+        if self.action != "update":
+            return True
+        if self.ongoing:
+            return not self.old_ongoing
+        return self.old_ongoing or self.old_date != self.finished
 
     @property
     def round_label(self) -> str:
@@ -136,7 +192,7 @@ class RowChange:
     def has_changes(self) -> bool:
         if self.action != "update" or self.old_values is None:
             return True
-        return any(self.old_values.get(f) != self.new_values.get(f) for f in METRIC_FIELDS)
+        return self.date_changes or any(self.old_values.get(f) != self.new_values.get(f) for f in METRIC_FIELDS)
 
 
 def build_plan(db: Session, sheets: Dict[str, pd.DataFrame]) -> List[RowChange]:
@@ -190,6 +246,8 @@ def build_plan(db: Session, sheets: Dict[str, pd.DataFrame]) -> List[RowChange]:
                 continue  # blank / summary / total row - not an error, just not a zip row
 
             new_values = {f: parse_int(row.get(col_map.get(f))) for f in METRIC_FIELDS}
+            finished, ongoing = parse_finished(row.get(col_map["finished"])) if col_map.get("finished") else (None, False)
+            dates = {"finished": finished, "ongoing": ongoing}
             zc = db.query(ZipCode).filter(ZipCode.zip_code == zip_val).first()
             zip_is_new = zc is None
 
@@ -211,11 +269,14 @@ def build_plan(db: Session, sheets: Dict[str, pd.DataFrame]) -> List[RowChange]:
                             new_values=new_values,
                             old_values={f: getattr(existing, f) for f in METRIC_FIELDS},
                             campaign_run_id=existing.id,
+                            old_date=_real(existing.run_date),
+                            old_ongoing=existing.ongoing,
+                            **dates,
                         )
                     )
                 else:
                     changes.append(
-                        RowChange(round_key=round_key, zip_code=zip_val, action="create", new_values=new_values, zip_is_new=zip_is_new)
+                        RowChange(round_key=round_key, zip_code=zip_val, action="create", new_values=new_values, zip_is_new=zip_is_new, **dates)
                     )
             else:
                 round_num = int(round_key[-1])
@@ -240,11 +301,14 @@ def build_plan(db: Session, sheets: Dict[str, pd.DataFrame]) -> List[RowChange]:
                             new_values=new_values,
                             old_values={f: getattr(target, f) for f in METRIC_FIELDS},
                             campaign_run_id=target.id,
+                            old_date=_real(target.run_date),
+                            old_ongoing=target.ongoing,
+                            **dates,
                         )
                     )
                 elif follow_up_count(zc, zip_val) == round_num - 1:
                     changes.append(
-                        RowChange(round_key=round_key, zip_code=zip_val, action="create", new_values=new_values, zip_is_new=zip_is_new)
+                        RowChange(round_key=round_key, zip_code=zip_val, action="create", new_values=new_values, zip_is_new=zip_is_new, **dates)
                     )
                     planned_follow_up_count[zip_val] = round_num
                 else:
@@ -292,11 +356,12 @@ def apply_plan(db: Session, changes: List[RowChange]) -> None:
                 continue
             for f in METRIC_FIELDS:
                 setattr(run, f, change.new_values[f])
+            _apply_dates(run, change)
         else:  # create
             run_type = RunType.initial if change.round_key == "initial" else RunType.follow_up
             run = CampaignRun(
                 zip_code_id=zc.id,
-                run_date=date.today(),
+                run_date=date.today().replace(day=1),
                 run_type=run_type,
                 sms_sent=change.new_values["sms_sent"],
                 replies=change.new_values["replies"],
@@ -304,6 +369,7 @@ def apply_plan(db: Session, changes: List[RowChange]) -> None:
                 warm=change.new_values["warm"],
                 drip=change.new_values["drip"],
             )
+            _apply_dates(run, change)
             db.add(run)
             if run_type == RunType.initial:
                 if zc.status == ZipStatus.not_tried:
@@ -311,3 +377,67 @@ def apply_plan(db: Session, changes: List[RowChange]) -> None:
             else:
                 if zc.follow_up_status == ZipStatus.not_tried:
                     zc.follow_up_status = ZipStatus.active
+
+    db.flush()
+    for zc in zip_cache.values():
+        sync_watchlist(db, zc)
+
+
+def _real(d: Optional[date]) -> Optional[date]:
+    return d if d and d != UNSET_DATE else None
+
+
+def _apply_dates(run: CampaignRun, change: RowChange) -> None:
+    if change.ongoing:
+        run.ongoing = True
+    elif change.finished:
+        run.ongoing = False
+        run.run_date = change.finished
+
+
+def sync_watchlist(db: Session, zc: ZipCode) -> Optional[str]:
+    """Watchlist while any campaign of the zip is still sending; back to Used
+    once all have finished. Blacklisted zips are left alone. Returns the new
+    status if it changed."""
+    if zc.status == ZipStatus.blacklist:
+        return None
+    ongoing = db.query(CampaignRun).filter(CampaignRun.zip_code_id == zc.id, CampaignRun.ongoing.is_(True)).count() > 0
+    if ongoing and zc.status != ZipStatus.watchlist:
+        zc.status = ZipStatus.watchlist
+        return zc.status
+    if not ongoing and zc.status == ZipStatus.watchlist:
+        zc.status = ZipStatus.active
+        return zc.status
+    return None
+
+
+def planned_status_changes(db: Session, changes: List[RowChange]) -> List[Tuple[str, str, str]]:
+    """For the preview: (zip, current status, status after this upload) for zips whose
+    Watchlist status would change. Simulates the ongoing flags the upload would set."""
+    ongoing_after: Dict[str, Dict[object, bool]] = {}
+    for c in changes:
+        if c.action == "skip" or not c.zip_code:
+            continue
+        runs = ongoing_after.setdefault(c.zip_code, {})
+        key = c.campaign_run_id or f"new-{len(runs)}"
+        if c.ongoing:
+            runs[key] = True
+        elif c.finished:
+            runs[key] = False
+        elif c.campaign_run_id is None:
+            runs[key] = False
+    result = []
+    for zip_code, planned in ongoing_after.items():
+        zc = db.query(ZipCode).filter(ZipCode.zip_code == zip_code).first()
+        current = zc.status if zc else ZipStatus.not_tried
+        if current == ZipStatus.blacklist:
+            continue
+        existing = {r.id: r.ongoing for r in (zc.runs if zc else [])}
+        existing.update(planned)
+        any_ongoing = any(existing.values())
+        if current == ZipStatus.not_tried and not any_ongoing:
+            continue  # creating a run makes it Used - not a Watchlist change
+        after = ZipStatus.watchlist if any_ongoing else (ZipStatus.active if current == ZipStatus.watchlist else current)
+        if after != current:
+            result.append((zip_code, str(getattr(current, "value", current)), str(getattr(after, "value", after))))
+    return sorted(result)

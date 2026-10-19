@@ -128,6 +128,9 @@ class CampaignRun(Base):
     drip: Mapped[int] = mapped_column(default=0)
     signed_agreements: Mapped[int] = mapped_column(default=0)
     opt_out: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Still sending (the VA's "Month Finished" = ONGOING). run_date is the
+    # finished month once there is one; while ongoing the zip is on Watchlist.
+    ongoing: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     import_batch_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )

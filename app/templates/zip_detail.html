@@ -132,7 +132,7 @@
   <table>
     <thead>
       <tr>
-        <th>Round</th><th>Date</th><th>Days since last SMS</th><th>SMS</th><th>Replies</th>
+        <th>Round</th><th>Finished</th><th>Days since last SMS</th><th>SMS</th><th>Replies</th>
         <th>% Replies</th><th>% Leads</th><th>% Warm</th><th>% Drip</th>
         <th>Leads</th><th>Warm</th><th>Drip</th><th>Signed</th><th>Deals</th>
       </tr>
@@ -141,8 +141,8 @@
       {% for rnd in follow_up.rounds %}
       <tr>
         <td>Follow-up {{ rnd.round_number }}</td>
-        <td>{{ rnd.run.run_date.strftime('%B %Y') if rnd.run.run_date != UNSET_DATE else "--" }}</td>
-        <td>{{ (rnd.days_since_last_sms ~ " days") if rnd.days_since_last_sms is not none else "--" }}</td>
+        <td>{% if rnd.run.ongoing %}<span class="badge badge-watchlist">Ongoing</span>{% elif rnd.run.run_date != UNSET_DATE %}{{ rnd.run.run_date.strftime('%B %Y') }}{% else %}--{% endif %}</td>
+        <td>{% if rnd.sending_now %}<span class="badge badge-watchlist">Sending now</span>{% elif rnd.days_since_last_sms is not none %}{{ rnd.days_since_last_sms }} days{% else %}--{% endif %}</td>
         <td>{{ rnd.run.sms_sent }}</td>
         <td>{{ rnd.run.replies }}</td>
         <td title="{{ macros.pct_title(rnd.reply_rate, rnd.reply_vs_avg, rnd.avg_reply_rate) }}">{{ "%.2f"|format(rnd.reply_rate*100) }}%</td>
@@ -214,13 +214,16 @@
   <table>
     <thead>
       <tr>
-        <th>Date</th><th>Type</th><th>SMS</th><th>Replies</th><th>Leads</th><th>Warm</th><th>Drip</th><th>Signed</th><th>Opt-out</th><th>Deals</th><th></th>
+        <th title="The month the campaign finished. Tick Ongoing while it's still sending - the zip stays on Watchlist until it has a finished month.">Finished</th><th>Type</th><th>SMS</th><th>Replies</th><th>Leads</th><th>Warm</th><th>Drip</th><th>Signed</th><th>Opt-out</th><th>Deals</th><th></th>
       </tr>
     </thead>
     <tbody>
       {% for run in runs %}
       <tr class="run-row" id="run-{{ run.id }}">
-        <td><input type="month" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date.strftime('%Y-%m') }}" placeholder="--" style="width:130px;"></td>
+        <td>
+          <input type="month" name="run_date" value="{{ '' if run.run_date == UNSET_DATE else run.run_date.strftime('%Y-%m') }}" placeholder="--" style="width:130px;">
+          <label class="muted" style="display:flex; gap:4px; align-items:center; font-size:12px; margin-top:4px;"><input type="checkbox" name="ongoing" value="1" {{ 'checked' if run.ongoing }}> Ongoing</label>
+        </td>
         <td>
           <select name="run_type">
             <option value="initial" {{ "selected" if run.run_type == "initial" else "" }}>Initial</option>

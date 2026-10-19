@@ -20,6 +20,7 @@ class FollowUpRound:
     round_number: int
     run: CampaignRun
     days_since_last_sms: Optional[int]  # same for every round of a zip
+    sending_now: bool = False  # a campaign of this zip is still ongoing
     deal_count: int = 0
     total_profit: float = 0.0
     avg_reply_rate: Optional[float] = None
@@ -171,12 +172,16 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
         for deal in db.execute(deal_stmt).scalars().all():
             deals_by_run[deal.campaign_run_id].append(deal)
 
-    # Days since the zip was last texted (initial or follow-up), up to today. Runs
-    # are recorded by month only, so each month counts as its 15th. Zips with no
-    # dated run show "--".
+    # Days since the zip was last texted (initial or follow-up), up to today,
+    # from each run's finished month (counted as its 15th). Zips with no dated
+    # run show "--".
+    # A zip with an ongoing campaign is "Sending now" instead of a count.
     today = date.today()
     last_sms_by_zip: Dict[int, date] = {}
+    sending_zips = set()
     for run in db.query(CampaignRun).all():
+        if run.ongoing:
+            sending_zips.add(run.zip_code_id)
         real = _real_date(run.run_date)
         if real is not None and real > last_sms_by_zip.get(run.zip_code_id, date.min):
             last_sms_by_zip[run.zip_code_id] = real
@@ -188,7 +193,10 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
     result: Dict[int, FollowUpSummary] = {}
     for zip_id, runs in runs_by_zip.items():
         last_sms = last_sms_by_zip.get(zip_id)
-        days_since_last = max(0, (today - last_sms.replace(day=15)).days) if last_sms else None
+        sending_now = zip_id in sending_zips
+        days_since_last = (
+            max(0, (today - last_sms.replace(day=15)).days) if last_sms and not sending_now else None
+        )
         # Tie-break same/unset dates by id, so round order stays stable and sane
         # even when none of the runs have a real date yet.
         runs.sort(key=lambda r: (r.run_date, r.id))
@@ -202,6 +210,7 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
                     round_number=i,
                     run=run,
                     days_since_last_sms=days_since_last,
+                    sending_now=sending_now,
                     deal_count=len(round_deals),
                     total_profit=round_profit,
                 )

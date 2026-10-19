@@ -29,8 +29,10 @@ from app.weekly_import import (
     ROUND_ORDER,
     apply_plan,
     build_plan,
+    planned_status_changes,
     read_workbook,
     save_workbook,
+    sync_watchlist,
 )
 from app.metrics import get_zip_metrics
 from app.models import (
@@ -387,11 +389,14 @@ def update_run(
     drip: int = Form(0),
     signed_agreements: int = Form(0),
     opt_out: str = Form(""),
+    ongoing: str = Form(""),
     db: Session = Depends(get_db),
 ):
     run = db.get(CampaignRun, run_id)
     if run and run.zip_code_id == zip_id:
         run.run_date = parse_month(run_date)
+        ongoing_changed = run.ongoing != bool(ongoing)
+        run.ongoing = bool(ongoing)
         run.run_type = run_type
         run.sms_sent = sms_sent
         run.replies = replies
@@ -400,6 +405,9 @@ def update_run(
         run.drip = drip
         run.signed_agreements = signed_agreements
         run.opt_out = int(opt_out) if opt_out.strip() else None
+        if ongoing_changed:  # only then can Watchlist need to change
+            db.flush()
+            sync_watchlist(db, run.zip_code)
         db.commit()
     if _is_htmx(request):
         return Response(status_code=204)
@@ -498,6 +506,7 @@ async def weekly_import_preview(request: Request, file: UploadFile = File(...), 
         for key in ROUND_ORDER
     }
     warnings = [c.warning for c in changes if c.warning]
+    status_changes = planned_status_changes(db, [c for c in changes if c.action in ("update", "create")])
 
     return templates.TemplateResponse(
         "weekly_import_preview.html",
@@ -512,6 +521,7 @@ async def weekly_import_preview(request: Request, file: UploadFile = File(...), 
             "warnings": warnings,
             "metric_fields": METRIC_FIELDS,
             "metric_labels": METRIC_LABELS,
+            "status_changes": status_changes,
         },
     )
 

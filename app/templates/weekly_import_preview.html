@@ -41,6 +41,18 @@
 </div>
 {% endif %}
 
+{% if status_changes %}
+<div class="card">
+  <h3>Status changes ({{ status_changes|length }})</h3>
+  <p class="muted" style="font-size:13px; margin-top:0;">Zips with a campaign still sending ("ONGOING") go on Watchlist; when all their campaigns have a finished month they go back to Used.</p>
+  <div class="pill-list">
+    {% for zip_code, before, after in status_changes %}
+    <span class="badge badge-{{ after }}" title="{{ STATUS_LABELS.get(before, before) }} → {{ STATUS_LABELS.get(after, after) }}">{{ zip_code }}: {{ STATUS_LABELS.get(before, before) }} → <strong>{{ STATUS_LABELS.get(after, after) }}</strong></span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% for key in round_order %}
 {% set rows = by_round[key] %}
 {% set visible_rows = rows|rejectattr('action', 'equalto', 'skip')|list %}
@@ -53,6 +65,7 @@
       <tr>
         <th>Zip</th><th></th>
         {% for f in metric_fields %}<th>{{ metric_labels[f] }}</th>{% endfor %}
+        <th title="From the Month Finished column">Finished</th>
       </tr>
     </thead>
     <tbody>
@@ -73,6 +86,16 @@
           {% endif %}
         </td>
         {% endfor %}
+        <td style="white-space:nowrap;">
+          {%- macro when(d, ongoing) -%}{% if ongoing %}<span class="badge badge-watchlist">Ongoing</span>{% elif d %}{{ d.strftime('%b %Y') }}{% else %}<span class="muted">--</span>{% endif %}{%- endmacro -%}
+          {% if not c.date_given %}
+            {% if c.action == 'update' %}{{ when(c.old_date, c.old_ongoing) }}{% else %}<span class="muted">--</span>{% endif %}
+          {% elif c.action == 'update' and c.date_changes %}
+            <span class="muted">{{ when(c.old_date, c.old_ongoing) }}</span> → <strong>{{ when(c.finished, c.ongoing) }}</strong>
+          {% else %}
+            {{ when(c.finished, c.ongoing) }}
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
