@@ -13,6 +13,7 @@ from app.finance import (
     CHANNELS,
     DEAL_STATUSES,
     LEAD_CHANNELS,
+    SMS_SOURCES,
     WHOLESALE_CHANNELS,
     MonthSummary,
     build_month_summaries,
@@ -76,6 +77,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     router = APIRouter(prefix="/finance")
     templates.env.globals["CHANNELS"] = CHANNELS
     templates.env.globals["DEAL_STATUSES"] = DEAL_STATUSES
+    templates.env.globals["SMS_SOURCES"] = SMS_SOURCES
 
     # ---------- Overview ----------
 
@@ -315,6 +317,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         estimated_value: str = Form(""),
         channel: str = Form(""),
         zip_code_id: str = Form(""),
+        sms_source: str = Form(""),
         notes: str = Form(""),
         db: Session = Depends(get_db),
     ):
@@ -334,6 +337,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.estimated_value = _optional_money(estimated_value)
             deal.channel = channel if channel in CHANNELS else None
             deal.zip_code_id = int(zip_code_id) if zip_code_id.isdigit() else None
+            deal.sms_source = sms_source if sms_source in SMS_SOURCES else None
             deal.notes = notes.strip() or None
             db.commit()
         return RedirectResponse("/finance/deals", status_code=303)

@@ -29,6 +29,16 @@ CHANNELS = OrderedDict(
 LEAD_CHANNELS = ["sms", "cold_call", "facebook"]
 WHOLESALE_CHANNELS = [c for c in CHANNELS if c != "general"]
 
+# Which SMS round a deal's lead came from (Finance › Deals "From").
+SMS_SOURCES = OrderedDict(
+    [
+        ("first_text", "First text"),
+        ("follow_up_1", "Follow-up 1"),
+        ("follow_up_2", "Follow-up 2"),
+        ("follow_up_3", "Follow-up 3"),
+    ]
+)
+
 DEAL_STATUSES = OrderedDict(
     [
         ("under_contract", "Under contract"),

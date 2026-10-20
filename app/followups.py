@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.metrics import _label_ratio, _ratio_to_average
-from app.metrics import score_group
+from app.metrics import deal_counts, score_group, sms_deals_by_zip
 from app.models import UNSET_DATE, CampaignRun, Deal, RunType
 
 
@@ -21,6 +21,7 @@ class FollowUpRound:
     run: CampaignRun
     days_since_last_sms: Optional[int]  # same for every round of a zip
     sending_now: bool = False  # a campaign of this zip is still ongoing
+    signed: int = 0  # Finance deals whose lead came from this round
     deal_count: int = 0
     total_profit: float = 0.0
     avg_reply_rate: Optional[float] = None
@@ -130,7 +131,7 @@ def _round_group_summary(rounds: List[FollowUpRound]) -> GroupSummary:
         gs.total_leads += rnd.run.leads
         gs.total_warm += rnd.run.warm
         gs.total_drip += rnd.run.drip
-        gs.total_signed_agreements += rnd.run.signed_agreements
+        gs.total_signed_agreements += rnd.signed
         gs.deal_count += rnd.deal_count
         gs.total_profit += rnd.total_profit
     if rounds:
@@ -186,6 +187,8 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
         if real is not None and real > last_sms_by_zip.get(run.zip_code_id, date.min):
             last_sms_by_zip[run.zip_code_id] = real
 
+    sms_deals = sms_deals_by_zip(db)
+
     runs_by_zip = defaultdict(list)
     for run in followup_runs:
         runs_by_zip[run.zip_code_id].append(run)
@@ -201,17 +204,22 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
         # even when none of the runs have a real date yet.
         runs.sort(key=lambda r: (r.run_date, r.id))
 
+        # Signed agreements / closed deals come from Finance › Deals tagged with
+        # this zip and the follow-up round they came from.
+        zip_deals = [d for d in sms_deals.get(zip_id, []) if (d.sms_source or "").startswith("follow_up")]
         summary = FollowUpSummary()
         for i, run in enumerate(runs, start=1):
             round_deals = deals_by_run.get(run.id, [])
-            round_profit = sum(float(d.profit) for d in round_deals)
+            signed, closed, profit = deal_counts([d for d in zip_deals if d.sms_source == f"follow_up_{i}"])
+            round_profit = sum(float(d.profit) for d in round_deals) + profit
             summary.rounds.append(
                 FollowUpRound(
                     round_number=i,
                     run=run,
                     days_since_last_sms=days_since_last,
                     sending_now=sending_now,
-                    deal_count=len(round_deals),
+                    signed=signed,
+                    deal_count=len(round_deals) + closed,
                     total_profit=round_profit,
                 )
             )
@@ -220,9 +228,11 @@ def get_follow_up_summaries(db: Session, zip_ids: Optional[List[int]] = None) ->
             summary.total_leads += run.leads
             summary.total_warm += run.warm
             summary.total_drip += run.drip
-            summary.total_signed_agreements += run.signed_agreements
-            summary.deal_count += len(round_deals)
+            summary.deal_count += len(round_deals) + closed
             summary.total_profit += round_profit
+        # Counted once per zip, so a deal tagged with a round the zip doesn't
+        # have (yet) still shows in the follow-up totals.
+        summary.total_signed_agreements = len(zip_deals)
 
         result[zip_id] = summary
 

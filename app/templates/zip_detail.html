@@ -152,7 +152,7 @@
         <td>{{ rnd.run.leads }}</td>
         <td>{{ rnd.run.warm }}</td>
         <td>{{ rnd.run.drip }}</td>
-        <td>{{ rnd.run.signed_agreements }}</td>
+        <td>{{ rnd.signed }}</td>
         <td>{{ rnd.deal_count }}</td>
       </tr>
       {% endfor %}
@@ -197,7 +197,6 @@
       <div class="form-row"><label>Leads</label><input type="number" name="leads" min="0" value="0" required></div>
       <div class="form-row"><label>Warm</label><input type="number" name="warm" min="0" value="0" required></div>
       <div class="form-row"><label>Drip</label><input type="number" name="drip" min="0" value="0" required></div>
-      <div class="form-row"><label>Signed Agreements</label><input type="number" name="signed_agreements" min="0" value="0"></div>
       <div class="form-row"><label>Opt-out (optional)</label><input type="number" name="opt_out" min="0"></div>
     </div>
     <button type="submit">Add Run</button>
@@ -214,7 +213,7 @@
   <table>
     <thead>
       <tr>
-        <th title="The month the campaign finished. Tick Ongoing while it's still sending - the zip stays on Watchlist until it has a finished month.">Finished</th><th>Type</th><th>SMS</th><th>Replies</th><th>Leads</th><th>Warm</th><th>Drip</th><th>Signed</th><th>Opt-out</th><th>Deals</th><th></th>
+        <th title="The month the campaign finished. Tick Ongoing while it's still sending - the zip stays on Watchlist until it has a finished month.">Finished</th><th>Type</th><th>SMS</th><th>Replies</th><th>Leads</th><th>Warm</th><th>Drip</th><th>Opt-out</th><th>Deals</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -235,7 +234,6 @@
         <td><input type="number" name="leads" value="{{ run.leads }}" style="width:50px;"></td>
         <td><input type="number" name="warm" value="{{ run.warm }}" style="width:50px;"></td>
         <td><input type="number" name="drip" value="{{ run.drip }}" style="width:50px;"></td>
-        <td><input type="number" name="signed_agreements" value="{{ run.signed_agreements }}" style="width:50px;"></td>
         <td><input type="number" name="opt_out" value="{{ run.opt_out if run.opt_out is not none else '' }}" style="width:50px;"></td>
         <td>
           {% for deal in run.deals %}

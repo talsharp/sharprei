@@ -178,8 +178,6 @@ SORT_FIELDS = {
     "drip_rate": lambda m: m.drip_rate,
     "warm_rate": lambda m: m.warm_rate,
     "lead_rate": lambda m: m.lead_rate,
-    # Leads and signed agreements sort by the total: first text + all follow-ups
-    # (the follow-up part is added in zip_list, which knows the follow-ups).
     "leads": lambda m: m.total_leads,
     "signed_agreements": lambda m: m.total_signed_agreements,
     "deals": lambda m: m.deal_count,
@@ -189,19 +187,24 @@ SORT_FIELDS = {
 }
 
 
+ZIP_VIEWS = {"total": "Total", "initial": "First Text", "follow_up": "Follow-ups"}
+
+
 @app.get("/")
-def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Session = Depends(get_db)):
-    metrics = get_zip_metrics(db)
-    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
+def zip_list(request: Request, sort: str = "score", dir: str = "desc", view: str = "total", db: Session = Depends(get_db)):
+    """One table, three views: Total (first text + all follow-ups), First Text,
+    or Follow-ups (all rounds together). Every number and the score follow the view."""
+    view = view if view in ZIP_VIEWS else "total"
+    metrics = get_zip_metrics(db, view=view)
+    if view == "follow_up":
+        # Only zips that have had follow-ups (or a deal from one).
+        metrics = [m for m in metrics if m.total_sms or m.total_signed_agreements or m.deal_count]
     key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
-    if sort in ("leads", "signed_agreements"):
-        fu_field = "total_leads" if sort == "leads" else "total_signed_agreements"
-        first = key_fn
-        key_fn = lambda m: (first(m) or 0) + (getattr(follow_ups.get(m.zip_code.id), fu_field, 0) or 0)
     metrics.sort(key=key_fn, reverse=(dir == "desc"))
     if sort == "score":
         # Zips with no sends have no score - keep them last in both directions.
         metrics.sort(key=lambda m: m.score is None)
+    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
     regions = sorted({m.zip_code.region_override or m.zip_code.region for m in metrics if (m.zip_code.region_override or m.zip_code.region)})
     return templates.TemplateResponse(
         "zip_list.html",
@@ -213,6 +216,8 @@ def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Sessi
             "regions": regions,
             "sort": sort,
             "dir": dir,
+            "view": view,
+            "views": ZIP_VIEWS,
         },
     )
 
@@ -354,7 +359,6 @@ def create_run(
     leads: int = Form(0),
     warm: int = Form(0),
     drip: int = Form(0),
-    signed_agreements: int = Form(0),
     opt_out: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -367,7 +371,6 @@ def create_run(
         leads=leads,
         warm=warm,
         drip=drip,
-        signed_agreements=signed_agreements,
         opt_out=int(opt_out) if opt_out.strip() else None,
     )
     db.add(run)
@@ -393,7 +396,6 @@ def update_run(
     leads: int = Form(0),
     warm: int = Form(0),
     drip: int = Form(0),
-    signed_agreements: int = Form(0),
     opt_out: str = Form(""),
     ongoing: str = Form(""),
     db: Session = Depends(get_db),
@@ -409,7 +411,6 @@ def update_run(
         run.leads = leads
         run.warm = warm
         run.drip = drip
-        run.signed_agreements = signed_agreements
         run.opt_out = int(opt_out) if opt_out.strip() else None
         if ongoing_changed:  # only then can Watchlist need to change
             db.flush()

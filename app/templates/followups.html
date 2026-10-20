@@ -122,7 +122,7 @@
         <td data-col="leads">{{ rnd.run.leads }}</td>
         <td data-col="warm">{{ rnd.run.warm }}</td>
         <td data-col="drip">{{ rnd.run.drip }}</td>
-        <td data-col="signed">{{ rnd.run.signed_agreements }}</td>
+        <td data-col="signed">{{ rnd.signed }}</td>
         <td data-col="score" class="score-cell" data-sort="{{ rnd.score if rnd.score is not none else '' }}">{{ "%.0f"|format(rnd.score) if rnd.score is not none else "—" }}</td>
       </tr>
       {% endfor %}

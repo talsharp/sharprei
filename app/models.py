@@ -437,7 +437,11 @@ class WholesaleDeal(Base):
     # as a wholesale deal. Counted as that deal's wholesale profit (marked est.).
     estimated_value: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     channel: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # The property's zip. For SMS deals this (with sms_source) is what Zip Codes
+    # counts: every deal is a signed agreement; closed/kept ones are closed deals.
     zip_code_id: Mapped[Optional[int]] = mapped_column(ForeignKey("zip_codes.id"), nullable=True)
+    # Which SMS round the lead came from: first_text / follow_up_1 / _2 / _3.
+    sms_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()

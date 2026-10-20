@@ -34,13 +34,30 @@
         {% for ch in lead_channels %}<option value="{{ ch }}" {{ 'selected' if ch == deal.channel else '' }}>{{ CHANNELS[ch] }}</option>{% endfor %}
       </select>
     </div>
-    <div class="form-row">
-      <label>Zip code (optional - counts toward that zip's Closed Deals and Profit on the Zip Codes page)</label>
+    <div class="form-row sms-only">
+      <label>Zip code (the property's zip)</label>
       <select name="zip_code_id">
         <option value="">None</option>
         {% for z in zip_codes %}<option value="{{ z.id }}" {{ 'selected' if z.id == deal.zip_code_id else '' }}>{{ z.zip_code }}{{ " - " ~ (z.region_override or z.region) if (z.region_override or z.region) else "" }}</option>{% endfor %}
       </select>
     </div>
+    <div class="form-row sms-only">
+      <label>From (which SMS round the lead came from)</label>
+      <select name="sms_source">
+        <option value="">Not set</option>
+        {% for key, label in SMS_SOURCES.items() %}<option value="{{ key }}" {{ 'selected' if key == deal.sms_source else '' }}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <p class="muted sms-only" style="font-size:12px; margin:0;">SMS deals with a zip show on Zip Codes: as a signed agreement right away, and as a closed deal with its profit once Closed or Kept - under First Text or Follow-ups depending on "From".</p>
+    <script>
+    (function() {
+      var channel = document.querySelector('select[name=channel]');
+      function toggle() {
+        document.querySelectorAll('.sms-only').forEach(function(el) { el.style.display = channel.value === 'sms' ? '' : 'none'; });
+      }
+      channel.addEventListener('change', toggle); toggle();
+    })();
+    </script>
   </div>
 
   <div class="card">

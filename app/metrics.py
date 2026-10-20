@@ -48,6 +48,34 @@ def score_group(rows: List[Tuple[int, int, int, int]]) -> List[Optional[float]]:
     return scores
 
 
+VIEWS = ("total", "initial", "follow_up")
+
+
+def sms_deals_by_zip(db: Session) -> dict:
+    """Finance › Deals that came from SMS and are tagged with a zip: {zip_id: [deal]}."""
+    result = {}
+    for d in db.query(WholesaleDeal).filter(WholesaleDeal.channel == "sms", WholesaleDeal.zip_code_id.isnot(None)):
+        result.setdefault(d.zip_code_id, []).append(d)
+    return result
+
+
+def deals_in_view(deals, view: str):
+    """Deals whose lead came from this view's SMS rounds. A deal without a
+    round ("From") only counts in the total."""
+    if view == "initial":
+        return [d for d in deals if d.sms_source == "first_text"]
+    if view == "follow_up":
+        return [d for d in deals if (d.sms_source or "").startswith("follow_up")]
+    return list(deals)
+
+
+def deal_counts(deals) -> Tuple[int, int, float]:
+    """(signed agreements, closed deals, profit). Every deal is a signed
+    agreement; closed and kept ones are closed deals (kept at est. profit)."""
+    closed = [d for d in deals if d.status in ("closed", "kept")]
+    return len(deals), len(closed), sum(d.profit or 0 for d in closed)
+
+
 @dataclass
 class ZipMetrics:
     zip_code: ZipCode
@@ -137,11 +165,22 @@ def _assign_comparisons(results: List[ZipMetrics]) -> None:
         m.drip_vs_avg = _label_ratio(_ratio_to_average(m.drip_rate, avg_drip_rate))
 
 
-def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipMetrics]:
-    """Metrics here reflect INITIAL sends only - follow-up performance is tracked
-    separately (see app.followups) and is never blended into these numbers,
-    including the score, so a zip's score always reflects its proven
-    initial-send performance regardless of how much follow-up activity it's had."""
+def _run_filter(view: str):
+    if view == "initial":
+        return (CampaignRun.run_type == RunType.initial,)
+    if view == "follow_up":
+        return (CampaignRun.run_type == RunType.follow_up,)
+    return ()
+
+
+def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None, view: str = "initial") -> List[ZipMetrics]:
+    """Per-zip metrics for one view: "initial" (first text only - the default,
+    and what each zip's own score has always meant), "follow_up" (all
+    follow-up rounds together) or "total" (everything). Scores and the
+    "vs average" comparisons are computed within the same view.
+
+    Signed agreements, closed deals and profit come from Finance › Deals (SMS
+    deals tagged with the zip, split by their "From" round)."""
     run_agg = (
         select(
             CampaignRun.zip_code_id.label("zip_code_id"),
@@ -154,7 +193,7 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
             func.sum(CampaignRun.opt_out).label("total_opt_out"),
             func.count(CampaignRun.id).label("run_count"),
         )
-        .where(CampaignRun.run_type == RunType.initial)
+        .where(*_run_filter(view))
         .group_by(CampaignRun.zip_code_id)
         .subquery()
     )
@@ -166,7 +205,7 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
             func.sum(Deal.profit).label("total_profit"),
         )
         .join(Deal, Deal.campaign_run_id == CampaignRun.id)
-        .where(CampaignRun.run_type == RunType.initial)
+        .where(*_run_filter(view))
         .group_by(CampaignRun.zip_code_id)
         .subquery()
     )
@@ -189,12 +228,7 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
         .outerjoin(deal_agg, deal_agg.c.zip_code_id == ZipCode.id)
     )
 
-    # Closed deals from Finance > Deals that were tagged with a zip code count
-    # toward that zip too (kept-for-portfolio houses count at their est. profit).
-    finance_deals = {}
-    for d in db.query(WholesaleDeal).filter(WholesaleDeal.status.in_(("closed", "kept")), WholesaleDeal.zip_code_id.isnot(None)):
-        count, profit = finance_deals.get(d.zip_code_id, (0, 0.0))
-        finance_deals[d.zip_code_id] = (count + 1, profit + (d.profit or 0))
+    finance_deals = {zid: deal_counts(deals_in_view(deals, view)) for zid, deals in sms_deals_by_zip(db).items()}
 
     results = []
     for row in db.execute(stmt).all():
@@ -219,11 +253,11 @@ def get_zip_metrics(db: Session, zip_code_id: Optional[int] = None) -> List[ZipM
                 total_leads=total_leads or 0,
                 total_warm=total_warm or 0,
                 total_drip=total_drip or 0,
-                total_signed_agreements=total_signed_agreements or 0,
+                total_signed_agreements=finance_deals.get(zc.id, (0, 0, 0.0))[0],
                 total_opt_out=total_opt_out,
                 run_count=run_count or 0,
-                deal_count=(deal_count or 0) + finance_deals.get(zc.id, (0, 0.0))[0],
-                total_profit=float(total_profit or 0) + finance_deals.get(zc.id, (0, 0.0))[1],
+                deal_count=(deal_count or 0) + finance_deals.get(zc.id, (0, 0, 0.0))[1],
+                total_profit=float(total_profit or 0) + finance_deals.get(zc.id, (0, 0, 0.0))[2],
             )
         )
 
