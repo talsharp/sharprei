@@ -99,8 +99,8 @@
       <th data-col="drip_rate">{{ sort_link('drip_rate', '% Drips') }}</th>
       <th data-col="warm_rate">{{ sort_link('warm_rate', '% Warms') }}</th>
       <th data-col="lead_rate">{{ sort_link('lead_rate', '% Leads') }}</th>
-      <th data-col="leads_number">{{ sort_link('leads', 'Leads Number') }}</th>
-      <th data-col="signed_agreements">{{ sort_link('signed_agreements', 'Signed Agreements') }}</th>
+      <th data-col="leads_number" title="Total = first text + all follow-ups. The line underneath shows the split.">{{ sort_link('leads', 'Leads Number') }}</th>
+      <th data-col="signed_agreements" title="Total = first text + all follow-ups. The line underneath shows the split.">{{ sort_link('signed_agreements', 'Signed Agreements') }}</th>
       <th data-col="deals">{{ sort_link('deals', 'Closed Deals') }}</th>
       <th data-col="profit">{{ sort_link('profit', 'Profit') }}</th>
       <th data-col="score" title="100 = an average zip. Above 100 is better, below is weaker. Based on leads (60%), replies (30%) and drips (10%) per message sent. Zips with few messages are pulled toward 100.">{{ sort_link('score', 'Score') }}</th>
@@ -133,8 +133,13 @@
       <td data-col="drip_rate" title="{{ macros.pct_title(m.drip_rate, m.drip_vs_avg, m.avg_drip_rate) }}">{{ "%.2f"|format(m.drip_rate * 100) }}%</td>
       <td data-col="warm_rate" title="{{ macros.pct_title(m.warm_rate, m.warm_vs_avg, m.avg_warm_rate) }}">{{ "%.2f"|format(m.warm_rate * 100) }}%</td>
       <td data-col="lead_rate" title="{{ macros.pct_title(m.lead_rate, m.lead_vs_avg, m.avg_lead_rate) }}">{{ "%.2f"|format(m.lead_rate * 100) }}%</td>
-      <td data-col="leads_number">{{ m.total_leads }}</td>
-      <td data-col="signed_agreements">{{ m.total_signed_agreements }}</td>
+      {% for col, first, fu_n in [("leads_number", m.total_leads or 0, (fu.total_leads if fu else 0) or 0),
+                                  ("signed_agreements", m.total_signed_agreements or 0, (fu.total_signed_agreements if fu else 0) or 0)] %}
+      <td data-col="{{ col }}" data-first="{{ first }}" data-fu="{{ fu_n }}" data-sort="{{ first + fu_n }}">
+        <strong>{{ first + fu_n }}</strong>
+        {% if first + fu_n %}<div class="split-line">{{ first }} first · {{ fu_n }} FU</div>{% endif %}
+      </td>
+      {% endfor %}
       <td data-col="deals">{{ m.deal_count }}</td>
       <td data-col="profit">${{ "%.0f"|format(m.total_profit) }}</td>
       <td data-col="score" data-sort="{{ m.score if m.score is not none else "" }}">{{ "%.0f"|format(m.score) if m.score is not none else "—" }}</td>
@@ -212,8 +217,8 @@
       <td data-col="drip_rate">0.00%</td>
       <td data-col="warm_rate">0.00%</td>
       <td data-col="lead_rate">0.00%</td>
-      <td data-col="leads_number">0</td>
-      <td data-col="signed_agreements">0</td>
+      <td data-col="leads_number" data-split="1">0</td>
+      <td data-col="signed_agreements" data-split="1">0</td>
       <td data-col="deals">0</td>
       <td data-col="profit">$0</td>
       <td data-col="score"></td>
@@ -270,13 +275,25 @@
     var rows = visibleDataRows();
 
     SUM_COLS.forEach(function(col) {
-      var total = 0;
+      var total = 0, first = 0, fu = 0;
       rows.forEach(function(tr) {
         var cell = tr.querySelector('[data-col="' + col + '"]');
-        if (cell) total += parseFloat(cell.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+        if (!cell) return;
+        if (cell.dataset.first !== undefined) {
+          first += parseFloat(cell.dataset.first) || 0;
+          fu += parseFloat(cell.dataset.fu) || 0;
+          total += (parseFloat(cell.dataset.first) || 0) + (parseFloat(cell.dataset.fu) || 0);
+        } else {
+          total += parseFloat(cell.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+        }
       });
       var footerCell = document.querySelector('#zip-table tfoot [data-col="' + col + '"]');
-      if (footerCell) footerCell.textContent = (col === 'profit' ? '$' : '') + total.toFixed(0);
+      if (!footerCell) return;
+      if (footerCell.dataset.split) {
+        footerCell.innerHTML = '<strong>' + total.toFixed(0) + '</strong><div class="split-line">' + first.toFixed(0) + ' first · ' + fu.toFixed(0) + ' FU</div>';
+      } else {
+        footerCell.textContent = (col === 'profit' ? '$' : '') + total.toFixed(0);
+      }
     });
 
     AVG_COLS.forEach(function(col) {
@@ -294,6 +311,7 @@
     var sumCol = function(col) {
       return rows.reduce(function(t, tr) {
         var c = tr.querySelector('[data-col="' + col + '"]');
+        if (c && c.dataset.first !== undefined) return t + (parseFloat(c.dataset.first) || 0) + (parseFloat(c.dataset.fu) || 0);
         return t + (c ? (parseFloat(c.textContent.replace(/[^0-9.\-]/g, '')) || 0) : 0);
       }, 0);
     };

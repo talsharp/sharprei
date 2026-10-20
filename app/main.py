@@ -178,6 +178,8 @@ SORT_FIELDS = {
     "drip_rate": lambda m: m.drip_rate,
     "warm_rate": lambda m: m.warm_rate,
     "lead_rate": lambda m: m.lead_rate,
+    # Leads and signed agreements sort by the total: first text + all follow-ups
+    # (the follow-up part is added in zip_list, which knows the follow-ups).
     "leads": lambda m: m.total_leads,
     "signed_agreements": lambda m: m.total_signed_agreements,
     "deals": lambda m: m.deal_count,
@@ -190,12 +192,16 @@ SORT_FIELDS = {
 @app.get("/")
 def zip_list(request: Request, sort: str = "score", dir: str = "desc", db: Session = Depends(get_db)):
     metrics = get_zip_metrics(db)
+    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
     key_fn = SORT_FIELDS.get(sort, SORT_FIELDS["score"])
+    if sort in ("leads", "signed_agreements"):
+        fu_field = "total_leads" if sort == "leads" else "total_signed_agreements"
+        first = key_fn
+        key_fn = lambda m: (first(m) or 0) + (getattr(follow_ups.get(m.zip_code.id), fu_field, 0) or 0)
     metrics.sort(key=key_fn, reverse=(dir == "desc"))
     if sort == "score":
         # Zips with no sends have no score - keep them last in both directions.
         metrics.sort(key=lambda m: m.score is None)
-    follow_ups = get_follow_up_summaries(db, [m.zip_code.id for m in metrics])
     regions = sorted({m.zip_code.region_override or m.zip_code.region for m in metrics if (m.zip_code.region_override or m.zip_code.region)})
     return templates.TemplateResponse(
         "zip_list.html",

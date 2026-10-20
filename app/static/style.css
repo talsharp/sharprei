@@ -556,3 +556,4 @@ a.filter-chip { display: inline-block; text-decoration: none; }
 .comps-save-bar #save-btn { padding: 10px 28px; font-size: 15px; }
 .comps-list-table td { vertical-align: middle; }
 tr.row-highlight td { background: #EAF6EC; }
+.split-line { font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 1px; }
