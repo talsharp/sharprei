@@ -16,6 +16,7 @@ from app.finance import (
     SMS_SOURCES,
     BUYER_STATUSES,
     contract_clock,
+    renegotiation_report,
     WHOLESALE_CHANNELS,
     MonthSummary,
     build_month_summaries,
@@ -105,6 +106,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             "lead_channels": LEAD_CHANNELS,
             "wholesale_channels": WHOLESALE_CHANNELS,
             "channel": channel,
+            "renegotiations": renegotiation_report(db.query(WholesaleDeal).all()),
         }
         if channel:
             context["cs"] = totals.channels[channel]
@@ -318,33 +320,28 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         """Names used on any deal before - suggested when adding a buyer."""
         return sorted({b.name for b in db.query(DealBuyer).all()}, key=str.lower)
 
-    @router.post("/deals/{deal_id}/inspection")
-    def finance_deal_inspection(request: Request, deal_id: int, inspection_days: str = Form(""), db: Session = Depends(get_db)):
+    @router.post("/deals/{deal_id}/contract")
+    async def finance_deal_contract(request: Request, deal_id: int, db: Session = Depends(get_db)):
+        """The under-contract inputs (inspection days, renegotiated price, buyer,
+        buyer's price, closing date). Saves whichever were sent; returns the boxes."""
         deal = db.get(WholesaleDeal, deal_id)
         if not deal:
             return Response(status_code=404)
-        deal.inspection_days = _int(inspection_days) or None
+        form = await request.form()
+        if "inspection_days" in form:
+            deal.inspection_days = _int(form["inspection_days"]) or None
+        if "renegotiated_price" in form:
+            deal.renegotiated_price = _optional_money(form["renegotiated_price"])
+        if "buyer_name" in form:
+            deal.buyer_name = form["buyer_name"].strip()[:120] or None
+        if "sell_price" in form:
+            deal.sell_price = _optional_money(form["sell_price"])
+        if "closed_date" in form:
+            closing = _optional_date(form["closed_date"])
+            if closing is None or closing.year >= 2000:  # a half-typed year never lands
+                deal.closed_date = closing
         db.commit()
-        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal, "buyer_names": _buyer_names(db)})
-
-    @router.post("/deals/{deal_id}/sale")
-    def finance_deal_sale(
-        request: Request,
-        deal_id: int,
-        buyer_name: str = Form(""),
-        sell_price: str = Form(""),
-        closed_date: str = Form(""),
-        db: Session = Depends(get_db),
-    ):
-        """The buyer found for an under-contract deal: who, how much, closing date."""
-        deal = db.get(WholesaleDeal, deal_id)
-        if not deal:
-            return Response(status_code=404)
-        deal.buyer_name = buyer_name.strip()[:120] or None
-        deal.sell_price = _optional_money(sell_price)
-        deal.closed_date = _optional_date(closed_date)
-        db.commit()
-        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal, "buyer_names": _buyer_names(db)})
+        return templates.TemplateResponse("_deal_contract_stats.html", {"request": request, "deal": deal})
 
     @router.post("/deals/{deal_id}/buyers/new")
     def finance_buyer_new(request: Request, deal_id: int, name: str = Form(""), visit_at: str = Form(""), db: Session = Depends(get_db)):
@@ -387,6 +384,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         address: str = Form(...),
         agreement_date: str = Form(""),
         agreement_price: str = Form(""),
+        renegotiated_price: str = Form(""),
         sell_price: str = Form(""),
         status: str = Form("under_contract"),
         closed_date: str = Form(""),
@@ -408,6 +406,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.address = address.strip()
             deal.agreement_date = _optional_date(agreement_date)
             deal.agreement_price = _optional_money(agreement_price)
+            deal.renegotiated_price = _optional_money(renegotiated_price)
             deal.sell_price = _optional_money(sell_price)
             deal.status = status if status in DEAL_STATUSES else "under_contract"
             deal.closed_date = _optional_date(closed_date)

@@ -571,8 +571,6 @@ tr.row-highlight td { background: #EAF6EC; }
 .contract-stat .sub { font-size: 12px; }
 .contract-stat.urgent { border-color: #E8A33C; background: #FFF6E5; }
 .contract-stat.over { border-color: #D64545; background: #FDECEC; }
-.inspection-form { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--navy); font-weight: 600; }
-.inspection-form input { width: 90px; font-size: 20px; font-weight: 700; padding: 4px 8px; }
 .visit-summary { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; line-height: 1.6; }
 .vs-tally { font-size: 12px; margin-top: 2px; }
 .vs-confirmed, .vs-visited { color: #23824A; } .vs-waiting { color: #B7791F; } .vs-cant { color: #C0392B; text-decoration: line-through; }
@@ -592,10 +590,14 @@ tr.row-highlight td { background: #EAF6EC; }
 @media (max-width: 760px) { .contract-stats { grid-template-columns: 1fr; } }
 .deal-clock { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .contract-stats { grid-template-columns: repeat(4, 1fr); }
-.sale-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
-.sale-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
-.sale-row input[name=buyer_name] { width: 200px; } .sale-row input[name=sell_price] { width: 130px; }
-.sale-title { font-weight: 700; color: var(--navy); align-self: center; min-width: 110px; }
-.sale-spread { align-self: center; font-size: 14px; }
 @media (max-width: 960px) { .contract-stats { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .contract-stats { grid-template-columns: 1fr; } }
+
+.contract-inputs { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.contract-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.contract-inputs input[name=inspection_days] { width: 80px; }
+.contract-inputs input[name=renegotiated_price], .contract-inputs input[name=sell_price] { width: 140px; }
+.contract-inputs input[name=buyer_name] { width: 190px; }
+.input-suffix { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
+.contract-divider { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+p.sale-spread { margin: 10px 0 0; font-size: 14px; }

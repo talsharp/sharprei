@@ -373,3 +373,32 @@ def start_month(db: Session, month: date) -> FinanceMonth:
     db.flush()
     copy_recurring(db, fm)
     return fm
+
+
+def renegotiation_report(deals) -> dict:
+    """Money made by renegotiating the agreement price down. Counted when the
+    deal closes (closed or kept), in its closing quarter; under-contract deals
+    are pending, dead ones made nothing."""
+    quarters: Dict[tuple, dict] = {}
+    years: Dict[int, dict] = {}
+    pending = {"count": 0, "saved": 0.0}
+    for d in deals:
+        saved = d.renegotiation_savings
+        if not saved:
+            continue
+        if d.status in ("closed", "kept") and d.closed_date:
+            key = (d.closed_date.year, (d.closed_date.month - 1) // 3 + 1)
+            for bucket in (quarters.setdefault(key, {"count": 0, "saved": 0.0, "deals": []}),
+                           years.setdefault(key[0], {"count": 0, "saved": 0.0})):
+                bucket["count"] += 1
+                bucket["saved"] += saved
+            quarters[key]["deals"].append(d)
+        elif d.status == "under_contract":
+            pending["count"] += 1
+            pending["saved"] += saved
+    return {
+        "quarters": sorted(quarters.items(), reverse=True),
+        "years": sorted(years.items(), reverse=True),
+        "pending": pending,
+        "total": sum(y["saved"] for y in years.values()),
+    }

@@ -424,7 +424,10 @@ class WholesaleDeal(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     address: Mapped[str] = mapped_column(String(255))
     agreement_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    agreement_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    agreement_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)  # the 1st agreed price
+    # Lower price after renegotiating (None = no renegotiation). The difference
+    # is money made from the renegotiation.
+    renegotiated_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     sell_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="under_contract")
     closed_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
@@ -457,6 +460,19 @@ class WholesaleDeal(Base):
     files: Mapped[list["DealFile"]] = relationship(
         back_populates="deal", cascade="all, delete-orphan", order_by="DealFile.uploaded_at.desc()"
     )
+
+    @property
+    def final_price(self) -> Optional[float]:
+        """What Tal pays in the end: the renegotiated price if there was one."""
+        if self.renegotiated_price is not None:
+            return float(self.renegotiated_price)
+        return float(self.agreement_price) if self.agreement_price is not None else None
+
+    @property
+    def renegotiation_savings(self) -> Optional[float]:
+        if self.renegotiated_price is None or self.agreement_price is None:
+            return None
+        return float(self.agreement_price) - float(self.renegotiated_price)
 
     @property
     def total_costs(self) -> float:

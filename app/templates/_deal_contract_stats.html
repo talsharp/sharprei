@@ -1,0 +1,53 @@
+{# Display-only boxes of the under-contract card. Re-rendered after every save -
+   the inputs live outside this block so they never redraw while typing. #}
+{% set c = contract_clock(deal) %}
+<div id="contract-stats">
+  <div class="contract-stats">
+    <div class="contract-stat">
+      <div class="label">Signed</div>
+      {% if c.days_since_signed is not none %}
+      <div class="value">{{ c.days_since_signed }} day{{ "s" if c.days_since_signed != 1 else "" }} ago</div>
+      <div class="muted sub">{{ deal.agreement_date.strftime('%a, %b %d, %Y') }}</div>
+      {% else %}
+      <div class="value muted">—</div><div class="muted sub">Add the agreement date below</div>
+      {% endif %}
+    </div>
+    <div class="contract-stat {{ 'urgent' if c.business_days_left is not none and c.calendar_days_left >= 0 and c.business_days_left <= 2 }} {{ 'over' if c.calendar_days_left is not none and c.calendar_days_left < 0 }}">
+      <div class="label">Inspection{% if deal.inspection_days %} · {{ deal.inspection_days }} business days{% endif %}</div>
+      {% if c.inspection_end is none %}
+      <div class="value muted">—</div><div class="muted sub">{{ "Set the inspection days below" if deal.agreement_date else "Needs the agreement date" }}</div>
+      {% elif c.calendar_days_left < 0 %}
+      <div class="value">Ended</div><div class="sub">{{ c.inspection_end.strftime('%a, %b %d') }} · {{ -c.calendar_days_left }} day{{ "s" if c.calendar_days_left != -1 else "" }} ago</div>
+      {% elif c.calendar_days_left == 0 %}
+      <div class="value">Ends today</div><div class="sub">{{ c.inspection_end.strftime('%a, %b %d') }}</div>
+      {% else %}
+      <div class="value">{{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }} left</div>
+      <div class="sub">{{ c.calendar_days_left }} calendar day{{ "s" if c.calendar_days_left != 1 else "" }} · ends {{ c.inspection_end.strftime('%a, %b %d') }}</div>
+      {% endif %}
+    </div>
+    <div class="contract-stat">
+      <div class="label">Price</div>
+      {% if deal.final_price is not none %}
+      <div class="value">${{ "{:,.0f}".format(deal.final_price) }}</div>
+      <div class="sub">{% if deal.renegotiation_savings %}<span class="muted"><s>${{ "{:,.0f}".format(deal.agreement_price|float) }}</s></span> <span class="{{ 'profit-up' if deal.renegotiation_savings > 0 else 'profit-down' }}">renegotiated {{ "-" if deal.renegotiation_savings > 0 else "+" }}${{ "{:,.0f}".format(deal.renegotiation_savings|abs) }}</span>{% else %}<span class="muted">agreement price</span>{% endif %}</div>
+      {% else %}
+      <div class="value muted">—</div><div class="muted sub">Add the agreement price below</div>
+      {% endif %}
+    </div>
+    <div class="contract-stat {{ 'urgent' if c.days_to_closing is not none and 0 <= c.days_to_closing <= 3 }}">
+      <div class="label">Closing</div>
+      {% if c.days_to_closing is none %}
+      <div class="value muted">—</div><div class="muted sub">Set the closing date below</div>
+      {% elif c.days_to_closing > 0 %}
+      <div class="value">in {{ c.days_to_closing }} day{{ "s" if c.days_to_closing != 1 else "" }}</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}{% if deal.buyer_name %} · {{ deal.buyer_name }}{% endif %}</div>
+      {% elif c.days_to_closing == 0 %}
+      <div class="value">Today</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
+      {% else %}
+      <div class="value">{{ -c.days_to_closing }} day{{ "s" if c.days_to_closing != -1 else "" }} ago</div><div class="muted sub">mark the deal Closed below</div>
+      {% endif %}
+    </div>
+  </div>
+  {% if deal.sell_price is not none and deal.final_price is not none %}
+  <p class="sale-spread">Spread: buyer's ${{ "{:,.0f}".format(deal.sell_price|float) }} − your ${{ "{:,.0f}".format(deal.final_price) }} = <strong class="{{ 'profit-up' if deal.sell_price|float > deal.final_price else 'profit-down' }}">${{ "{:,.0f}".format(deal.sell_price|float - deal.final_price) }}</strong></p>
+  {% endif %}
+</div>

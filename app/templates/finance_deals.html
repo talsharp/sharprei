@@ -48,7 +48,7 @@
       </td>
       <td>{{ fx.status_badge(d.status) }}</td>
       <td>{{ d.agreement_date.strftime('%b %d, %Y') if d.agreement_date else "—" }}</td>
-      <td>{{ fx.money(d.agreement_price|float if d.agreement_price is not none else none) }}</td>
+      <td>{% if d.renegotiation_savings %}<span class="muted"><s>{{ fx.money(d.agreement_price|float) }}</s></span> {{ fx.money(d.renegotiated_price|float) }}{% else %}{{ fx.money(d.agreement_price|float if d.agreement_price is not none else none) }}{% endif %}</td>
       <td>{{ fx.money(d.sell_price|float if d.sell_price is not none else none) }}</td>
       <td>{{ d.closed_date.strftime('%b %d, %Y') if d.closed_date else "—" }}</td>
       <td>{{ fx.money(d.revenue|float) if d.status == 'closed' else "—" }}</td>

@@ -95,6 +95,41 @@
   {{ funnel(totals.leads, totals.signed_agreements, totals.closed_deals, totals.lead_to_agreement, totals.agreement_to_deal, totals.lead_to_deal, totals.under_contract) }}
 </div>
 
+{% set rn = renegotiations %}
+<div class="card">
+  <h3>Renegotiations <span class="muted" style="font-weight:400; font-size:13px;">· money made by lowering the agreement price, counted when the deal closes</span></h3>
+  {% if rn.years or rn.pending.count %}
+  <div class="grid-2" style="gap:16px;">
+    <table>
+      <thead><tr><th>Quarter</th><th>Deals</th><th>Made</th></tr></thead>
+      <tbody>
+        {% for (year, q), b in rn.quarters %}
+        <tr title="{% for d in b.deals %}{{ d.address }}: ${{ '{:,.0f}'.format(d.agreement_price|float) }} → ${{ '{:,.0f}'.format(d.renegotiated_price|float) }}&#10;{% endfor %}">
+          <td>Q{{ q }} {{ year }}</td><td>{{ b.count }}</td><td class="profit-up">{{ fm.money(b.saved) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="muted">No closed deal was renegotiated yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Year</th><th>Deals</th><th>Made</th></tr></thead>
+      <tbody>
+        {% for year, b in rn.years %}
+        <tr><td>{{ year }}</td><td>{{ b.count }}</td><td class="profit-up"><strong>{{ fm.money(b.saved) }}</strong></td></tr>
+        {% endfor %}
+        {% if rn.pending.count %}
+        <tr><td class="muted">Pending</td><td class="muted">{{ rn.pending.count }}</td><td class="muted" title="Renegotiated deals still under contract - counted when they close">{{ fm.money(rn.pending.saved) }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Hover a quarter to see the deals. Set the renegotiated price on the deal (Finance › Deals).</p>
+  {% else %}
+  <p class="muted" style="margin:0;">No renegotiations yet. When you get a better price on a deal, enter it as the <strong>Renegotiated price</strong> on the deal and it shows up here once the deal closes.</p>
+  {% endif %}
+</div>
+
 <div class="card">
   <h3>Monthly profit and loss</h3>
   <div style="overflow-x:auto;">

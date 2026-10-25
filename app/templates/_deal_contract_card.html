@@ -1,57 +1,15 @@
-{% set c = contract_clock(deal) %}
 <div class="card contract-card" id="contract-card">
-  <div class="contract-stats">
-    <div class="contract-stat">
-      <div class="label">Signed</div>
-      {% if c.days_since_signed is not none %}
-      <div class="value">{{ c.days_since_signed }} day{{ "s" if c.days_since_signed != 1 else "" }} ago</div>
-      <div class="muted sub">{{ deal.agreement_date.strftime('%a, %b %d, %Y') }}</div>
-      {% else %}
-      <div class="value muted">—</div><div class="muted sub">Add the agreement date below</div>
-      {% endif %}
-    </div>
-    <div class="contract-stat">
-      <div class="label">Inspection period</div>
-      <form hx-post="/finance/deals/{{ deal.id }}/inspection" hx-target="#contract-card" hx-swap="outerHTML" hx-trigger="change" class="inspection-form">
-        <input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10" aria-label="Inspection business days"> <span>business days</span>
-      </form>
-      {% if c.inspection_end %}<div class="muted sub">ends {{ c.inspection_end.strftime('%a, %b %d') }}</div>{% endif %}
-    </div>
-    <div class="contract-stat {{ 'urgent' if c.business_days_left is not none and c.calendar_days_left is not none and c.calendar_days_left >= 0 and c.business_days_left <= 2 }} {{ 'over' if c.calendar_days_left is not none and c.calendar_days_left < 0 }}">
-      <div class="label">Until inspection ends</div>
-      {% if c.inspection_end is none %}
-      <div class="value muted">—</div><div class="muted sub">{{ "Set the inspection days" if deal.agreement_date else "Needs the agreement date" }}</div>
-      {% elif c.calendar_days_left < 0 %}
-      <div class="value">Ended</div><div class="sub">{{ -c.calendar_days_left }} day{{ "s" if c.calendar_days_left != -1 else "" }} ago</div>
-      {% elif c.calendar_days_left == 0 %}
-      <div class="value">Today</div><div class="sub">last day of inspection</div>
-      {% else %}
-      <div class="value">{{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }}</div>
-      <div class="sub">{{ c.calendar_days_left }} calendar day{{ "s" if c.calendar_days_left != 1 else "" }}</div>
-      {% endif %}
-    </div>
-    <div class="contract-stat {{ 'urgent' if c.days_to_closing is not none and 0 <= c.days_to_closing <= 3 }}">
-      <div class="label">Closing</div>
-      {% if c.days_to_closing is none %}
-      <div class="value muted">—</div><div class="muted sub">Set the closing date below</div>
-      {% elif c.days_to_closing > 0 %}
-      <div class="value">in {{ c.days_to_closing }} day{{ "s" if c.days_to_closing != 1 else "" }}</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
-      {% elif c.days_to_closing == 0 %}
-      <div class="value">Today</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
-      {% else %}
-      <div class="value">{{ -c.days_to_closing }} day{{ "s" if c.days_to_closing != -1 else "" }} ago</div><div class="muted sub">mark the deal Closed below</div>
-      {% endif %}
-    </div>
-  </div>
+  {% include "_deal_contract_stats.html" %}
 
-  <form class="sale-row" hx-post="/finance/deals/{{ deal.id }}/sale" hx-target="#contract-card" hx-swap="outerHTML" hx-trigger="change"
-        hx-on::after-request="if(event.detail.successful){window.syncSaleFields && window.syncSaleFields(this);}">
-    <span class="sale-title">{{ "Buyer found" if deal.buyer_name else "Found a buyer?" }}</span>
-    <label>Buyer<input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" placeholder="Name" maxlength="120"></label>
-    <label>Price ($)<input type="number" step="any" name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}" placeholder="0"></label>
-    <label>Closing date<input type="date" name="closed_date" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></label>
-    {% if deal.sell_price is not none and deal.agreement_price is not none %}
-    <span class="sale-spread" title="Buyer's price − your agreement price">Spread <strong class="{{ 'profit-up' if deal.sell_price|float > deal.agreement_price|float else 'profit-down' }}">${{ "{:,.0f}".format(deal.sell_price|float - deal.agreement_price|float) }}</strong></span>
-    {% endif %}
+  {# Saves on change into the boxes above. A date is only sent once its year is complete. #}
+  <form class="contract-inputs" hx-post="/finance/deals/{{ deal.id }}/contract" hx-target="#contract-stats" hx-swap="outerHTML"
+        hx-trigger="change[event.target.type !== 'date' || !event.target.value || event.target.value.slice(0, 4) >= '2000']"
+        hx-on::after-request="if(event.detail.successful){window.syncContractFields && window.syncContractFields();}">
+    <label>Inspection<span class="input-suffix"><input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10"> business days</span></label>
+    <label title="Leave empty if there was no renegotiation">Renegotiated price ($)<input type="number" step="any" name="renegotiated_price" value="{{ '%g'|format(deal.renegotiated_price|float) if deal.renegotiated_price is not none else '' }}" placeholder="if renegotiated"></label>
+    <span class="contract-divider"></span>
+    <label>Buyer<input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" placeholder="Found a buyer?" maxlength="120"></label>
+    <label>Buyer's price ($)<input type="number" step="any" name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}" placeholder="0"></label>
+    <label>Closing date<input type="date" name="closed_date" min="2000-01-01" max="2100-12-31" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></label>
   </form>
 </div>
