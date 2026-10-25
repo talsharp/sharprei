@@ -1,5 +1,5 @@
 import shutil
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
@@ -14,6 +14,8 @@ from app.finance import (
     DEAL_STATUSES,
     LEAD_CHANNELS,
     SMS_SOURCES,
+    BUYER_STATUSES,
+    contract_clock,
     WHOLESALE_CHANNELS,
     MonthSummary,
     build_month_summaries,
@@ -26,7 +28,7 @@ from app.finance import (
     start_month,
 )
 from app.statements import charges_by_expense
-from app.models import DealFile, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.models import DealBuyer, DealFile, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -49,6 +51,13 @@ def _int(value: str) -> int:
         return max(0, int(float(value or 0)))
     except ValueError:
         return 0
+
+
+def _datetime(value: str) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except ValueError:
+        return None
 
 
 def _optional_date(value: str) -> Optional[date]:
@@ -78,6 +87,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     templates.env.globals["CHANNELS"] = CHANNELS
     templates.env.globals["DEAL_STATUSES"] = DEAL_STATUSES
     templates.env.globals["SMS_SOURCES"] = SMS_SOURCES
+    templates.env.globals["BUYER_STATUSES"] = BUYER_STATUSES
+    templates.env.globals["contract_clock"] = contract_clock
 
     # ---------- Overview ----------
 
@@ -297,8 +308,59 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             "finance_deal_detail.html",
             {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
-             "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal)},
+             "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal),
+             "buyer_names": _buyer_names(db)},
         )
+
+    # ---------- Under contract: inspection clock + buyers / walkthroughs ----------
+
+    def _buyer_names(db: Session):
+        """Names used on any deal before - suggested when adding a buyer."""
+        return sorted({b.name for b in db.query(DealBuyer).all()}, key=str.lower)
+
+    @router.post("/deals/{deal_id}/inspection")
+    def finance_deal_inspection(request: Request, deal_id: int, inspection_days: str = Form(""), db: Session = Depends(get_db)):
+        deal = db.get(WholesaleDeal, deal_id)
+        if not deal:
+            return Response(status_code=404)
+        deal.inspection_days = _int(inspection_days) or None
+        db.commit()
+        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal})
+
+    @router.post("/deals/{deal_id}/buyers/new")
+    def finance_buyer_new(request: Request, deal_id: int, name: str = Form(""), visit_at: str = Form(""), db: Session = Depends(get_db)):
+        deal = db.get(WholesaleDeal, deal_id)
+        if not deal or not name.strip():
+            return Response(status_code=204)
+        buyer = DealBuyer(deal_id=deal.id, name=name.strip()[:120], visit_at=_datetime(visit_at))
+        db.add(buyer)
+        db.commit()
+        return templates.TemplateResponse("_deal_buyer_row.html", {"request": request, "b": buyer})
+
+    @router.post("/deals/buyers/{buyer_id}")
+    async def finance_buyer_update(buyer_id: int, request: Request, db: Session = Depends(get_db)):
+        buyer = db.get(DealBuyer, buyer_id)
+        if not buyer:
+            return Response(status_code=404)
+        form = await request.form()
+        if form.get("name", "").strip():
+            buyer.name = form["name"].strip()[:120]
+        if "visit_at" in form:
+            buyer.visit_at = _datetime(form["visit_at"])
+        if form.get("status") in BUYER_STATUSES:
+            buyer.status = form["status"]
+        if "note" in form:
+            buyer.note = form["note"].strip() or None
+        db.commit()
+        return Response(status_code=204)
+
+    @router.post("/deals/buyers/{buyer_id}/delete")
+    def finance_buyer_delete(buyer_id: int, db: Session = Depends(get_db)):
+        buyer = db.get(DealBuyer, buyer_id)
+        if buyer:
+            db.delete(buyer)
+            db.commit()
+        return Response(status_code=204)
 
     @router.post("/deals/{deal_id}/update")
     def finance_deal_update(

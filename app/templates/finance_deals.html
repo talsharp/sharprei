@@ -34,7 +34,17 @@
   <tbody>
     {% for d in deals %}
     <tr>
-      <td><a class="zip-link" href="/finance/deals/{{ d.id }}" {% if d.notes %}title="{{ d.notes }}"{% endif %}>{{ d.address }}</a>{% if d.notes %} <span class="muted" title="{{ d.notes }}">ⓘ</span>{% endif %}{% if d.files %} <span class="file-count" title="{{ d.files|length }} file{{ 's' if d.files|length != 1 else '' }}"><svg class="clip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>{{ d.files|length }}</span>{% endif %}</td>
+      <td><a class="zip-link" href="/finance/deals/{{ d.id }}" {% if d.notes %}title="{{ d.notes }}"{% endif %}>{{ d.address }}</a>{% if d.notes %} <span class="muted" title="{{ d.notes }}">ⓘ</span>{% endif %}{% if d.files %} <span class="file-count" title="{{ d.files|length }} file{{ 's' if d.files|length != 1 else '' }}"><svg class="clip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>{{ d.files|length }}</span>{% endif %}
+        {% if d.status == 'under_contract' %}
+        {% set c = contract_clock(d) %}
+        {% set confirmed = d.buyers|selectattr('status', 'equalto', 'confirmed')|list|length %}
+        <div class="deal-clock">
+          {% if c.days_since_signed is not none %}Day {{ c.days_since_signed }}{% endif %}
+          {% if c.inspection_end %} · <span class="{{ 'profit-down' if c.calendar_days_left < 0 or c.business_days_left <= 2 }}">{% if c.calendar_days_left < 0 %}inspection ended{% elif c.calendar_days_left == 0 %}inspection ends today{% else %}inspection: {{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }} left{% endif %}</span>{% endif %}
+          {% if d.buyers %} · {{ d.buyers|length }} buyer{{ "s" if d.buyers|length != 1 else "" }}, {{ confirmed }} confirmed{% endif %}
+        </div>
+        {% endif %}
+      </td>
       <td>{{ fx.status_badge(d.status) }}</td>
       <td>{{ d.agreement_date.strftime('%b %d, %Y') if d.agreement_date else "—" }}</td>
       <td>{{ fx.money(d.agreement_price|float if d.agreement_price is not none else none) }}</td>

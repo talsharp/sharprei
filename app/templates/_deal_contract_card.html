@@ -1,0 +1,34 @@
+{% set c = contract_clock(deal) %}
+<div class="card contract-card" id="contract-card">
+  <div class="contract-stats">
+    <div class="contract-stat">
+      <div class="label">Signed</div>
+      {% if c.days_since_signed is not none %}
+      <div class="value">{{ c.days_since_signed }} day{{ "s" if c.days_since_signed != 1 else "" }} ago</div>
+      <div class="muted sub">{{ deal.agreement_date.strftime('%a, %b %d, %Y') }}</div>
+      {% else %}
+      <div class="value muted">—</div><div class="muted sub">Add the agreement date below</div>
+      {% endif %}
+    </div>
+    <div class="contract-stat">
+      <div class="label">Inspection period</div>
+      <form hx-post="/finance/deals/{{ deal.id }}/inspection" hx-target="#contract-card" hx-swap="outerHTML" hx-trigger="change" class="inspection-form">
+        <input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="0" aria-label="Inspection business days"> <span>business days</span>
+      </form>
+      {% if c.inspection_end %}<div class="muted sub">ends {{ c.inspection_end.strftime('%a, %b %d') }}</div>{% endif %}
+    </div>
+    <div class="contract-stat {{ 'urgent' if c.business_days_left is not none and c.calendar_days_left is not none and c.calendar_days_left >= 0 and c.business_days_left <= 2 }} {{ 'over' if c.calendar_days_left is not none and c.calendar_days_left < 0 }}">
+      <div class="label">Until inspection ends</div>
+      {% if c.inspection_end is none %}
+      <div class="value muted">—</div><div class="muted sub">{{ "Set the inspection days" if deal.agreement_date else "Needs the agreement date" }}</div>
+      {% elif c.calendar_days_left < 0 %}
+      <div class="value">Ended</div><div class="sub">{{ -c.calendar_days_left }} day{{ "s" if c.calendar_days_left != -1 else "" }} ago</div>
+      {% elif c.calendar_days_left == 0 %}
+      <div class="value">Today</div><div class="sub">last day of inspection</div>
+      {% else %}
+      <div class="value">{{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }}</div>
+      <div class="sub">{{ c.calendar_days_left }} calendar day{{ "s" if c.calendar_days_left != 1 else "" }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -442,9 +442,15 @@ class WholesaleDeal(Base):
     zip_code_id: Mapped[Optional[int]] = mapped_column(ForeignKey("zip_codes.id"), nullable=True)
     # Which SMS round the lead came from: first_text / follow_up_1 / _2 / _3.
     sms_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Inspection period in business days, counted from the agreement date.
+    inspection_days: Mapped[Optional[int]] = mapped_column(nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()
+    buyers: Mapped[list["DealBuyer"]] = relationship(
+        back_populates="deal", cascade="all, delete-orphan",
+        order_by="(DealBuyer.visit_at.is_(None), DealBuyer.visit_at, DealBuyer.id)",
+    )
     files: Mapped[list["DealFile"]] = relationship(
         back_populates="deal", cascade="all, delete-orphan", order_by="DealFile.uploaded_at.desc()"
     )
@@ -631,6 +637,23 @@ class ApiUsage(Base):
     service: Mapped[str] = mapped_column(String(40))
     month: Mapped[date] = mapped_column(Date)
     calls: Mapped[int] = mapped_column(default=0)
+
+
+class DealBuyer(Base):
+    """An investor Tal is trying to sell an under-contract deal to, and their walkthrough."""
+    __tablename__ = "deal_buyers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    # Each buyer has their own visit time: same time = a group walkthrough,
+    # different times = a second walkthrough or a vacant house.
+    visit_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="waiting")  # waiting / confirmed / visited / cant
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    deal: Mapped["WholesaleDeal"] = relationship(back_populates="buyers")
 
 
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).

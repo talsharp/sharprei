@@ -562,3 +562,32 @@ tr.row-highlight td { background: #EAF6EC; }
 .view-switch a:hover { color: var(--navy); background: var(--panel-soft); }
 .view-switch a.active { background: var(--navy); color: #fff; }
 .view-hint { font-size: 12px; }
+
+/* Deals › under contract */
+.contract-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.contract-stat { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+.contract-stat .label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.contract-stat .value { font-size: 22px; font-weight: 700; color: var(--navy); }
+.contract-stat .sub { font-size: 12px; }
+.contract-stat.urgent { border-color: #E8A33C; background: #FFF6E5; }
+.contract-stat.over { border-color: #D64545; background: #FDECEC; }
+.inspection-form { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--navy); font-weight: 600; }
+.inspection-form input { width: 70px; font-size: 20px; font-weight: 700; padding: 4px 8px; }
+.visit-summary { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; line-height: 1.6; }
+.vs-tally { font-size: 12px; margin-top: 2px; }
+.vs-confirmed, .vs-visited { color: #23824A; } .vs-waiting { color: #B7791F; } .vs-cant { color: #C0392B; text-decoration: line-through; }
+.buyers-table { width: 100%; }
+.buyers-table td { padding: 4px 6px; vertical-align: middle; }
+.buyers-table input[type=text], .buyers-table input[type=datetime-local], .buyers-table select { width: 100%; padding: 6px 8px; font-size: 13px; }
+.buyers-table td:nth-child(1) { width: 20%; min-width: 140px; } .buyers-table td:nth-child(2) { width: 210px; min-width: 200px; } .buyers-table td:nth-child(3) { width: 150px; min-width: 140px; } .buyers-table td:nth-child(4) { min-width: 180px; }
+.buyers-table input.buyer-name { font-weight: 600; }
+.buyer-row.status-confirmed select, .buyer-row.status-visited select { background: #E3F4E8; color: #23824A; border-color: #B7E0C3; }
+.buyer-row.status-waiting select { background: #FFF6E5; color: #B7791F; border-color: #F0D9A8; }
+.buyer-row.status-cant select { background: #FBE7E7; color: #C0392B; border-color: #F1C0C0; }
+.buyer-row.status-cant input { color: var(--muted); }
+.buyer-delete { background: none; border: none; color: #B7C0CE; font-size: 18px; padding: 0 4px; }
+.buyer-delete:hover { color: #D64545; }
+.buyers-table .saved { border-color: #2E8B57 !important; box-shadow: 0 0 0 3px rgba(46,139,87,.15) !important; }
+.buyer-add input { width: 100%; margin-top: 8px; border-style: dashed; }
+@media (max-width: 760px) { .contract-stats { grid-template-columns: 1fr; } }
+.deal-clock { font-size: 12px; color: var(--muted); margin-top: 2px; }

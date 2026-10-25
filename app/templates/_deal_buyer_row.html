@@ -1,0 +1,11 @@
+<tr class="buyer-row status-{{ b.status }}" data-id="{{ b.id }}">
+  <td><input type="text" class="buyer-name" data-field="name" value="{{ b.name }}" maxlength="120" aria-label="Buyer"></td>
+  <td><input type="datetime-local" data-field="visit_at" value="{{ b.visit_at.strftime('%Y-%m-%dT%H:%M') if b.visit_at else '' }}" aria-label="Visit"></td>
+  <td>
+    <select data-field="status" class="buyer-status" aria-label="Walkthrough status">
+      {% for k, label in BUYER_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == b.status }}>{{ label }}</option>{% endfor %}
+    </select>
+  </td>
+  <td><input type="text" data-field="note" value="{{ b.note or '' }}" placeholder="Where they stand…" aria-label="Note"></td>
+  <td><button type="button" class="buyer-delete" title="Remove">×</button></td>
+</tr>

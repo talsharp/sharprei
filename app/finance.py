@@ -10,7 +10,7 @@ wholesale expenses, so they don't reduce wholesale profit either.
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session, selectinload
@@ -47,6 +47,52 @@ DEAL_STATUSES = OrderedDict(
         ("cancelled", "Dead"),
     ]
 )
+
+
+BUYER_STATUSES = OrderedDict(
+    [("waiting", "Waiting"), ("confirmed", "Confirmed"), ("visited", "Visited"), ("cant", "Can't make it")]
+)
+
+
+def add_business_days(start: date, days: int) -> date:
+    """The date `days` business days after `start` (weekends skipped, the start day not counted)."""
+    d, counted = start, 0
+    while counted < days:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            counted += 1
+    return d
+
+
+def business_days_until(start: date, end: date) -> int:
+    """Business days after `start` up to and including `end` (0 if end isn't later)."""
+    count, d = 0, start
+    while d < end:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            count += 1
+    return count
+
+
+@dataclass
+class ContractClock:
+    days_since_signed: Optional[int] = None
+    inspection_end: Optional[date] = None
+    business_days_left: Optional[int] = None
+    calendar_days_left: Optional[int] = None
+
+
+def contract_clock(deal: WholesaleDeal, today: Optional[date] = None) -> ContractClock:
+    today = today or date.today()
+    clock = ContractClock()
+    if deal.agreement_date:
+        clock.days_since_signed = (today - deal.agreement_date).days
+        if deal.inspection_days:
+            end = add_business_days(deal.agreement_date, deal.inspection_days)
+            clock.inspection_end = end
+            clock.calendar_days_left = (end - today).days
+            clock.business_days_left = business_days_until(today, end) if end >= today else 0
+    return clock
 
 
 def month_start(d: date) -> date:

@@ -12,6 +12,28 @@
   <a class="btn secondary" href="/finance/deals">Back to deals</a>
 </div>
 
+{% if deal.status == 'under_contract' %}{% include "_deal_contract_card.html" %}{% endif %}
+
+{% if deal.status == 'under_contract' or deal.buyers %}
+<div class="card" id="buyers-card">
+  <h3>Buyers &amp; walkthroughs</h3>
+  <div id="visit-summary" class="visit-summary"></div>
+  <datalist id="buyer-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
+  <div style="overflow-x:auto;">
+  <table class="buyers-table">
+    <thead><tr><th>Buyer</th><th>Visit</th><th>Status</th><th>Note</th><th></th></tr></thead>
+    <tbody id="buyer-rows">
+      {% for b in deal.buyers %}{% include "_deal_buyer_row.html" %}{% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form id="buyer-add" class="buyer-add" autocomplete="off">
+    <input type="text" name="name" list="buyer-names" placeholder="+ Add buyer (type a name, press Enter)" maxlength="120">
+  </form>
+  <p class="muted" style="font-size:12px; margin:8px 0 0;">Same visit time = one walkthrough together. A new buyer gets the last visit time you used - change it for a second walkthrough or a vacant house. Everything saves as you type.</p>
+</div>
+{% endif %}
+
 <form method="post" action="/finance/deals/{{ deal.id }}/update">
 <div class="grid-2">
   <div class="card">
@@ -92,5 +114,74 @@
 <form method="post" action="/finance/deals/{{ deal.id }}/delete" onsubmit="return confirm('Delete this deal permanently? Its files will be deleted too.');" style="margin-top:28px;">
   <button type="submit" class="danger">Delete deal</button>
 </form>
+
+{% if deal.status == 'under_contract' or deal.buyers %}
+<script>
+(function() {
+  var STATUS = {{ BUYER_STATUSES|tojson }};
+  var ICON = {waiting: '⏳', confirmed: '✓', visited: '✓✓', cant: '✕'};
+  var rows = document.getElementById('buyer-rows');
+
+  function post(url, data) {
+    var body = new URLSearchParams();
+    Object.keys(data || {}).forEach(function(k) { body.append(k, data[k]); });
+    return fetch(url, {method: 'POST', body: body}).then(function(r) { if (!r.ok) throw new Error(r.status); return r; })
+      .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
+  }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // Groups buyers by visit time: "Sat, Oct 26 · 11:00 AM - John ✓, Sarah ⏳"
+  function summarize() {
+    var groups = {}, order = [], counts = {waiting: 0, confirmed: 0, visited: 0, cant: 0};
+    rows.querySelectorAll('.buyer-row').forEach(function(tr) {
+      var when = tr.querySelector('[data-field=visit_at]').value, status = tr.querySelector('[data-field=status]').value;
+      counts[status]++;
+      var key = when || 'none';
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push('<span class="vs-' + status + '">' + esc(tr.querySelector('[data-field=name]').value) + ' ' + ICON[status] + '</span>');
+    });
+    order.sort(function(a, b) { return a === 'none' ? 1 : b === 'none' ? -1 : a.localeCompare(b); });
+    var html = order.map(function(key) {
+      var label = key === 'none' ? 'No visit time yet' : new Date(key).toLocaleString('en-US', {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+      return '<div><strong>' + label + '</strong> - ' + groups[key].join(', ') + '</div>';
+    }).join('');
+    var total = rows.querySelectorAll('.buyer-row').length;
+    var tally = total ? '<div class="muted vs-tally">' + total + ' buyer' + (total === 1 ? '' : 's') + ' · ' + counts.confirmed + ' confirmed · ' + counts.waiting + ' waiting' + (counts.visited ? ' · ' + counts.visited + ' visited' : '') + (counts.cant ? ' · ' + counts.cant + " can't make it" : '') + '</div>' : '<div class="muted">No buyers yet.</div>';
+    document.getElementById('visit-summary').innerHTML = html + tally;
+  }
+
+  function wire(tr) {
+    tr.querySelectorAll('[data-field]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        var data = {}; data[input.dataset.field] = input.value;
+        post('/finance/deals/buyers/' + tr.dataset.id, data).then(function() {
+          if (input.dataset.field === 'status') tr.className = 'buyer-row status-' + input.value;
+          input.classList.add('saved'); setTimeout(function() { input.classList.remove('saved'); }, 800);
+          summarize();
+        });
+      });
+    });
+    tr.querySelector('.buyer-delete').addEventListener('click', function() {
+      post('/finance/deals/buyers/' + tr.dataset.id + '/delete').then(function() { tr.remove(); summarize(); });
+    });
+  }
+  rows.querySelectorAll('.buyer-row').forEach(wire);
+
+  document.getElementById('buyer-add').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var input = this.querySelector('input'), name = input.value.trim();
+    if (!name) return;
+    // New buyers join the last visit time used (a group walkthrough).
+    var times = Array.prototype.map.call(rows.querySelectorAll('[data-field=visit_at]'), function(i) { return i.value; }).filter(Boolean);
+    input.value = '';
+    post('/finance/deals/{{ deal.id }}/buyers/new', {name: name, visit_at: times.length ? times[times.length - 1] : ''})
+      .then(function(r) { return r.text(); })
+      .then(function(html) { rows.insertAdjacentHTML('beforeend', html); wire(rows.lastElementChild); summarize(); input.focus(); })
+      .catch(function() { input.value = name; });
+  });
+  summarize();
+})();
+</script>
+{% endif %}
 
 {% endblock %}
