@@ -80,6 +80,7 @@ class ContractClock:
     inspection_end: Optional[date] = None
     business_days_left: Optional[int] = None
     calendar_days_left: Optional[int] = None
+    days_to_closing: Optional[int] = None
 
 
 def contract_clock(deal: WholesaleDeal, today: Optional[date] = None) -> ContractClock:
@@ -92,6 +93,8 @@ def contract_clock(deal: WholesaleDeal, today: Optional[date] = None) -> Contrac
             clock.inspection_end = end
             clock.calendar_days_left = (end - today).days
             clock.business_days_left = business_days_until(today, end) if end >= today else 0
+    if deal.closed_date:
+        clock.days_to_closing = (deal.closed_date - today).days
     return clock
 
 

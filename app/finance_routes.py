@@ -325,7 +325,26 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             return Response(status_code=404)
         deal.inspection_days = _int(inspection_days) or None
         db.commit()
-        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal})
+        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal, "buyer_names": _buyer_names(db)})
+
+    @router.post("/deals/{deal_id}/sale")
+    def finance_deal_sale(
+        request: Request,
+        deal_id: int,
+        buyer_name: str = Form(""),
+        sell_price: str = Form(""),
+        closed_date: str = Form(""),
+        db: Session = Depends(get_db),
+    ):
+        """The buyer found for an under-contract deal: who, how much, closing date."""
+        deal = db.get(WholesaleDeal, deal_id)
+        if not deal:
+            return Response(status_code=404)
+        deal.buyer_name = buyer_name.strip()[:120] or None
+        deal.sell_price = _optional_money(sell_price)
+        deal.closed_date = _optional_date(closed_date)
+        db.commit()
+        return templates.TemplateResponse("_deal_contract_card.html", {"request": request, "deal": deal, "buyer_names": _buyer_names(db)})
 
     @router.post("/deals/{deal_id}/buyers/new")
     def finance_buyer_new(request: Request, deal_id: int, name: str = Form(""), visit_at: str = Form(""), db: Session = Depends(get_db)):
@@ -380,6 +399,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         channel: str = Form(""),
         zip_code_id: str = Form(""),
         sms_source: str = Form(""),
+        buyer_name: str = Form(""),
         notes: str = Form(""),
         db: Session = Depends(get_db),
     ):
@@ -400,6 +420,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.channel = channel if channel in CHANNELS else None
             deal.zip_code_id = int(zip_code_id) if zip_code_id.isdigit() else None
             deal.sms_source = sms_source if sms_source in SMS_SOURCES else None
+            deal.buyer_name = buyer_name.strip()[:120] or None
             deal.notes = notes.strip() or None
             db.commit()
         return RedirectResponse("/finance/deals", status_code=303)

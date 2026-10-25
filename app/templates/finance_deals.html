@@ -41,7 +41,8 @@
         <div class="deal-clock">
           {% if c.days_since_signed is not none %}Day {{ c.days_since_signed }}{% endif %}
           {% if c.inspection_end %} · <span class="{{ 'profit-down' if c.calendar_days_left < 0 or c.business_days_left <= 2 }}">{% if c.calendar_days_left < 0 %}inspection ended{% elif c.calendar_days_left == 0 %}inspection ends today{% else %}inspection: {{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }} left{% endif %}</span>{% endif %}
-          {% if d.buyers %} · {{ d.buyers|length }} buyer{{ "s" if d.buyers|length != 1 else "" }}, {{ confirmed }} confirmed{% endif %}
+          {% if d.buyer_name %} · <strong>sold to {{ d.buyer_name }}</strong>{% if d.sell_price is not none %} for {{ fx.money(d.sell_price|float) }}{% endif %}{% if c.days_to_closing is not none %}, closing {{ d.closed_date.strftime('%b %d') }}{% if c.days_to_closing >= 0 %} ({{ "today" if c.days_to_closing == 0 else "in " ~ c.days_to_closing ~ " days" }}){% endif %}{% endif %}
+          {% elif d.buyers %} · {{ d.buyers|length }} buyer{{ "s" if d.buyers|length != 1 else "" }}, {{ confirmed }} confirmed{% endif %}
         </div>
         {% endif %}
       </td>

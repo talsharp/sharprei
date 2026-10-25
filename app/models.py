@@ -444,6 +444,9 @@ class WholesaleDeal(Base):
     sms_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # Inspection period in business days, counted from the agreement date.
     inspection_days: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # The end buyer once one is found. Their price is sell_price; closed_date
+    # is the scheduled closing date until the deal closes.
+    buyer_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()

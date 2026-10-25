@@ -12,13 +12,25 @@
   <a class="btn secondary" href="/finance/deals">Back to deals</a>
 </div>
 
+<datalist id="buyer-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
 {% if deal.status == 'under_contract' %}{% include "_deal_contract_card.html" %}{% endif %}
+<script>
+// The sale row and the deal form below edit the same fields - keep them in step.
+window.syncSaleFields = function() {
+  var card = document.getElementById('contract-card'), form = document.querySelector('form[action$="/update"]');
+  if (!card || !form) return;
+  ['buyer_name', 'sell_price', 'closed_date'].forEach(function(n) {
+    var src = card.querySelector('[name=' + n + ']'), dst = form.querySelector('[name=' + n + ']');
+    if (src && dst) dst.value = src.value;
+  });
+};
+document.body.addEventListener('htmx:afterSettle', function() { window.syncSaleFields(); });
+</script>
 
 {% if deal.status == 'under_contract' or deal.buyers %}
 <div class="card" id="buyers-card">
   <h3>Buyers &amp; walkthroughs</h3>
   <div id="visit-summary" class="visit-summary"></div>
-  <datalist id="buyer-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
   <div style="overflow-x:auto;">
   <table class="buyers-table">
     <thead><tr><th>Buyer</th><th>Visit</th><th>Status</th><th>Note</th><th></th></tr></thead>
@@ -41,6 +53,7 @@
     <div class="form-row"><label>Address</label><input type="text" name="address" value="{{ deal.address }}" required></div>
     <div class="form-row"><label>Agreement date</label><input type="date" name="agreement_date" value="{{ deal.agreement_date.isoformat() if deal.agreement_date else '' }}"></div>
     <div class="form-row"><label>Agreement price ($)</label><input type="number" step="any" name="agreement_price" value="{{ '%g'|format(deal.agreement_price|float) if deal.agreement_price is not none else '' }}"></div>
+    <div class="form-row"><label>Buyer</label><input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" maxlength="120"></div>
     <div class="form-row"><label>Sell price ($)</label><input type="number" step="any" name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}"></div>
     <div class="form-row">
       <label>Status</label>
@@ -48,7 +61,7 @@
         {% for k, label in DEAL_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == deal.status else '' }}>{{ label }}</option>{% endfor %}
       </select>
     </div>
-    <div class="form-row"><label>Closed date</label><input type="date" name="closed_date" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></div>
+    <div class="form-row"><label>Closing date</label><input type="date" name="closed_date" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></div>
     <div class="form-row">
       <label>Lead source (channel)</label>
       <select name="channel">

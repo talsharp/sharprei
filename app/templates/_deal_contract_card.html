@@ -13,7 +13,7 @@
     <div class="contract-stat">
       <div class="label">Inspection period</div>
       <form hx-post="/finance/deals/{{ deal.id }}/inspection" hx-target="#contract-card" hx-swap="outerHTML" hx-trigger="change" class="inspection-form">
-        <input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="0" aria-label="Inspection business days"> <span>business days</span>
+        <input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10" aria-label="Inspection business days"> <span>business days</span>
       </form>
       {% if c.inspection_end %}<div class="muted sub">ends {{ c.inspection_end.strftime('%a, %b %d') }}</div>{% endif %}
     </div>
@@ -30,5 +30,28 @@
       <div class="sub">{{ c.calendar_days_left }} calendar day{{ "s" if c.calendar_days_left != 1 else "" }}</div>
       {% endif %}
     </div>
+    <div class="contract-stat {{ 'urgent' if c.days_to_closing is not none and 0 <= c.days_to_closing <= 3 }}">
+      <div class="label">Closing</div>
+      {% if c.days_to_closing is none %}
+      <div class="value muted">—</div><div class="muted sub">Set the closing date below</div>
+      {% elif c.days_to_closing > 0 %}
+      <div class="value">in {{ c.days_to_closing }} day{{ "s" if c.days_to_closing != 1 else "" }}</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
+      {% elif c.days_to_closing == 0 %}
+      <div class="value">Today</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
+      {% else %}
+      <div class="value">{{ -c.days_to_closing }} day{{ "s" if c.days_to_closing != -1 else "" }} ago</div><div class="muted sub">mark the deal Closed below</div>
+      {% endif %}
+    </div>
   </div>
+
+  <form class="sale-row" hx-post="/finance/deals/{{ deal.id }}/sale" hx-target="#contract-card" hx-swap="outerHTML" hx-trigger="change"
+        hx-on::after-request="if(event.detail.successful){window.syncSaleFields && window.syncSaleFields(this);}">
+    <span class="sale-title">{{ "Buyer found" if deal.buyer_name else "Found a buyer?" }}</span>
+    <label>Buyer<input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" placeholder="Name" maxlength="120"></label>
+    <label>Price ($)<input type="number" step="any" name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}" placeholder="0"></label>
+    <label>Closing date<input type="date" name="closed_date" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></label>
+    {% if deal.sell_price is not none and deal.agreement_price is not none %}
+    <span class="sale-spread" title="Buyer's price − your agreement price">Spread <strong class="{{ 'profit-up' if deal.sell_price|float > deal.agreement_price|float else 'profit-down' }}">${{ "{:,.0f}".format(deal.sell_price|float - deal.agreement_price|float) }}</strong></span>
+    {% endif %}
+  </form>
 </div>
