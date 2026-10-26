@@ -669,3 +669,29 @@ p.sale-spread { margin: 10px 0 0; font-size: 14px; }
   .listing h1 { font-size: 22px; }
   .contact-card { position: static; }
 }
+.listing h1.listing-title { margin: 0 0 14px; font-size: 30px; }
+.listing-main { padding-top: 4px; }
+.contact-person { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 0 6px; }
+.contact-photo { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid #fff; box-shadow: 0 2px 10px rgba(31,58,95,.18); }
+.contact-card .contact-name { font-size: 17px; font-weight: 700; color: var(--navy); margin: 0; }
+.contact-line { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 15px; }
+.contact-line a { color: var(--navy); font-weight: 600; text-decoration: none; word-break: break-all; }
+.contact-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+@media (max-width: 860px) { .listing h1.listing-title { font-size: 22px; } }
+.view-kpis { grid-template-columns: repeat(5, 1fr); }
+.photos-seen { margin-left: auto; font-size: 12px; color: var(--navy); font-weight: 600; }
+.drop-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 2px dashed #C9D3E0; border-radius: 12px; padding: 22px; text-align: center; cursor: pointer; background: var(--panel-soft); margin-bottom: 14px; transition: background .15s, border-color .15s; font-size: 14px; color: var(--text); }
+.drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: #EEF4FB; }
+.drop-zone.busy { opacity: .7; pointer-events: none; }
+.drop-icon { font-size: 22px; color: var(--accent); }
+.drop-status { font-size: 13px; min-height: 16px; }
+.photo-tile { cursor: grab; }
+.photo-tile.dragging { opacity: .4; }
+.photo-number { position: absolute; top: 6px; right: 6px; background: rgba(15,30,50,.7); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
+.photo-cover[hidden] { display: none; }
+.photo-actions button { padding: 3px 8px; }
+.contact-photo-row { display: flex; align-items: center; gap: 14px; }
+.contact-photo-row .contact-photo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); }
+.contact-photo.placeholder { display: flex; align-items: center; justify-content: center; background: var(--panel-soft); color: var(--muted); font-size: 11px; }
+@media (max-width: 860px) { .view-kpis { grid-template-columns: repeat(3, 1fr); } }
+.page-form .wide { grid-column: 1 / -1; }

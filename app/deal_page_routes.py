@@ -4,6 +4,7 @@
 same page, and each visit is recorded against the link it came through.
 """
 
+import shutil
 from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
@@ -26,6 +27,7 @@ from app.deal_pages import (
     new_token,
     page_folder,
     public_base,
+    save_contact_photo,
     save_photo,
     view_stats,
 )
@@ -56,6 +58,12 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                         contact_name=last.contact_name if last else "Tal Perry",
                         contact_phone=last.contact_phone if last else None,
                         contact_email=last.contact_email if last else None)
+        db.add(page)
+        db.flush()
+        if last and last.contact_photo and (page_folder(last.id) / last.contact_photo).is_file():
+            page_folder(page.id).mkdir(parents=True, exist_ok=True)
+            shutil.copy(page_folder(last.id) / last.contact_photo, page_folder(page.id) / last.contact_photo)
+            page.contact_photo = last.contact_photo
         probe = CompHouse(address=deal.address, is_subject=True)
         try:
             fill_from_county(probe)
@@ -187,6 +195,51 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         db.commit()
         return RedirectResponse(f"/finance/deals/{deal_id}/page#links", status_code=303)
 
+    @router.post("/finance/deals/{deal_id}/page/photos/order")
+    async def photos_order(deal_id: int, request: Request, db: Session = Depends(get_db)):
+        """Body: {"ids": [photo ids in the new order]} - the first is the cover."""
+        page = _page_for(db, deal_id)
+        if not page:
+            return Response(status_code=404)
+        ids = [int(x) for x in (await request.json()).get("ids", []) if str(x).isdigit()]
+        by_id = {p.id: p for p in page.photos}
+        ordered = [by_id[i] for i in ids if i in by_id] + [p for p in page.photos if p.id not in ids]
+        for position, photo in enumerate(ordered):
+            photo.position = position
+        db.commit()
+        return Response(status_code=204)
+
+    @router.post("/finance/deals/{deal_id}/page/contact-photo")
+    async def contact_photo_upload(deal_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+        page = _page_for(db, deal_id)
+        if not page:
+            return RedirectResponse("/finance/deals", status_code=303)
+        data = await file.read(MAX_UPLOAD_BYTES + 1)
+        name = save_contact_photo(page.id, data) if data and len(data) <= MAX_UPLOAD_BYTES else None
+        if not name:
+            return RedirectResponse(f"/finance/deals/{deal_id}/page?error=contact#details", status_code=303)
+        if page.contact_photo:
+            (page_folder(page.id) / page.contact_photo).unlink(missing_ok=True)
+        page.contact_photo = name
+        db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}/page#details", status_code=303)
+
+    @router.post("/finance/deals/{deal_id}/page/contact-photo/delete")
+    def contact_photo_delete(deal_id: int, db: Session = Depends(get_db)):
+        page = _page_for(db, deal_id)
+        if page and page.contact_photo:
+            (page_folder(page.id) / page.contact_photo).unlink(missing_ok=True)
+            page.contact_photo = None
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}/page#details", status_code=303)
+
+    @router.get("/finance/deals/{deal_id}/page/contact-photo")
+    def contact_photo_private(deal_id: int, db: Session = Depends(get_db)):
+        page = _page_for(db, deal_id)
+        if not page or not page.contact_photo:
+            return Response(status_code=404)
+        return FileResponse(page_folder(page.id) / page.contact_photo, media_type="image/jpeg")
+
     @router.get("/finance/deals/{deal_id}/page/preview")
     def page_preview(request: Request, deal_id: int, db: Session = Depends(get_db)):
         page = _page_for(db, deal_id)
@@ -194,8 +247,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             return RedirectResponse(f"/finance/deals/{deal_id}/page", status_code=303)
         return templates.TemplateResponse(
             "deal_page_public.html",
-            {"request": request, "page": page, "preview": True, "base": public_base(request),
-             "photo_url": lambda p: f"/finance/deal-photos/{p.id}"},
+            {"request": request, "page": page, "preview": True, "base": public_base(request), "view_id": None,
+             "photo_url": lambda p: f"/finance/deal-photos/{p.id}",
+             "contact_photo_url": f"/finance/deals/{deal_id}/page/contact-photo"},
         )
 
     # ---------- Public ----------
@@ -218,24 +272,51 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         page, link = _resolve(db, token)
         if not page:
             return templates.TemplateResponse("deal_page_missing.html", {"request": request}, status_code=404)
-        response = templates.TemplateResponse(
-            "deal_page_public.html",
-            {"request": request, "page": page, "preview": False, "base": public_base(request), "token": token,
-             "photo_url": lambda p: f"/d/{token}/p/{p.id}"},
-        )
         user_agent = request.headers.get("user-agent", "")
+        view, visitor = None, None
         # Not counted: link-preview bots, and you yourself (logged in on this address).
         if not is_bot(user_agent) and not request.session.get("user_id"):
             visitor = request.cookies.get(VISITOR_COOKIE)
             if not visitor or len(visitor) > 40:
                 visitor = uuid4().hex
             seen = db.query(DealPageView.id).filter(DealPageView.page_id == page.id, DealPageView.visitor_id == visitor).first()
-            db.add(DealPageView(page_id=page.id, link_id=link.id if link else None, visitor_id=visitor,
-                                is_return=seen is not None, device=device_of(user_agent), created_at=datetime.utcnow()))
+            view = DealPageView(page_id=page.id, link_id=link.id if link else None, visitor_id=visitor,
+                                is_return=seen is not None, device=device_of(user_agent), created_at=datetime.utcnow())
+            db.add(view)
             db.commit()
+        response = templates.TemplateResponse(
+            "deal_page_public.html",
+            {"request": request, "page": page, "preview": False, "base": public_base(request), "token": token,
+             "view_id": view.id if view else None,
+             "photo_url": lambda p: f"/d/{token}/p/{p.id}",
+             "contact_photo_url": f"/d/{token}/contact"},
+        )
+        if view:
             response.set_cookie(VISITOR_COOKIE, visitor, max_age=400 * 24 * 3600, path="/d/",
                                 httponly=True, samesite="lax", secure=request.url.scheme == "https")
         return response
+
+    @router.post("/d/{token}/seen")
+    async def photos_seen(token: str, request: Request, db: Session = Depends(get_db)):
+        """The photo viewer reports how many different photos this visit opened."""
+        page, _ = _resolve(db, token)
+        form = await request.form()
+        view = db.get(DealPageView, int(form.get("view", "0"))) if page and str(form.get("view", "")).isdigit() else None
+        # Only the visitor who made the view can update it (their own cookie).
+        if view and view.page_id == page.id and view.visitor_id == request.cookies.get(VISITOR_COOKIE):
+            count = min(int(form.get("count", "0")) if str(form.get("count", "")).isdigit() else 0, len(page.photos))
+            if count > view.photos_seen:
+                view.photos_seen = count
+                db.commit()
+        return Response(status_code=204)
+
+    @router.get("/d/{token}/contact")
+    def contact_photo_public(token: str, db: Session = Depends(get_db)):
+        page, _ = _resolve(db, token)
+        if not page or not page.contact_photo:
+            return Response(status_code=404)
+        return FileResponse(page_folder(page.id) / page.contact_photo, media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
 
     @router.get("/d/{token}/p/{photo_id}")
     def photo_public(token: str, photo_id: int, db: Session = Depends(get_db)):

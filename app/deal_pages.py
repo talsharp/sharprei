@@ -72,6 +72,20 @@ def save_photo(page_id: int, data: bytes) -> Optional[str]:
     return name
 
 
+def save_contact_photo(page_id: int, data: bytes) -> Optional[str]:
+    """A square headshot, 400px, metadata removed."""
+    try:
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+        img = ImageOps.fit(img.convert("RGB"), (400, 400))
+    except Exception:
+        return None
+    folder = page_folder(page_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"contact-{uuid4().hex}.jpg"
+    img.save(folder / name, "JPEG", quality=88, optimize=True)
+    return name
+
+
 def is_bot(user_agent: str) -> bool:
     return not user_agent or bool(BOT_PATTERN.search(user_agent))
 
@@ -92,6 +106,7 @@ def view_stats(views) -> dict:
         "views": len(views),
         "people": len(visitors),
         "returning": len({v.visitor_id for v in views if v.is_return}),
+        "photo_people": len({v.visitor_id for v in views if v.photos_seen}),
         "last": views[0].created_at if views else None,
     }
 

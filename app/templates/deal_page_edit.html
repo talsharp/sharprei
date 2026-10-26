@@ -20,6 +20,7 @@
 {% if not page.published %}
 <div class="card" style="border-color:#F0D9A8; background:#FFF8EA;">This page is a <strong>draft</strong> - links don't open it yet. Add photos and details, check <strong>Preview</strong>, then click <strong>Publish</strong>.</div>
 {% endif %}
+{% if error == 'contact' %}<div class="card login-error">That photo couldn't be used - try a JPG or PNG under 30 MB.</div>{% endif %}
 {% if error and error.startswith('photos') %}
 <div class="card login-error">{{ error[6:] }} file{{ "s" if error[6:] != "1" else "" }} couldn't be added - not a photo, over 30 MB, or the page already has {{ max_photos }} photos.</div>
 {% endif %}
@@ -42,7 +43,7 @@
         {% for l in page.links %}
         {% set s = link_stats[l.id] %}
         <tr>
-          <td><strong>{{ l.name }}</strong><div class="muted" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
+          <td><strong>{{ l.name }}</strong><div class="muted" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
           <td style="text-align:right; white-space:nowrap;">
             <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
             <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>
@@ -66,6 +67,7 @@
       <div><div class="value">{{ stats.views }}</div><div class="label">views</div></div>
       <div><div class="value">{{ stats.people }}</div><div class="label">people</div></div>
       <div><div class="value">{{ stats.returning }}</div><div class="label">came back</div></div>
+      <div><div class="value">{{ stats.photo_people }}</div><div class="label">opened photos</div></div>
       <div><div class="value small">{{ ago(stats.last) }}</div><div class="label">last view</div></div>
     </div>
     <div class="view-list">
@@ -75,6 +77,7 @@
         <strong>{{ v.link.name if v.link else "General link" }}</strong>
         {% if v.is_return %}<span class="badge deal-closed">returning</span>{% else %}<span class="badge deal-under_contract">new</span>{% endif %}
         <span class="muted">{{ v.device or "" }}</span>
+        {% if v.photos_seen %}<span class="photos-seen" title="Opened the photo viewer">📷 {{ v.photos_seen }} of {{ page.photos|length }} photos</span>{% endif %}
       </div>
       {% else %}
       <p class="muted" style="margin:0; font-size:13px;">No views yet. Link previews in WhatsApp/iMessage don't count, and neither do you when you're logged in - use Preview to look at it yourself.</p>
@@ -98,42 +101,61 @@
     <label><span>Rent <span class="muted" style="font-weight:400;">optional</span></span><input type="text" name="rent" value="{{ page.rent or '' }}" placeholder="e.g. $1,400/mo or vacant"></label>
     <label class="wide"><span>Walkthrough <span class="muted" style="font-weight:400;">optional</span></span><input type="text" name="walkthrough" value="{{ page.walkthrough or '' }}" placeholder="e.g. Sat Oct 31, 11 AM - or vacant, lockbox, text for access"></label>
     <label class="wide">About this deal<textarea name="description" rows="6" placeholder="What makes it a good deal, condition, repairs needed, occupancy, terms...">{{ page.description or '' }}</textarea></label>
+    <div class="wide contact-photo-row">
+      {% if page.contact_photo %}<img class="contact-photo" src="/finance/deals/{{ deal.id }}/page/contact-photo" alt="">{% else %}<div class="contact-photo placeholder">No photo</div>{% endif %}
+      <div>
+        <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Your photo (shown on the right of the page, above your name)</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label class="btn secondary small" style="margin:0;">{{ "Change photo" if page.contact_photo else "Add photo" }}<input type="file" accept="image/*,.heic,.heif" hidden form="contact-photo-form" name="file" onchange="document.getElementById('contact-photo-form').submit();"></label>
+          {% if page.contact_photo %}<button type="submit" form="contact-photo-delete" class="secondary small">Remove</button>{% endif %}
+        </div>
+      </div>
+    </div>
     <label>Contact name<input type="text" name="contact_name" value="{{ page.contact_name or '' }}"></label>
     <label>Phone<input type="text" name="contact_phone" value="{{ page.contact_phone or '' }}" placeholder="for Call / Text buttons"></label>
     <label>Email<input type="text" name="contact_email" value="{{ page.contact_email or '' }}"></label>
   </form>
-  <p class="muted" style="font-size:12px; margin:10px 0 0;">Beds, baths, sqft and year built were filled from the county records - check them. Contact details are copied to your next page.</p>
+  <form method="post" action="/finance/deals/{{ deal.id }}/page/contact-photo" enctype="multipart/form-data" id="contact-photo-form" hidden></form>
+  <form method="post" action="/finance/deals/{{ deal.id }}/page/contact-photo/delete" id="contact-photo-delete" hidden></form>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Beds, baths, sqft and year built were filled from the county records - check them. Your photo and contact details are copied to your next page.</p>
 </div>
 
 <div class="card" id="photos">
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-    <h3 style="margin:0;">Photos <span class="muted" style="font-weight:400; font-size:13px;">· {{ page.photos|length }} of {{ max_photos }} · the first one is the cover</span></h3>
-    <form method="post" action="/finance/deals/{{ deal.id }}/page/photos" enctype="multipart/form-data" id="photo-form">
-      <label class="btn">Add photos<input type="file" name="files" accept="image/*,.heic,.heif" multiple hidden onchange="this.form.querySelector('.uploading').hidden=false; this.form.submit();"></label>
-      <span class="uploading muted" hidden style="font-size:13px; margin-left:8px;">Uploading…</span>
-    </form>
-  </div>
-  <p class="muted" style="font-size:12px; margin:6px 0 12px;">Select many at once. Photos are resized for the web and their hidden location data is removed.</p>
-  <div class="photo-grid">
+  <h3 style="margin:0 0 4px;">Photos <span class="muted" style="font-weight:400; font-size:13px;">· {{ page.photos|length }} of {{ max_photos }} · the first one is the cover</span></h3>
+  <p class="muted" style="font-size:12px; margin:0 0 12px;">Photos are resized for the web and their hidden location data is removed. <strong>Drag a photo</strong> to change the order, or use ◀ ▶.</p>
+
+  <form method="post" action="/finance/deals/{{ deal.id }}/page/photos" enctype="multipart/form-data" id="photo-form">
+    <label class="drop-zone" id="drop-zone">
+      <input type="file" name="files" accept="image/*,.heic,.heif" multiple hidden id="photo-input">
+      <span class="drop-icon">⬆</span>
+      <span><strong>Drag photos here</strong> or click to choose - many at once</span>
+      <span class="muted drop-status" id="drop-status"></span>
+    </label>
+  </form>
+
+  <div class="photo-grid" id="photo-grid">
     {% for p in page.photos %}
-    <div class="photo-tile">
-      <img src="/finance/deal-photos/{{ p.id }}" alt="" loading="lazy">
-      {% if loop.first %}<span class="photo-cover">Cover</span>{% endif %}
+    <div class="photo-tile" draggable="true" data-id="{{ p.id }}">
+      <img src="/finance/deal-photos/{{ p.id }}" alt="" loading="lazy" draggable="false">
+      <span class="photo-number">{{ loop.index }}</span>
+      <span class="photo-cover"{{ ' hidden' if not loop.first }}>Cover</span>
       <div class="photo-actions">
-        {% if not loop.first %}<form method="post" action="/finance/deal-photos/{{ p.id }}/cover"><button type="submit" class="small secondary">Make cover</button></form>{% endif %}
-        <form method="post" action="/finance/deal-photos/{{ p.id }}/delete"><button type="submit" class="small secondary">Remove</button></form>
+        <button type="button" class="small secondary move-left" title="Move earlier">◀</button>
+        <button type="button" class="small secondary move-right" title="Move later">▶</button>
+        <form method="post" action="/finance/deal-photos/{{ p.id }}/delete" style="margin-left:auto;"><button type="submit" class="small secondary" title="Remove photo">Remove</button></form>
       </div>
     </div>
     {% else %}
     <p class="muted" style="margin:0;">No photos yet.</p>
     {% endfor %}
   </div>
+  <span class="muted save-flash" id="order-saved" hidden>✓ Order saved</span>
 </div>
 
 <script>
 (function() {
   var form = document.getElementById('page-form');
-  form.querySelectorAll('input, textarea').forEach(function(input) {
+  form.querySelectorAll('input:not([type=file]), textarea').forEach(function(input) {
     input.addEventListener('change', function() {
       var body = new URLSearchParams(); body.append(input.name, input.value);
       fetch(form.dataset.url, {method: 'POST', body: body}).then(function(r) {
@@ -148,6 +170,55 @@
       if (!isNaN(n)) input.value = n.toLocaleString('en-US', {maximumFractionDigits: 0});
     });
   });
+  // ----- photos: drop to upload -----
+  var zone = document.getElementById('drop-zone'), input = document.getElementById('photo-input'), status = document.getElementById('drop-status');
+  function upload(files) {
+    files = Array.prototype.filter.call(files, function(f) { return /^image\//.test(f.type) || /\.(heic|heif)$/i.test(f.name); });
+    if (!files.length) { status.textContent = 'Those aren\'t photos.'; return; }
+    var data = new FormData();
+    files.forEach(function(f) { data.append('files', f); });
+    status.textContent = 'Uploading ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '…';
+    zone.classList.add('busy');
+    fetch(document.getElementById('photo-form').action, {method: 'POST', body: data})
+      .then(function(r) { window.location = r.url.split('#')[0] + '#photos'; window.location.reload(); })
+      .catch(function() { status.textContent = 'Upload failed - try again.'; zone.classList.remove('busy'); });
+  }
+  input.addEventListener('change', function() { upload(input.files); });
+  ['dragenter', 'dragover'].forEach(function(ev) { zone.addEventListener(ev, function(e) { if (e.dataTransfer.types.indexOf('Files') < 0) return; e.preventDefault(); zone.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function(ev) { zone.addEventListener(ev, function() { zone.classList.remove('over'); }); });
+  zone.addEventListener('drop', function(e) { if (!e.dataTransfer.files.length) return; e.preventDefault(); upload(e.dataTransfer.files); });
+
+  // ----- photos: drag to reorder -----
+  var grid = document.getElementById('photo-grid'), dragged = null, orderTimer = null;
+  function renumber() {
+    grid.querySelectorAll('.photo-tile').forEach(function(t, i) {
+      t.querySelector('.photo-number').textContent = i + 1;
+      t.querySelector('.photo-cover').hidden = i !== 0;
+    });
+  }
+  function saveOrder() {
+    renumber();
+    clearTimeout(orderTimer);
+    orderTimer = setTimeout(function() {
+      var ids = Array.prototype.map.call(grid.querySelectorAll('.photo-tile'), function(t) { return t.dataset.id; });
+      fetch('/finance/deals/{{ deal.id }}/page/photos/order', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids: ids})})
+        .then(function(r) { if (!r.ok) throw 0; var f = document.getElementById('order-saved'); f.hidden = false; setTimeout(function() { f.hidden = true; }, 1500); })
+        .catch(function() { alert('Could not save the order - reload and try again.'); });
+    }, 300);
+  }
+  grid.querySelectorAll('.photo-tile').forEach(function(tile) {
+    tile.addEventListener('dragstart', function(e) { dragged = tile; tile.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', tile.dataset.id); });
+    tile.addEventListener('dragend', function() { tile.classList.remove('dragging'); if (dragged) { dragged = null; saveOrder(); } });
+    tile.addEventListener('dragover', function(e) {
+      if (!dragged || dragged === tile) return;
+      e.preventDefault();
+      var box = tile.getBoundingClientRect(), after = (e.clientX - box.left) > box.width / 2;
+      grid.insertBefore(dragged, after ? tile.nextSibling : tile);
+    });
+    tile.querySelector('.move-left').addEventListener('click', function() { if (tile.previousElementSibling) { grid.insertBefore(tile, tile.previousElementSibling); saveOrder(); } });
+    tile.querySelector('.move-right').addEventListener('click', function() { if (tile.nextElementSibling) { grid.insertBefore(tile.nextElementSibling, tile); saveOrder(); } });
+  });
+
   document.querySelectorAll('.copy-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var label = btn.textContent;

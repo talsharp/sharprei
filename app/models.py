@@ -697,6 +697,7 @@ class DealPage(Base):
     contact_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     contact_phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     contact_email: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    contact_photo: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # stored file name
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -749,6 +750,8 @@ class DealPageView(Base):
     visitor_id: Mapped[str] = mapped_column(String(40))
     is_return: Mapped[bool] = mapped_column(Boolean, default=False)
     device: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # How many different photos they opened in the photo viewer (0 = didn't open it).
+    photos_seen: Mapped[int] = mapped_column(default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     page: Mapped[DealPage] = relationship(back_populates="views")

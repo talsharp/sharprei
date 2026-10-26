@@ -17,12 +17,13 @@
 <body class="public-page">
   {% if preview %}<div class="preview-bar">Preview - this is how investors see the page{% if not page.published %} (not published yet){% endif %}. Visits from here aren't counted.</div>{% endif %}
   <main class="listing">
+    <h1 class="listing-title">{{ page.title }}</h1>
     {% if page.photos %}
     <div class="gallery {{ 'single' if page.photos|length == 1 }}">
       {% for p in page.photos[:5] %}
       <button type="button" class="gallery-item {{ 'main' if loop.first }}" data-index="{{ loop.index0 }}">
         <img src="{{ photo_url(p) }}" alt="Photo {{ loop.index }}" {{ 'loading=lazy' if not loop.first }}>
-        {% if loop.index == 5 and page.photos|length > 5 %}<span class="gallery-more">+{{ page.photos|length - 5 }} photos</span>{% endif %}
+        {% if loop.index == 5 and page.photos|length > 5 %}<span class="gallery-more">+{{ page.photos|length - 5 }} photo{{ "s" if page.photos|length - 5 != 1 }}</span>{% endif %}
       </button>
       {% endfor %}
     </div>
@@ -31,8 +32,6 @@
 
     <div class="listing-body">
       <div class="listing-main">
-        <h1>{{ page.title }}</h1>
-        <p class="listing-address">{{ page.deal.address }}</p>
         {% if price %}<div class="listing-price"><span>Asking price</span> {{ price }}</div>{% endif %}
 
         <div class="listing-facts">
@@ -58,13 +57,21 @@
       <aside class="listing-contact">
         <div class="contact-card">
           <div class="contact-title">Interested?</div>
-          {% if page.contact_name %}<div class="contact-name">{{ page.contact_name }}</div>{% endif %}
           {% set phone = (page.contact_phone or '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') %}
+          <div class="contact-person">
+            {% if page.contact_photo %}<img class="contact-photo" src="{{ contact_photo_url }}" alt="{{ page.contact_name or '' }}">{% endif %}
+            {% if page.contact_name %}<div class="contact-name">{{ page.contact_name }}</div>{% endif %}
+          </div>
+          {% if page.contact_phone %}
+          <div class="contact-line"><span class="contact-label">Phone</span><a href="tel:{{ phone }}">{{ page.contact_phone }}</a></div>
+          {% endif %}
+          {% if page.contact_email %}
+          <div class="contact-line"><span class="contact-label">Email</span><a href="mailto:{{ page.contact_email }}?subject={{ ('Offer - ' ~ page.deal.address.split(',')[0])|urlencode }}">{{ page.contact_email }}</a></div>
+          {% endif %}
           {% if phone %}
           <a class="btn contact-btn" href="sms:{{ phone }}?&body={{ ('Hi, I am interested in ' ~ page.deal.address.split(',')[0])|urlencode }}">Text me</a>
-          <a class="btn secondary contact-btn" href="tel:{{ phone }}">Call {{ page.contact_phone }}</a>
+          <a class="btn secondary contact-btn" href="tel:{{ phone }}">Call</a>
           {% endif %}
-          {% if page.contact_email %}<a class="btn secondary contact-btn" href="mailto:{{ page.contact_email }}?subject={{ ('Offer - ' ~ page.deal.address.split(',')[0])|urlencode }}">Email</a>{% endif %}
         </div>
       </aside>
     </div>
@@ -82,7 +89,19 @@
   (function() {
     var urls = [{% for p in page.photos %}"{{ photo_url(p) }}"{{ "," if not loop.last }}{% endfor %}];
     var box = document.getElementById('lightbox'), img = document.getElementById('lb-img'), count = document.getElementById('lb-count'), at = 0;
-    function show(i) { at = (i + urls.length) % urls.length; img.src = urls[at]; count.textContent = (at + 1) + ' / ' + urls.length; box.hidden = false; document.body.style.overflow = 'hidden'; }
+    // Tells you how many different photos this visitor opened.
+    var seen = {}, viewId = {{ view_id|tojson }}, reportTimer = null;
+    function report() {
+      if (!viewId) return;
+      var body = new URLSearchParams({view: viewId, count: Object.keys(seen).length});
+      fetch('/d/{{ token }}/seen', {method: 'POST', body: body, keepalive: true}).catch(function() {});
+    }
+    function show(i) {
+      at = (i + urls.length) % urls.length; img.src = urls[at]; count.textContent = (at + 1) + ' / ' + urls.length;
+      box.hidden = false; document.body.style.overflow = 'hidden';
+      if (!seen[at]) { seen[at] = 1; clearTimeout(reportTimer); reportTimer = setTimeout(report, 800); }
+    }
+    window.addEventListener('pagehide', report);
     function close() { box.hidden = true; document.body.style.overflow = ''; }
     document.querySelectorAll('[data-index]').forEach(function(el) { el.addEventListener('click', function() { show(+el.dataset.index); }); });
     box.querySelector('.lb-close').addEventListener('click', close);
