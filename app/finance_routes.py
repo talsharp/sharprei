@@ -29,7 +29,8 @@ from app.finance import (
     start_month,
 )
 from app.statements import charges_by_expense
-from app.models import DealBuyer, DealFile, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.deal_pages import public_base, view_stats
+from app.models import DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -311,8 +312,14 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
              "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal),
-             "buyer_names": _buyer_names(db)},
+             "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal)},
         )
+
+    def _landing(request: Request, db: Session, deal: WholesaleDeal):
+        page = db.query(DealPage).filter(DealPage.deal_id == deal.id).first()
+        if not page:
+            return None
+        return {"page": page, "stats": view_stats(page.views), "url": f"{public_base(request)}/d/{page.token}"}
 
     # ---------- Under contract: inspection clock + buyers / walkthroughs ----------
 

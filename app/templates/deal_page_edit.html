@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Landing page · {{ deal.address }}{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Landing page {% if page.published %}<span class="badge deal-closed">Live</span>{% else %}<span class="badge deal-under_contract">Draft</span>{% endif %}</h2>
+    <p class="page-subtitle">{{ deal.address }} · everything saves as you type</p>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn secondary" href="/finance/deals/{{ deal.id }}">Back to deal</a>
+    <a class="btn secondary" href="/finance/deals/{{ deal.id }}/page/preview" target="_blank" rel="noopener">Preview</a>
+    <form method="post" action="/finance/deals/{{ deal.id }}/page/publish" style="display:inline;">
+      {% if page.published %}<input type="hidden" name="on" value="0"><button type="submit" class="secondary">Take offline</button>
+      {% else %}<button type="submit">Publish</button>{% endif %}
+    </form>
+  </div>
+</div>
+
+{% if not page.published %}
+<div class="card" style="border-color:#F0D9A8; background:#FFF8EA;">This page is a <strong>draft</strong> - links don't open it yet. Add photos and details, check <strong>Preview</strong>, then click <strong>Publish</strong>.</div>
+{% endif %}
+{% if error and error.startswith('photos') %}
+<div class="card login-error">{{ error[6:] }} file{{ "s" if error[6:] != "1" else "" }} couldn't be added - not a photo, over 30 MB, or the page already has {{ max_photos }} photos.</div>
+{% endif %}
+
+<div class="grid-2 page-editor-top">
+  <div class="card" id="links" style="margin-bottom:0;">
+    <h3>Links</h3>
+    <div class="link-row">
+      <div><strong>General link</strong> <span class="muted" style="font-size:12px;">- for group texts and blasts</span></div>
+      <div class="share-row">
+        <input type="text" value="{{ base }}/d/{{ page.token }}" readonly onclick="this.select()">
+        <button type="button" class="copy-btn" data-url="{{ base }}/d/{{ page.token }}">Copy</button>
+      </div>
+      <div class="muted" style="font-size:12px;">{% set s = link_stats[None] %}{{ s.views }} view{{ "s" if s.views != 1 else "" }} · {{ s.people }} {{ "person" if s.people == 1 else "people" }} · last {{ ago(s.last) }}</div>
+    </div>
+
+    <h4 style="margin:16px 0 6px;">Personal links <span class="muted" style="font-weight:400; font-size:12px;">- one per investor, so you see who looked</span></h4>
+    <table class="personal-links">
+      <tbody>
+        {% for l in page.links %}
+        {% set s = link_stats[l.id] %}
+        <tr>
+          <td><strong>{{ l.name }}</strong><div class="muted" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
+            <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td class="muted" style="font-size:13px;">No personal links yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <datalist id="investor-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
+    <form method="post" action="/finance/deals/{{ deal.id }}/page/links" class="comps-paste-form" style="margin-top:8px;">
+      <input type="text" name="name" list="investor-names" placeholder="Investor's name" required maxlength="120">
+      <button type="submit">Create link</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <h3>Views</h3>
+    <div class="view-kpis">
+      <div><div class="value">{{ stats.views }}</div><div class="label">views</div></div>
+      <div><div class="value">{{ stats.people }}</div><div class="label">people</div></div>
+      <div><div class="value">{{ stats.returning }}</div><div class="label">came back</div></div>
+      <div><div class="value small">{{ ago(stats.last) }}</div><div class="label">last view</div></div>
+    </div>
+    <div class="view-list">
+      {% for v in page.views[:40] %}
+      <div class="view-item">
+        <span class="muted">{{ ago(v.created_at) }}</span>
+        <strong>{{ v.link.name if v.link else "General link" }}</strong>
+        {% if v.is_return %}<span class="badge deal-closed">returning</span>{% else %}<span class="badge deal-under_contract">new</span>{% endif %}
+        <span class="muted">{{ v.device or "" }}</span>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0; font-size:13px;">No views yet. Link previews in WhatsApp/iMessage don't count, and neither do you when you're logged in - use Preview to look at it yourself.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card" id="details" style="margin-top:20px;">
+  <h3>Details</h3>
+  <form id="page-form" class="page-form" data-url="/finance/deals/{{ deal.id }}/page" onsubmit="return false;">
+    <label class="wide">Title<input type="text" name="title" value="{{ page.title }}" maxlength="255"></label>
+    <label>Asking price ($)<input type="text" inputmode="decimal" name="asking_price" class="money" value="{{ '{:,.0f}'.format(page.asking_price|float) if page.asking_price is not none else '' }}" placeholder="e.g. 130,000"></label>
+    <label><span>ARV ($) <span class="muted" style="font-weight:400;">optional</span></span><input type="text" inputmode="decimal" name="arv" class="money" value="{{ '{:,.0f}'.format(page.arv|float) if page.arv is not none else '' }}"></label>
+    <label>Property type<input type="text" name="property_type" value="{{ page.property_type or '' }}" list="property-types" placeholder="e.g. Single Family"></label>
+    <datalist id="property-types"><option value="Single Family"></option><option value="Multi-Family"></option><option value="Duplex"></option><option value="Townhouse"></option><option value="Condo"></option><option value="Land"></option></datalist>
+    <label>Beds<input type="text" inputmode="decimal" name="bedrooms" value="{{ '%g'|format(page.bedrooms|float) if page.bedrooms is not none else '' }}"></label>
+    <label>Baths<input type="text" inputmode="decimal" name="bathrooms" value="{{ '%g'|format(page.bathrooms|float) if page.bathrooms is not none else '' }}"></label>
+    <label>Sqft<input type="text" inputmode="numeric" name="sqft" value="{{ page.sqft or '' }}"></label>
+    <label>Year built<input type="text" inputmode="numeric" name="year_built" value="{{ page.year_built or '' }}"></label>
+    <label><span>Rent <span class="muted" style="font-weight:400;">optional</span></span><input type="text" name="rent" value="{{ page.rent or '' }}" placeholder="e.g. $1,400/mo or vacant"></label>
+    <label class="wide"><span>Walkthrough <span class="muted" style="font-weight:400;">optional</span></span><input type="text" name="walkthrough" value="{{ page.walkthrough or '' }}" placeholder="e.g. Sat Oct 31, 11 AM - or vacant, lockbox, text for access"></label>
+    <label class="wide">About this deal<textarea name="description" rows="6" placeholder="What makes it a good deal, condition, repairs needed, occupancy, terms...">{{ page.description or '' }}</textarea></label>
+    <label>Contact name<input type="text" name="contact_name" value="{{ page.contact_name or '' }}"></label>
+    <label>Phone<input type="text" name="contact_phone" value="{{ page.contact_phone or '' }}" placeholder="for Call / Text buttons"></label>
+    <label>Email<input type="text" name="contact_email" value="{{ page.contact_email or '' }}"></label>
+  </form>
+  <p class="muted" style="font-size:12px; margin:10px 0 0;">Beds, baths, sqft and year built were filled from the county records - check them. Contact details are copied to your next page.</p>
+</div>
+
+<div class="card" id="photos">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <h3 style="margin:0;">Photos <span class="muted" style="font-weight:400; font-size:13px;">· {{ page.photos|length }} of {{ max_photos }} · the first one is the cover</span></h3>
+    <form method="post" action="/finance/deals/{{ deal.id }}/page/photos" enctype="multipart/form-data" id="photo-form">
+      <label class="btn">Add photos<input type="file" name="files" accept="image/*,.heic,.heif" multiple hidden onchange="this.form.querySelector('.uploading').hidden=false; this.form.submit();"></label>
+      <span class="uploading muted" hidden style="font-size:13px; margin-left:8px;">Uploading…</span>
+    </form>
+  </div>
+  <p class="muted" style="font-size:12px; margin:6px 0 12px;">Select many at once. Photos are resized for the web and their hidden location data is removed.</p>
+  <div class="photo-grid">
+    {% for p in page.photos %}
+    <div class="photo-tile">
+      <img src="/finance/deal-photos/{{ p.id }}" alt="" loading="lazy">
+      {% if loop.first %}<span class="photo-cover">Cover</span>{% endif %}
+      <div class="photo-actions">
+        {% if not loop.first %}<form method="post" action="/finance/deal-photos/{{ p.id }}/cover"><button type="submit" class="small secondary">Make cover</button></form>{% endif %}
+        <form method="post" action="/finance/deal-photos/{{ p.id }}/delete"><button type="submit" class="small secondary">Remove</button></form>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted" style="margin:0;">No photos yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function() {
+  var form = document.getElementById('page-form');
+  form.querySelectorAll('input, textarea').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var body = new URLSearchParams(); body.append(input.name, input.value);
+      fetch(form.dataset.url, {method: 'POST', body: body}).then(function(r) {
+        if (!r.ok) throw new Error(r.status);
+        input.classList.add('saved'); setTimeout(function() { input.classList.remove('saved'); }, 900);
+      }).catch(function() { alert('Could not save - check your connection and try again.'); });
+    });
+  });
+  form.querySelectorAll('.money').forEach(function(input) {
+    input.addEventListener('blur', function() {
+      var n = parseFloat(input.value.replace(/[$,\s]/g, ''));
+      if (!isNaN(n)) input.value = n.toLocaleString('en-US', {maximumFractionDigits: 0});
+    });
+  });
+  document.querySelectorAll('.copy-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var label = btn.textContent;
+      function done() { btn.textContent = 'Copied ✓'; setTimeout(function() { btn.textContent = label; }, 1500); }
+      if (navigator.clipboard) navigator.clipboard.writeText(btn.dataset.url).then(done, function() { window.prompt('Copy this link:', btn.dataset.url); });
+      else window.prompt('Copy this link:', btn.dataset.url);
+    });
+  });
+})();
+</script>
+
+{% endblock %}

@@ -53,7 +53,7 @@ def fingerprint(eng, session_factory) -> dict:
 
 
 STATUS_FILE = BACKUP_DIR / "last_backup.json"
-FILE_FOLDERS = ["deals", "properties", "renovations", "statements"]
+FILE_FOLDERS = ["deals", "properties", "renovations", "statements", "deal_pages"]
 FILE_MIRROR = BACKUP_DIR / "files"
 
 

@@ -51,7 +51,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     @router.get("/tools/comps")
     def comps_list(request: Request, db: Session = Depends(get_db)):
         analyses = db.query(CompAnalysis).order_by(CompAnalysis.updated_at.desc()).all()
-        base = config.BASE_URL or str(request.base_url).rstrip("/")
+        base = config.PUBLIC_URL or config.BASE_URL or str(request.base_url).rstrip("/")
         return templates.TemplateResponse(
             "comps_list.html",
             {"request": request, "active": "comps", "analyses": analyses, "usage": _usage(db),
@@ -80,7 +80,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         analysis = db.get(CompAnalysis, analysis_id)
         if not analysis:
             return RedirectResponse("/tools/comps", status_code=303)
-        share_url = f"{config.BASE_URL or str(request.base_url).rstrip('/')}/c/{analysis.share_token}" if analysis.share_token else None
+        share_url = f"{config.PUBLIC_URL or config.BASE_URL or str(request.base_url).rstrip('/')}/c/{analysis.share_token}" if analysis.share_token else None
         return templates.TemplateResponse(
             "comps_detail.html",
             {"request": request, "active": "comps", "a": analysis, "usage": _usage(db),

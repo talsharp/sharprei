@@ -601,3 +601,71 @@ tr.row-highlight td { background: #EAF6EC; }
 .input-suffix { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
 .contract-divider { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
 p.sale-spread { margin: 10px 0 0; font-size: 14px; }
+
+/* ---------- Deal landing pages ---------- */
+.page-editor-top { align-items: start; }
+.link-row { display: flex; flex-direction: column; gap: 6px; }
+.personal-links { width: 100%; }
+.personal-links td { padding: 8px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.view-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+.view-kpis > div { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; text-align: center; }
+.view-kpis .value { font-size: 22px; font-weight: 700; color: var(--navy); }
+.view-kpis .value.small { font-size: 14px; padding: 6px 0; }
+.view-kpis .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.view-list { max-height: 260px; overflow-y: auto; }
+.view-item { display: flex; gap: 10px; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.view-item .muted:first-child { min-width: 90px; }
+.page-form { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.page-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.page-form label.wide { grid-column: 1 / -1; }
+.page-form input, .page-form textarea { width: 100%; font-size: 14px; }
+.page-form .saved { border-color: #2E8B57 !important; box-shadow: 0 0 0 3px rgba(46,139,87,.15) !important; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.photo-tile { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--panel-soft); }
+.photo-tile img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+.photo-cover { position: absolute; top: 6px; left: 6px; background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
+.photo-actions { display: flex; gap: 4px; padding: 6px; justify-content: flex-end; }
+.deal-page-card .share-row input { font-size: 13px; }
+@media (max-width: 860px) { .page-form { grid-template-columns: repeat(2, 1fr); } .view-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+/* public listing */
+.preview-bar { background: var(--navy); color: #fff; text-align: center; font-size: 13px; padding: 8px 12px; }
+.listing { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+.gallery { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 200px 200px; gap: 6px; border-radius: 14px; overflow: hidden; }
+.gallery.single { grid-template-columns: 1fr; grid-template-rows: 420px; }
+.gallery-item { position: relative; padding: 0; border: none; background: #E9EDF3; cursor: zoom-in; border-radius: 0; overflow: hidden; }
+.gallery-item.main { grid-row: 1 / 3; }
+.gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+.gallery-item:hover img { transform: scale(1.03); }
+.gallery-more { position: absolute; inset: 0; background: rgba(15, 30, 50, .55); color: #fff; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.link-btn { background: none; border: none; color: var(--accent); font-weight: 600; padding: 8px 0; font-size: 14px; }
+.listing-body { display: grid; grid-template-columns: 1fr 320px; gap: 28px; margin-top: 16px; align-items: start; }
+.listing h1 { font-size: 28px; color: var(--navy); margin: 0; }
+.listing h2 { font-size: 18px; color: var(--navy); margin: 24px 0 8px; }
+.listing-address { color: var(--muted); margin: 4px 0 12px; }
+.listing-price { font-size: 30px; font-weight: 800; color: var(--navy); margin-bottom: 16px; }
+.listing-price span { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.listing-facts { display: flex; flex-wrap: wrap; gap: 10px; }
+.fact { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; min-width: 96px; }
+.fact-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.fact-value { font-size: 18px; font-weight: 700; color: var(--navy); }
+.listing-walkthrough { margin-top: 16px; background: #FFF6E5; border: 1px solid #F0D9A8; border-radius: 10px; padding: 10px 14px; }
+.listing-description { white-space: pre-wrap; line-height: 1.6; color: var(--text); }
+.contact-card { position: sticky; top: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 24px rgba(31,58,95,.08); }
+.contact-title { font-size: 18px; font-weight: 700; color: var(--navy); }
+.contact-name { color: var(--muted); margin-top: -6px; }
+.contact-btn { text-align: center; padding: 12px; font-size: 15px; }
+.lightbox { position: fixed; inset: 0; background: rgba(8, 14, 24, .92); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 92vw; max-height: 86vh; object-fit: contain; border-radius: 6px; }
+.lightbox button { position: absolute; background: rgba(255,255,255,.12); color: #fff; border: none; border-radius: 999px; width: 46px; height: 46px; font-size: 28px; line-height: 1; }
+.lb-close { top: 16px; right: 16px; } .lb-prev { left: 16px; } .lb-next { right: 16px; }
+.lb-count { position: absolute; bottom: 18px; color: #fff; font-size: 14px; }
+@media (max-width: 860px) {
+  .listing-body { grid-template-columns: 1fr; }
+  .gallery { grid-template-columns: 1fr 1fr; grid-template-rows: 240px 110px; }
+  .gallery-item.main { grid-column: 1 / 3; grid-row: 1; }
+  .gallery-item:nth-child(n+4) { display: none; }
+  .listing h1 { font-size: 22px; }
+  .contact-card { position: static; }
+}

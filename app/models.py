@@ -675,5 +675,85 @@ class DealBuyer(Base):
     deal: Mapped["WholesaleDeal"] = relationship(back_populates="buyers")
 
 
+class DealPage(Base):
+    """A public landing page for a deal (like an InvestorBase listing), shared by link."""
+    __tablename__ = "deal_pages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), unique=True)
+    token: Mapped[str] = mapped_column(String(40), unique=True, index=True)  # the general link
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    title: Mapped[str] = mapped_column(String(255))
+    asking_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    property_type: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    bedrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
+    bathrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
+    sqft: Mapped[Optional[int]] = mapped_column(nullable=True)
+    year_built: Mapped[Optional[int]] = mapped_column(nullable=True)
+    arv: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    rent: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    walkthrough: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    deal: Mapped["WholesaleDeal"] = relationship()
+    photos: Mapped[list["DealPhoto"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="(DealPhoto.position, DealPhoto.id)"
+    )
+    links: Mapped[list["DealPageLink"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="DealPageLink.id"
+    )
+    views: Mapped[list["DealPageView"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="DealPageView.created_at.desc()"
+    )
+
+
+class DealPhoto(Base):
+    __tablename__ = "deal_photos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("deal_pages.id"), index=True)
+    stored_name: Mapped[str] = mapped_column(String(255))
+    position: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    page: Mapped[DealPage] = relationship(back_populates="photos")
+
+
+class DealPageLink(Base):
+    """A personal link for one investor, so the views show who looked."""
+    __tablename__ = "deal_page_links"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("deal_pages.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    token: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    page: Mapped[DealPage] = relationship(back_populates="links")
+    views: Mapped[list["DealPageView"]] = relationship(back_populates="link", order_by="DealPageView.created_at.desc()")
+
+
+class DealPageView(Base):
+    """One visit to a deal page. visitor_id is an anonymous browser cookie, so a
+    later visit from the same browser counts as returning."""
+    __tablename__ = "deal_page_views"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("deal_pages.id"), index=True)
+    link_id: Mapped[Optional[int]] = mapped_column(ForeignKey("deal_page_links.id", ondelete="SET NULL"), nullable=True)
+    visitor_id: Mapped[str] = mapped_column(String(40))
+    is_return: Mapped[bool] = mapped_column(Boolean, default=False)
+    device: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    page: Mapped[DealPage] = relationship(back_populates="views")
+    link: Mapped[Optional[DealPageLink]] = relationship(back_populates="views")
+
+
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401

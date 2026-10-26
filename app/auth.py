@@ -12,8 +12,11 @@ from app.audit import current_user_email, log_event
 from app.database import SessionLocal
 from app.models import User
 
-# "/c/" = read-only comp analyses shared by link (unguessable token).
-PUBLIC_PATHS = ("/login", "/auth/", "/static/", "/health", "/favicon.ico", "/c/")
+# "/c/" = read-only comp analyses and "/d/" = deal landing pages, shared by
+# link (unguessable tokens).
+PUBLIC_PATHS = ("/login", "/auth/", "/static/", "/health", "/favicon.ico", "/c/", "/d/")
+# The only paths the public address (deals.sharprei.com) answers.
+PUBLIC_HOST_PATHS = ("/c/", "/d/", "/static/", "/favicon.ico", "/health")
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 oauth = OAuth()
@@ -48,6 +51,12 @@ def install(app: FastAPI, templates: Jinja2Templates) -> None:
     @app.middleware("http")
     async def auth_gate(request: Request, call_next):
         path = request.url.path
+
+        # The public address shows shared pages only - nothing of the app itself.
+        if config.PUBLIC_HOST and request.url.netloc == config.PUBLIC_HOST:
+            if path.startswith(PUBLIC_HOST_PATHS):
+                return await call_next(request)
+            return Response("Not found", status_code=404)
 
         # One canonical address, so the login cookie always belongs to it.
         if config.BASE_HOST and request.url.netloc != config.BASE_HOST and path != "/health":

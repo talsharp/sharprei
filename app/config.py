@@ -11,6 +11,11 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 OWNER_EMAILS = {e.strip().lower() for e in os.environ.get("OWNER_EMAIL", "").split(",") if e.strip()}
 BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")
+# Public pages (deal landing pages /d/, comp shares /c/) are linked on this
+# address when set, e.g. https://deals.sharprei.com - so investors never see
+# the app's address. That host serves only those pages.
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
+PUBLIC_HOST = urlparse(PUBLIC_URL).netloc if PUBLIC_URL else ""
 # Property data lookups for Tools › Comps (rentcast.io). Without it, comps are entered by hand.
 RENTCAST_API_KEY = os.environ.get("RENTCAST_API_KEY", "").strip()
 

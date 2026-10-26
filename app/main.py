@@ -21,6 +21,7 @@ from app.finance_routes import build_router as build_finance_router
 from app.statement_routes import build_router as build_statement_router
 from app.task_routes import build_router as build_task_router
 from app.comp_routes import build_router as build_comp_router
+from app.deal_page_routes import build_router as build_deal_page_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -93,6 +94,7 @@ app.include_router(build_finance_router(templates))
 app.include_router(build_statement_router(templates))
 app.include_router(build_task_router(templates))
 app.include_router(build_comp_router(templates))
+app.include_router(build_deal_page_router(templates))
 auth.install(app, templates)
 
 

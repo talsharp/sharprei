@@ -46,6 +46,24 @@ window.syncContractFields = function() {
 </div>
 {% endif %}
 
+<div class="card deal-page-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h3 style="margin:0;">Landing page
+        {% if landing %}{% if landing.page.published %}<span class="badge deal-closed">Live</span>{% else %}<span class="badge deal-under_contract">Draft</span>{% endif %}{% endif %}
+      </h3>
+      <p class="muted" style="margin:4px 0 0; font-size:13px;">
+        {% if landing %}{{ landing.page.photos|length }} photo{{ "s" if landing.page.photos|length != 1 else "" }} · {{ landing.stats.views }} view{{ "s" if landing.stats.views != 1 else "" }} · {{ landing.stats.people }} {{ "person" if landing.stats.people == 1 else "people" }} · {{ landing.stats.returning }} came back · last {{ ago(landing.stats.last) }}
+        {% else %}A page with photos, price and your contact to send to investors - with links that show who looked.{% endif %}
+      </p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      {% if landing and landing.page.published %}<button type="button" class="secondary" onclick="var b=this; navigator.clipboard.writeText('{{ landing.url }}').then(function(){ b.textContent='Copied ✓'; setTimeout(function(){ b.textContent='Copy link'; }, 1500); });">Copy link</button>{% endif %}
+      <a class="btn" href="/finance/deals/{{ deal.id }}/page">{{ "Open landing page" if landing else "Create landing page" }}</a>
+    </div>
+  </div>
+</div>
+
 <form method="post" action="/finance/deals/{{ deal.id }}/update">
 <div class="grid-2">
   <div class="card">

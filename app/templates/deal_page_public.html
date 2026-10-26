@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  {% set cover = page.photos[0] if page.photos else none %}
+  {% set price = "${:,.0f}".format(page.asking_price|float) if page.asking_price is not none else none %}
+  <title>{{ page.title }}{% if price %} · {{ price }}{% endif %}</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page.title }}{% if price %} · {{ price }}{% endif %}">
+  <meta property="og:description" content="{{ [page.property_type, (('%g'|format(page.bedrooms|float)) ~ ' bd') if page.bedrooms is not none else none, (('%g'|format(page.bathrooms|float)) ~ ' ba') if page.bathrooms is not none else none, ('{:,}'.format(page.sqft) ~ ' sqft') if page.sqft else none]|select|join(' · ') or 'Investment property' }}">
+  {% if cover and not preview %}<meta property="og:image" content="{{ base }}/d/{{ token }}/p/{{ cover.id }}">{% endif %}
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ STATIC_VERSION }}">
+  <link rel="stylesheet" href="/static/style.css?v={{ STATIC_VERSION }}">
+</head>
+<body class="public-page">
+  {% if preview %}<div class="preview-bar">Preview - this is how investors see the page{% if not page.published %} (not published yet){% endif %}. Visits from here aren't counted.</div>{% endif %}
+  <main class="listing">
+    {% if page.photos %}
+    <div class="gallery {{ 'single' if page.photos|length == 1 }}">
+      {% for p in page.photos[:5] %}
+      <button type="button" class="gallery-item {{ 'main' if loop.first }}" data-index="{{ loop.index0 }}">
+        <img src="{{ photo_url(p) }}" alt="Photo {{ loop.index }}" {{ 'loading=lazy' if not loop.first }}>
+        {% if loop.index == 5 and page.photos|length > 5 %}<span class="gallery-more">+{{ page.photos|length - 5 }} photos</span>{% endif %}
+      </button>
+      {% endfor %}
+    </div>
+    <button type="button" class="link-btn" data-index="0">See all {{ page.photos|length }} photo{{ "s" if page.photos|length != 1 else "" }}</button>
+    {% endif %}
+
+    <div class="listing-body">
+      <div class="listing-main">
+        <h1>{{ page.title }}</h1>
+        <p class="listing-address">{{ page.deal.address }}</p>
+        {% if price %}<div class="listing-price"><span>Asking price</span> {{ price }}</div>{% endif %}
+
+        <div class="listing-facts">
+          {% for label, value in [("Type", page.property_type),
+                                   ("Beds", ('%g'|format(page.bedrooms|float)) if page.bedrooms is not none else none),
+                                   ("Baths", ('%g'|format(page.bathrooms|float)) if page.bathrooms is not none else none),
+                                   ("Sqft", '{:,}'.format(page.sqft) if page.sqft else none),
+                                   ("Year built", page.year_built),
+                                   ("ARV", "${:,.0f}".format(page.arv|float) if page.arv is not none else none),
+                                   ("Rent", page.rent)] %}
+          {% if value %}<div class="fact"><div class="fact-label">{{ label }}</div><div class="fact-value">{{ value }}</div></div>{% endif %}
+          {% endfor %}
+        </div>
+
+        {% if page.walkthrough %}<div class="listing-walkthrough"><strong>Walkthrough:</strong> {{ page.walkthrough }}</div>{% endif %}
+
+        {% if page.description %}
+        <h2>About this deal</h2>
+        <div class="listing-description">{{ page.description }}</div>
+        {% endif %}
+      </div>
+
+      <aside class="listing-contact">
+        <div class="contact-card">
+          <div class="contact-title">Interested?</div>
+          {% if page.contact_name %}<div class="contact-name">{{ page.contact_name }}</div>{% endif %}
+          {% set phone = (page.contact_phone or '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') %}
+          {% if phone %}
+          <a class="btn contact-btn" href="sms:{{ phone }}?&body={{ ('Hi, I am interested in ' ~ page.deal.address.split(',')[0])|urlencode }}">Text me</a>
+          <a class="btn secondary contact-btn" href="tel:{{ phone }}">Call {{ page.contact_phone }}</a>
+          {% endif %}
+          {% if page.contact_email %}<a class="btn secondary contact-btn" href="mailto:{{ page.contact_email }}?subject={{ ('Offer - ' ~ page.deal.address.split(',')[0])|urlencode }}">Email</a>{% endif %}
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  {% if page.photos %}
+  <div class="lightbox" id="lightbox" hidden>
+    <button type="button" class="lb-close" aria-label="Close">×</button>
+    <button type="button" class="lb-prev" aria-label="Previous">‹</button>
+    <img id="lb-img" alt="">
+    <button type="button" class="lb-next" aria-label="Next">›</button>
+    <div class="lb-count" id="lb-count"></div>
+  </div>
+  <script>
+  (function() {
+    var urls = [{% for p in page.photos %}"{{ photo_url(p) }}"{{ "," if not loop.last }}{% endfor %}];
+    var box = document.getElementById('lightbox'), img = document.getElementById('lb-img'), count = document.getElementById('lb-count'), at = 0;
+    function show(i) { at = (i + urls.length) % urls.length; img.src = urls[at]; count.textContent = (at + 1) + ' / ' + urls.length; box.hidden = false; document.body.style.overflow = 'hidden'; }
+    function close() { box.hidden = true; document.body.style.overflow = ''; }
+    document.querySelectorAll('[data-index]').forEach(function(el) { el.addEventListener('click', function() { show(+el.dataset.index); }); });
+    box.querySelector('.lb-close').addEventListener('click', close);
+    box.querySelector('.lb-prev').addEventListener('click', function(e) { e.stopPropagation(); show(at - 1); });
+    box.querySelector('.lb-next').addEventListener('click', function(e) { e.stopPropagation(); show(at + 1); });
+    box.addEventListener('click', function(e) { if (e.target === box) close(); });
+    document.addEventListener('keydown', function(e) {
+      if (box.hidden) return;
+      if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') show(at - 1); else if (e.key === 'ArrowRight') show(at + 1);
+    });
+    var startX = null;
+    box.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; });
+    box.addEventListener('touchend', function(e) { if (startX === null) return; var dx = e.changedTouches[0].clientX - startX; if (Math.abs(dx) > 40) show(at + (dx < 0 ? 1 : -1)); startX = null; });
+  })();
+  </script>
+  {% endif %}
+</body>
+</html>
