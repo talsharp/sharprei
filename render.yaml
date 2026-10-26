@@ -34,5 +34,7 @@ services:
         sync: false
       - key: BASE_URL
         value: https://app.sharprei.com
+      - key: PUBLIC_URL
+        value: https://deals.sharprei.com
       - key: RENTCAST_API_KEY
         sync: false
