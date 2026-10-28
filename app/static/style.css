@@ -763,3 +763,15 @@ p.sale-spread { margin: 10px 0 0; font-size: 14px; }
 .bell-kind.kind-task { color: var(--accent); }
 .bell-title { font-size: 14px; font-weight: 600; color: var(--navy); }
 .bell-detail { font-size: 12px; color: var(--muted); }
+
+/* Collapsible sidebar groups */
+button.nav-toggle { width: 100%; background: none; border: none; cursor: pointer; text-align: left; font-family: inherit; box-shadow: none; }
+button.nav-section.nav-toggle { display: flex; align-items: center; justify-content: space-between; padding: 16px 10px 6px; border-radius: 0; }
+button.nav-section.nav-toggle:hover { color: var(--navy); background: none; }
+button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
+.nav-chevron { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; margin-left: auto; flex: none; opacity: .7; }
+.nav-toggle.collapsed .nav-chevron { transform: rotate(-90deg); }
+.nav-collapse.collapsed { display: none; }
+/* The Finance reminder count only shows on the group line while it's collapsed. */
+.nav-badge-collapsed { display: none; }
+.nav-toggle.collapsed .nav-badge-collapsed { display: inline-flex; }

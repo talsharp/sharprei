@@ -14,7 +14,7 @@
 <div class="view-switch-row">
   <div class="view-switch" role="tablist" aria-label="Which messages to count">
     {% for key, label in views.items() %}
-    <a role="tab" class="{{ 'active' if key == view }}" aria-selected="{{ 'true' if key == view else 'false' }}" href="/?view={{ key }}&sort={{ sort }}&dir={{ dir }}">{{ label }}</a>
+    <a role="tab" class="{{ 'active' if key == view }}" aria-selected="{{ 'true' if key == view else 'false' }}" href="/zips?view={{ key }}&sort={{ sort }}&dir={{ dir }}">{{ label }}</a>
     {% endfor %}
   </div>
   <span class="muted view-hint">
@@ -92,7 +92,7 @@
 
 {% macro sort_link(field, label) %}
   {% set next_dir = 'asc' if (sort == field and dir == 'desc') else 'desc' %}
-  <a href="/?view={{ view }}&sort={{ field }}&dir={{ next_dir }}" style="color:inherit; text-decoration:none;">
+  <a href="/zips?view={{ view }}&sort={{ field }}&dir={{ next_dir }}" style="color:inherit; text-decoration:none;">
     {{ label }}{% if sort == field %} {{ '▼' if dir == 'desc' else '▲' }}{% endif %}
   </a>
 {% endmacro %}

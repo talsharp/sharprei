@@ -231,6 +231,12 @@ ZIP_VIEWS = {"total": "Total", "initial": "First Text", "follow_up": "Follow-ups
 
 
 @app.get("/")
+def home():
+    """Tasks is the home screen."""
+    return RedirectResponse("/tools/tasks", status_code=303)
+
+
+@app.get("/zips")
 def zip_list(request: Request, sort: str = "score", dir: str = "desc", view: str = "total", db: Session = Depends(get_db)):
     """One table, three views: Total (first text + all follow-ups), First Text,
     or Follow-ups (all rounds together). Every number and the score follow the view."""
@@ -286,7 +292,7 @@ def followups_page(request: Request, db: Session = Depends(get_db)):
 def zip_detail(request: Request, zip_id: int, db: Session = Depends(get_db)):
     metrics_list = get_zip_metrics(db, zip_code_id=zip_id)
     if not metrics_list:
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/zips", status_code=303)
     metrics = metrics_list[0]
     runs = (
         db.query(CampaignRun)
@@ -502,7 +508,7 @@ def create_zip(zip_code: str = Form(...), db: Session = Depends(get_db)):
         return RedirectResponse(f"/zip/{zc.id}", status_code=303)
     if existing:
         return RedirectResponse(f"/zip/{existing.id}", status_code=303)
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/zips", status_code=303)
 
 
 @app.get("/import/weekly")
