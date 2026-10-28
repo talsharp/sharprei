@@ -98,6 +98,21 @@ def due_task_count() -> int:
 
 
 templates.env.globals["due_task_count"] = due_task_count
+
+
+def notifications() -> list:
+    """The bell's items (see app/notifications.py), for every page."""
+    from app.notifications import today_items
+    db = SessionLocal()
+    try:
+        return today_items(db)
+    except Exception:
+        return []
+    finally:
+        db.close()
+
+
+templates.env.globals["notifications"] = notifications
 # Cache-buster for /static assets: derived from style.css's own mtime, so the
 # browser always fetches fresh CSS after a deploy instead of serving a stale
 # cached copy until the user manually hard-refreshes.

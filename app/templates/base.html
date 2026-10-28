@@ -11,9 +11,32 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <a href="/" class="logo" aria-label="SharpREI - home">
-        <span class="logo-sharp">Sharp</span><span class="logo-rei">REI</span>
-      </a>
+      <div class="sidebar-top">
+        <a href="/" class="logo" aria-label="SharpREI - home">
+          <span class="logo-sharp">Sharp</span><span class="logo-rei">REI</span>
+        </a>
+        {% if request.state.user is defined and request.state.user %}
+        {% set notes = notifications() %}
+        <div class="bell-wrap">
+          <button type="button" class="bell {{ 'has-items' if notes }}" id="bell-btn" aria-label="Today: {{ notes|length }} item{{ 's' if notes|length != 1 }}" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/></svg>
+            {% if notes %}<span class="bell-count">{{ notes|length }}</span>{% endif %}
+          </button>
+          <div class="bell-panel" id="bell-panel" hidden>
+            <div class="bell-head">{% if notes %}<strong>{{ notes|length }} for today</strong>{% else %}<strong>Nothing for today</strong>{% endif %}<span class="muted">{{ local_today().strftime('%a, %b %d') }}</span></div>
+            {% for n in notes %}
+            <a class="bell-item {{ 'urgent' if n.urgent }}" href="{{ n.url }}">
+              <span class="bell-kind kind-{{ n.kind|lower|replace(' ', '-') }}">{{ n.kind }}</span>
+              <span class="bell-title">{{ n.title }}</span>
+              {% if n.detail %}<span class="bell-detail">{{ n.detail }}</span>{% endif %}
+            </a>
+            {% else %}
+            <p class="muted" style="margin:6px 0 2px; font-size:13px;">No deal tasks, walkthroughs, inspections, closings or board tasks today. 🎉</p>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
 
       <nav class="side-nav">
         <div class="nav-section">Wholesale</div>
@@ -72,6 +95,24 @@
     <main>
       {% block content %}{% endblock %}
     </main>
+  <script>
+  (function() {
+    var btn = document.getElementById('bell-btn'), panel = document.getElementById('bell-panel');
+    if (!btn) return;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      panel.hidden = !panel.hidden;
+      btn.setAttribute('aria-expanded', String(!panel.hidden));
+      if (!panel.hidden) {  // float it just under the bell, kept on screen
+        var r = btn.getBoundingClientRect();
+        panel.style.top = (r.bottom + 6) + 'px';
+        panel.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - panel.offsetWidth - 8)) + 'px';
+      }
+    });
+    document.addEventListener('click', function(e) { if (!panel.hidden && !panel.contains(e.target)) { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') panel.hidden = true; });
+  })();
+  </script>
   </div>
 </body>
 </html>
