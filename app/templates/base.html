@@ -25,14 +25,17 @@
           <div class="bell-panel" id="bell-panel" hidden>
             <div class="bell-head">{% if notes %}<strong>{{ notes|length }} for today</strong>{% else %}<strong>Nothing for today</strong>{% endif %}<span class="muted">{{ local_today().strftime('%a, %b %d') }}</span></div>
             {% for n in notes %}
-            <a class="bell-item {{ 'urgent' if n.urgent }}" href="{{ n.url }}">
-              <span class="bell-kind kind-{{ n.kind|lower|replace(' ', '-') }}">{{ n.kind }}</span>
-              <span class="bell-title">{{ n.title }}</span>
-              {% if n.detail %}<span class="bell-detail">{{ n.detail }}</span>{% endif %}
-            </a>
-            {% else %}
-            <p class="muted" style="margin:6px 0 2px; font-size:13px;">No deal tasks, walkthroughs, inspections, closings or board tasks today. 🎉</p>
+            <div class="bell-item {{ 'urgent' if n.urgent }}">
+              <a class="bell-link" href="{{ n.url }}">
+                <span class="bell-kind kind-{{ n.kind|lower|replace(' ', '-') }}">{{ n.kind }}</span>
+                <span class="bell-title">{{ n.title }}</span>
+                {% if n.detail %}<span class="bell-detail">{{ n.detail }}</span>{% endif %}
+              </a>
+              <button type="button" class="bell-done" data-key="{{ n.key }}"
+                      title="{{ 'Mark this task Done' if n.done_label else 'Hide for today' }}">✓ {{ n.done_label or "Seen" }}</button>
+            </div>
             {% endfor %}
+            <p class="muted bell-empty" style="margin:6px 0 2px; font-size:13px;{{ ' display:none;' if notes }}">All clear for today. 🎉</p>
           </div>
         </div>
         {% endif %}
@@ -111,6 +114,24 @@
     });
     document.addEventListener('click', function(e) { if (!panel.hidden && !panel.contains(e.target)) { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') panel.hidden = true; });
+    // ✓ in the bell: mark done / hide for today, without leaving the page.
+    panel.querySelectorAll('.bell-done').forEach(function(b) {
+      b.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var item = b.closest('.bell-item'), body = new URLSearchParams({key: b.dataset.key});
+        b.disabled = true;
+        fetch('/notifications/done', {method: 'POST', body: body}).then(function(r) {
+          if (!r.ok) throw new Error(r.status);
+          return r.json();
+        }).then(function(res) {
+          item.classList.add('leaving');
+          setTimeout(function() { item.remove(); }, 250);
+          var count = btn.querySelector('.bell-count'), head = panel.querySelector('.bell-head strong');
+          if (res.count) { if (count) count.textContent = res.count; head.textContent = res.count + ' for today'; }
+          else { if (count) count.remove(); btn.classList.remove('has-items'); head.textContent = 'Nothing for today'; panel.querySelector('.bell-empty').style.display = ''; }
+        }).catch(function() { b.disabled = false; alert('Could not update - try again.'); });
+      });
+    });
   })();
   </script>
   </div>

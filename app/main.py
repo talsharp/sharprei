@@ -113,6 +113,14 @@ def notifications() -> list:
 
 
 templates.env.globals["notifications"] = notifications
+
+
+@app.post("/notifications/done")
+def notification_done(key: str = Form(""), db: Session = Depends(get_db)):
+    from app.notifications import mark_done, today_items
+    if not mark_done(db, key):
+        return Response(status_code=404)
+    return {"count": len(today_items(db))}
 # Cache-buster for /static assets: derived from style.css's own mtime, so the
 # browser always fetches fresh CSS after a deploy instead of serving a stale
 # cached copy until the user manually hard-refreshes.

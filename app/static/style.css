@@ -748,7 +748,11 @@ p.sale-spread { margin: 10px 0 0; font-size: 14px; }
 .bell-panel[hidden] { display: none; }
 .bell-head { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 2px 8px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--navy); }
 .bell-head .muted { font-size: 12px; }
-.bell-item { display: flex; flex-direction: column; gap: 2px; padding: 9px 8px; border-radius: 8px; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--border); }
+.bell-item { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 8px; border-radius: 8px; border-bottom: 1px solid var(--border); transition: opacity .25s, transform .25s; }
+.bell-item.leaving { opacity: 0; transform: translateX(20px); }
+.bell-link { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 3px 0; text-decoration: none; color: var(--text); }
+.bell-done { flex: none; background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #23824A; white-space: nowrap; }
+.bell-done:hover { background: #E3F4E8; border-color: #B7E0C3; }
 .bell-item:last-child { border-bottom: none; }
 .bell-item:hover { background: var(--panel-soft); }
 .bell-item.urgent { background: #FDF3F3; }

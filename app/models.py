@@ -778,5 +778,15 @@ class DealTask(Base):
     deal: Mapped["WholesaleDeal"] = relationship(back_populates="tasks")
 
 
+class NotificationDismissal(Base):
+    """A bell reminder Tal ticked off. The key includes the day, so a reminder
+    hidden today can come back tomorrow if it's still relevant."""
+    __tablename__ = "notification_dismissals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401

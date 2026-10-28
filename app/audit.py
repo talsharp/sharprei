@@ -19,7 +19,7 @@ from app.models import AuditLog
 current_user_email: ContextVar[Optional[str]] = ContextVar("current_user_email", default=None)
 
 # Page views are visitor traffic, not edits - keep them out of the activity log.
-SKIP_TABLES = {"audit_log", "deal_page_views"}
+SKIP_TABLES = {"audit_log", "deal_page_views", "notification_dismissals"}
 SKIP_COLUMNS = {"created_at", "updated_at", "last_login_at"}
 LABEL_FIELDS = ("address", "zip_code", "name", "email", "month", "description")
 
