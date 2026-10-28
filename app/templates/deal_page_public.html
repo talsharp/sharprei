@@ -56,7 +56,6 @@
 
       <aside class="listing-contact">
         <div class="contact-card">
-          <div class="contact-title">Interested?</div>
           {% set phone = (page.contact_phone or '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') %}
           <div class="contact-person">
             {% if page.contact_photo %}<img class="contact-photo" src="{{ contact_photo_url }}" alt="{{ page.contact_name or '' }}">{% endif %}

@@ -9,6 +9,7 @@
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <a class="btn secondary" href="/finance/deals/{{ deal.id }}">Back to deal</a>
+    <button type="button" class="save-page-btn">Save changes</button>
     <a class="btn secondary" href="/finance/deals/{{ deal.id }}/page/preview" target="_blank" rel="noopener">Preview</a>
     <form method="post" action="/finance/deals/{{ deal.id }}/page/publish" style="display:inline;">
       {% if page.published %}<input type="hidden" name="on" value="0"><button type="submit" class="secondary">Take offline</button>
@@ -115,6 +116,10 @@
     <label>Phone<input type="text" name="contact_phone" value="{{ page.contact_phone or '' }}" placeholder="for Call / Text buttons"></label>
     <label>Email<input type="text" name="contact_email" value="{{ page.contact_email or '' }}"></label>
   </form>
+  <div class="page-save-bar">
+    <button type="button" class="save-page-btn">Save changes</button>
+    <span class="muted page-save-status" style="font-size:13px;">Changes also save on their own when you leave a box.</span>
+  </div>
   <form method="post" action="/finance/deals/{{ deal.id }}/page/contact-photo" enctype="multipart/form-data" id="contact-photo-form" hidden></form>
   <form method="post" action="/finance/deals/{{ deal.id }}/page/contact-photo/delete" id="contact-photo-delete" hidden></form>
   <p class="muted" style="font-size:12px; margin:10px 0 0;">Beds, baths, sqft and year built were filled from the county records - check them. Your photo and contact details are copied to your next page.</p>
@@ -164,6 +169,25 @@
       }).catch(function() { alert('Could not save - check your connection and try again.'); });
     });
   });
+  // Save changes: sends every field at once and confirms.
+  function saveAll(btn) {
+    var body = new URLSearchParams();
+    form.querySelectorAll('input:not([type=file]), textarea').forEach(function(i) { if (i.name) body.append(i.name, i.value); });
+    var buttons = document.querySelectorAll('.save-page-btn');
+    buttons.forEach(function(b) { b.disabled = true; b.textContent = 'Saving…'; });
+    fetch(form.dataset.url, {method: 'POST', body: body}).then(function(r) {
+      if (!r.ok) throw new Error(r.status);
+      var time = new Date().toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+      document.querySelectorAll('.page-save-status').forEach(function(s) { s.textContent = '✓ Saved at ' + time + ' - the page is updated.'; s.classList.add('profit-up'); });
+      buttons.forEach(function(b) { b.textContent = 'Saved ✓'; });
+      setTimeout(function() { buttons.forEach(function(b) { b.disabled = false; b.textContent = 'Save changes'; }); }, 1500);
+    }).catch(function() {
+      buttons.forEach(function(b) { b.disabled = false; b.textContent = 'Save changes'; });
+      alert('Could not save - check your connection and try again.');
+    });
+  }
+  document.querySelectorAll('.save-page-btn').forEach(function(b) { b.addEventListener('click', function() { saveAll(b); }); });
+
   form.querySelectorAll('.money').forEach(function(input) {
     input.addEventListener('blur', function() {
       var n = parseFloat(input.value.replace(/[$,\s]/g, ''));
