@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app import config  # noqa: F401  (loads .env before anything else)
 from app import audit  # noqa: F401  (registers the audit log listener)
 from app import auth, scheduler
-from app.database import backup_db, get_db
+from app.database import SessionLocal, backup_db, get_db
 from app.documents import MAX_FILE_MB, folder_for, save_uploads, serve, too_big_suffix
 from app.finance_routes import build_router as build_finance_router
 from app.statement_routes import build_router as build_statement_router
@@ -83,6 +83,21 @@ STATUS_LABELS = {
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["ZipStatus"] = ZipStatus
 templates.env.globals["UNSET_DATE"] = UNSET_DATE
+
+
+def due_task_count() -> int:
+    """For the sidebar reminder badge on every page."""
+    from app.finance import due_tasks
+    db = SessionLocal()
+    try:
+        return len(due_tasks(db))
+    except Exception:
+        return 0
+    finally:
+        db.close()
+
+
+templates.env.globals["due_task_count"] = due_task_count
 # Cache-buster for /static assets: derived from style.css's own mtime, so the
 # browser always fetches fresh CSS after a deploy instead of serving a stale
 # cached copy until the user manually hard-refreshes.

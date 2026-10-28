@@ -1,0 +1,19 @@
+{% set today = local_today() %}
+<div class="dtask status-{{ t.status }}{{ ' overdue' if t.status != 'done' and t.due_date and t.due_date < today }}{{ ' due-today' if t.status != 'done' and t.due_date == today }}" data-id="{{ t.id }}">
+  <div class="dtask-main">
+    <select class="dtask-status" data-field="status" aria-label="Status">
+      {% for k, label in TASK_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == t.status }}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="button" class="dtask-open" title="Open">
+      <span class="dtask-title">{{ t.title }}</span>
+      {% if t.details %}<svg class="task-desc-icon" viewBox="0 0 24 24" aria-label="Has details"><path d="M5 7h14M5 12h14M5 17h9"/></svg>{% endif %}
+    </button>
+    <input type="date" class="dtask-date" data-field="due_date" min="2000-01-01" max="2100-12-31" value="{{ t.due_date.isoformat() if t.due_date else '' }}" aria-label="Date">
+    <span class="dtask-when"></span>
+    <button type="button" class="dtask-delete" title="Delete">×</button>
+  </div>
+  <div class="dtask-detail" hidden>
+    <input type="text" data-field="title" value="{{ t.title }}" maxlength="255" aria-label="Task">
+    <textarea data-field="details" rows="3" placeholder="More details, phone numbers, who to call...">{{ t.details or '' }}</textarea>
+  </div>
+</div>

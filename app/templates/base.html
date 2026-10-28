@@ -34,7 +34,8 @@
         <a href="/finance" class="nav-item sub {{ 'active' if active == 'fin_overview' else '' }}">Overview</a>
         <a href="/finance/month" class="nav-item sub {{ 'active' if active == 'fin_month' else '' }}">Monthly Expenses</a>
         <a href="/finance/statements" class="nav-item sub {{ 'active' if active == 'fin_statements' else '' }}">Card Statements</a>
-        <a href="/finance/deals" class="nav-item sub {{ 'active' if active == 'fin_deals' else '' }}">Deals</a>
+        {% set due_n = due_task_count() if request.state.user is defined and request.state.user else 0 %}
+        <a href="/finance/deals" class="nav-item sub {{ 'active' if active == 'fin_deals' else '' }}">Deals{% if due_n %} <span class="nav-badge" title="{{ due_n }} deal task{{ 's' if due_n != 1 else '' }} due today or overdue">{{ due_n }}</span>{% endif %}</a>
         <a href="/finance/vendors" class="nav-item sub {{ 'active' if active == 'fin_vendors' else '' }}">Vendors</a>
 
         <div class="nav-section">Rentals</div>

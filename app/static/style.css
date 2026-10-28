@@ -696,3 +696,40 @@ p.sale-spread { margin: 10px 0 0; font-size: 14px; }
 @media (max-width: 860px) { .view-kpis { grid-template-columns: repeat(3, 1fr); } }
 .page-form .wide { grid-column: 1 / -1; }
 .page-save-bar { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* Deal tasks */
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #D64545; color: #fff; font-size: 11px; font-weight: 700; margin-left: 6px; }
+.dtask { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; background: var(--panel); }
+.dtask-main { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
+.dtask-status { width: 130px; padding: 5px 8px; font-size: 13px; font-weight: 600; }
+.dtask.status-todo .dtask-status { background: #F1F3F7; color: var(--navy); }
+.dtask.status-in_progress .dtask-status { background: #E8F0FB; color: var(--accent); border-color: #BFD4EF; }
+.dtask.status-waiting .dtask-status { background: #FFF6E5; color: #B7791F; border-color: #F0D9A8; }
+.dtask.status-done .dtask-status { background: #E3F4E8; color: #23824A; border-color: #B7E0C3; }
+.dtask.status-done .dtask-title { text-decoration: line-through; color: var(--muted); }
+.dtask-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 4px; font-size: 14px; color: var(--text); cursor: pointer; }
+.dtask-open:hover .dtask-title { color: var(--accent); }
+.dtask-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dtask-date { width: 150px; padding: 5px 8px; font-size: 13px; }
+.dtask-when { width: 90px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dtask.overdue { border-color: #F1C0C0; background: #FDF3F3; }
+.dtask.overdue .dtask-when { color: #C0392B; }
+.dtask.due-today { border-color: #F0D9A8; background: #FFFAF0; }
+.dtask.due-today .dtask-when { color: #B7791F; }
+.dtask-delete { background: none; border: none; color: #B7C0CE; font-size: 18px; padding: 0 4px; }
+.dtask-delete:hover { color: #D64545; }
+.dtask-detail { padding: 0 10px 10px 148px; display: flex; flex-direction: column; gap: 6px; }
+.dtask-detail input, .dtask-detail textarea { width: 100%; font-size: 14px; }
+.dtask .saved { border-color: #2E8B57 !important; box-shadow: 0 0 0 3px rgba(46,139,87,.15) !important; }
+.task-add-row { display: flex; gap: 8px; margin-top: 8px; }
+.task-add-row input[name=title] { flex: 1; border-style: dashed; }
+.task-add-row input[name=due_date] { width: 160px; }
+.due-box { border-color: #F0D9A8; background: #FFFAF0; }
+.due-item { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-top: 1px solid #F3E4C4; text-decoration: none; color: var(--text); font-size: 14px; }
+.due-item:hover strong { color: var(--accent); }
+.due-when { min-width: 90px; font-size: 12px; font-weight: 700; color: #B7791F; }
+.due-item.late .due-when { color: #C0392B; }
+@media (max-width: 700px) {
+  .dtask-main { flex-wrap: wrap; } .dtask-open { flex-basis: 100%; order: -1; } .dtask-detail { padding-left: 10px; }
+}
+.dtask-detail[hidden] { display: none; }

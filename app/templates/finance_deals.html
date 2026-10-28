@@ -25,6 +25,19 @@
 </div>
 
 <div style="overflow-x:auto;">
+{% if due %}
+<div class="card due-box">
+  <h3>🔔 Due today &amp; overdue <span class="muted" style="font-weight:400; font-size:13px;">· {{ due|length }} task{{ "s" if due|length != 1 else "" }}</span></h3>
+  {% for t in due %}
+  <a class="due-item {{ 'late' if t.due_date < task_today }}" href="/finance/deals/{{ t.deal_id }}#tasks-card">
+    <span class="due-when">{% if t.due_date == task_today %}Today{% else %}{{ (task_today - t.due_date).days }} day{{ "s" if (task_today - t.due_date).days != 1 else "" }} late{% endif %}</span>
+    <strong>{{ t.title }}</strong>
+    <span class="muted">{{ t.deal.address.split(',')[0] }} · {{ TASK_STATUSES[t.status] }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <table class="sticky-table">
   <thead>
     <tr>
@@ -43,6 +56,8 @@
           {% if c.inspection_end %} · <span class="{{ 'profit-down' if c.calendar_days_left < 0 or c.business_days_left <= 2 }}">{% if c.calendar_days_left < 0 %}inspection ended{% elif c.calendar_days_left == 0 %}inspection ends today{% else %}inspection: {{ c.business_days_left }} business day{{ "s" if c.business_days_left != 1 else "" }} left{% endif %}</span>{% endif %}
           {% if d.buyer_name %} · <strong>sold to {{ d.buyer_name }}</strong>{% if d.sell_price is not none %} for {{ fx.money(d.sell_price|float) }}{% endif %}{% if c.days_to_closing is not none %}, closing {{ d.closed_date.strftime('%b %d') }}{% if c.days_to_closing >= 0 %} ({{ "today" if c.days_to_closing == 0 else "in " ~ c.days_to_closing ~ " days" }}){% endif %}{% endif %}
           {% elif d.buyers %} · {{ d.buyers|length }} buyer{{ "s" if d.buyers|length != 1 else "" }}, {{ confirmed }} confirmed{% endif %}
+          {% set open_tasks = d.tasks|rejectattr('status', 'equalto', 'done')|list %}
+          {% if d.tasks %} · {{ d.tasks|length - open_tasks|length }}/{{ d.tasks|length }} tasks done{% endif %}
         </div>
         {% endif %}
       </td>

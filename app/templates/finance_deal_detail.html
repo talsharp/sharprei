@@ -27,6 +27,20 @@ window.syncContractFields = function() {
 
 </script>
 
+{% if deal.status == 'under_contract' or deal.tasks %}
+<div class="card" id="tasks-card">
+  <h3>Tasks <span class="muted" style="font-weight:400; font-size:13px;" id="task-tally"></span></h3>
+  <div id="task-rows">
+    {% for t in deal.tasks %}{% include "_deal_task_row.html" %}{% endfor %}
+  </div>
+  <form id="task-add" class="task-add-row" autocomplete="off">
+    <input type="text" name="title" placeholder="+ Add a task (e.g. Send contract to title) and press Enter" maxlength="255">
+    <input type="date" name="due_date" min="2000-01-01" max="2100-12-31" aria-label="Date">
+  </form>
+  <p class="muted" style="font-size:12px; margin:8px 0 0;">Click a task to add details. On its date it shows as a reminder on the Deals page and next to Deals in the menu, until it's Done.</p>
+</div>
+{% endif %}
+
 {% if deal.status == 'under_contract' or deal.buyers %}
 <div class="card" id="buyers-card">
   <h3>Buyers &amp; walkthroughs</h3>
@@ -212,6 +226,74 @@ window.syncContractFields = function() {
       .catch(function() { input.value = name; });
   });
   summarize();
+})();
+</script>
+{% endif %}
+
+{% if deal.status == 'under_contract' or deal.tasks %}
+<script>
+(function() {
+  var rows = document.getElementById('task-rows');
+  var TODAY = '{{ local_today().isoformat() }}';
+  function post(url, data) {
+    var body = new URLSearchParams();
+    Object.keys(data || {}).forEach(function(k) { body.append(k, data[k]); });
+    return fetch(url, {method: 'POST', body: body}).then(function(r) { if (!r.ok) throw new Error(r.status); return r; })
+      .catch(function(e) { alert('Could not save - check your connection and try again.'); throw e; });
+  }
+  function when(row) {
+    var d = row.querySelector('.dtask-date').value, status = row.querySelector('.dtask-status').value, label = '';
+    var done = status === 'done';
+    row.classList.toggle('overdue', !done && d && d < TODAY);
+    row.classList.toggle('due-today', !done && d === TODAY);
+    if (d && !done) {
+      var days = Math.round((new Date(d) - new Date(TODAY)) / 86400000);
+      label = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days === -1 ? '1 day late' : days < 0 ? (-days) + ' days late' : 'in ' + days + ' days';
+    }
+    row.querySelector('.dtask-when').textContent = label;
+  }
+  function tally() {
+    var all = rows.querySelectorAll('.dtask'), done = rows.querySelectorAll('.dtask.status-done').length;
+    var late = rows.querySelectorAll('.dtask.overdue').length, today = rows.querySelectorAll('.dtask.due-today').length;
+    document.getElementById('task-tally').textContent = all.length ? '· ' + done + ' of ' + all.length + ' done' + (today ? ' · ' + today + ' due today' : '') + (late ? ' · ' + late + ' late' : '') : '';
+  }
+  function wire(row) {
+    var id = row.dataset.id, detail = row.querySelector('.dtask-detail');
+    row.querySelector('.dtask-open').addEventListener('click', function() {
+      detail.hidden = !detail.hidden; row.classList.toggle('open', !detail.hidden);
+      if (!detail.hidden) detail.querySelector('textarea').focus();
+    });
+    row.querySelectorAll('[data-field]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        if (input.type === 'date' && input.value && input.value.slice(0, 4) < '2000') return;  // still typing the year
+        var data = {}; data[input.dataset.field] = input.value;
+        post('/finance/deal-tasks/' + id, data).then(function() {
+          if (input.dataset.field === 'status') row.className = row.className.replace(/status-\w+/, 'status-' + input.value);
+          if (input.dataset.field === 'title') row.querySelector('.dtask-title').textContent = input.value;
+          input.classList.add('saved'); setTimeout(function() { input.classList.remove('saved'); }, 800);
+          when(row); tally();
+        });
+      });
+    });
+    row.querySelector('.dtask-delete').addEventListener('click', function() {
+      post('/finance/deal-tasks/' + id + '/delete').then(function() { row.remove(); tally(); });
+    });
+    when(row);
+  }
+  rows.querySelectorAll('.dtask').forEach(wire);
+  var add = document.getElementById('task-add');
+  add.addEventListener('submit', function(e) { e.preventDefault(); });
+  add.querySelector('[name=title]').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var title = this.value.trim(), date = add.querySelector('[name=due_date]');
+    if (!title) return;
+    this.value = '';
+    post('/finance/deals/{{ deal.id }}/tasks/new', {title: title, due_date: date.value}).then(function(r) { return r.text(); }).then(function(html) {
+      rows.insertAdjacentHTML('beforeend', html); wire(rows.lastElementChild); tally();
+    });
+  });
+  tally();
 })();
 </script>
 {% endif %}

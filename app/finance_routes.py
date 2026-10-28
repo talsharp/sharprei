@@ -16,6 +16,9 @@ from app.finance import (
     SMS_SOURCES,
     BUYER_STATUSES,
     contract_clock,
+    TASK_STATUSES,
+    due_tasks,
+    local_today,
     renegotiation_report,
     WHOLESALE_CHANNELS,
     MonthSummary,
@@ -30,7 +33,7 @@ from app.finance import (
 )
 from app.statements import charges_by_expense
 from app.deal_pages import public_base, view_stats
-from app.models import DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.models import DealBuyer, DealFile, DealPage, DealTask, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -90,6 +93,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     templates.env.globals["DEAL_STATUSES"] = DEAL_STATUSES
     templates.env.globals["SMS_SOURCES"] = SMS_SOURCES
     templates.env.globals["BUYER_STATUSES"] = BUYER_STATUSES
+    templates.env.globals["TASK_STATUSES"] = TASK_STATUSES
+    templates.env.globals["local_today"] = local_today
     templates.env.globals["contract_clock"] = contract_clock
 
     # ---------- Overview ----------
@@ -273,7 +278,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         return templates.TemplateResponse(
             "finance_deals.html",
             {"request": request, "active": "fin_deals", "deals": deals, "totals": totals,
-             "today": date.today().isoformat(), "lead_channels": LEAD_CHANNELS},
+             "today": date.today().isoformat(), "lead_channels": LEAD_CHANNELS,
+             "due": due_tasks(db), "task_today": local_today()},
         )
 
     @router.post("/deals/{deal_id}/channel")
@@ -349,6 +355,45 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 deal.closed_date = closing
         db.commit()
         return templates.TemplateResponse("_deal_contract_stats.html", {"request": request, "deal": deal})
+
+    # ---------- Deal tasks ----------
+
+    @router.post("/deals/{deal_id}/tasks/new")
+    def finance_task_new(request: Request, deal_id: int, title: str = Form(""), due_date: str = Form(""), db: Session = Depends(get_db)):
+        deal = db.get(WholesaleDeal, deal_id)
+        if not deal or not title.strip():
+            return Response(status_code=204)
+        task = DealTask(deal_id=deal.id, title=title.strip()[:255], due_date=_optional_date(due_date))
+        db.add(task)
+        db.commit()
+        return templates.TemplateResponse("_deal_task_row.html", {"request": request, "t": task})
+
+    @router.post("/deal-tasks/{task_id}")
+    async def finance_task_update(task_id: int, request: Request, db: Session = Depends(get_db)):
+        task = db.get(DealTask, task_id)
+        if not task:
+            return Response(status_code=404)
+        form = await request.form()
+        if form.get("title", "").strip():
+            task.title = form["title"].strip()[:255]
+        if "details" in form:
+            task.details = form["details"].strip() or None
+        if "due_date" in form:
+            due = _optional_date(form["due_date"])
+            if due is None or due.year >= 2000:  # ignore a half-typed year
+                task.due_date = due
+        if form.get("status") in TASK_STATUSES:
+            task.status = form["status"]
+        db.commit()
+        return Response(status_code=204)
+
+    @router.post("/deal-tasks/{task_id}/delete")
+    def finance_task_delete(task_id: int, db: Session = Depends(get_db)):
+        task = db.get(DealTask, task_id)
+        if task:
+            db.delete(task)
+            db.commit()
+        return Response(status_code=204)
 
     @router.post("/deals/{deal_id}/buyers/new")
     def finance_buyer_new(request: Request, deal_id: int, name: str = Form(""), visit_at: str = Form(""), db: Session = Depends(get_db)):

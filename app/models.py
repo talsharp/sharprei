@@ -453,6 +453,10 @@ class WholesaleDeal(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()
+    tasks: Mapped[list["DealTask"]] = relationship(
+        back_populates="deal", cascade="all, delete-orphan",
+        order_by="(DealTask.status == 'done', DealTask.due_date.is_(None), DealTask.due_date, DealTask.id)",
+    )
     buyers: Mapped[list["DealBuyer"]] = relationship(
         back_populates="deal", cascade="all, delete-orphan",
         order_by="(DealBuyer.visit_at.is_(None), DealBuyer.visit_at, DealBuyer.id)",
@@ -756,6 +760,22 @@ class DealPageView(Base):
 
     page: Mapped[DealPage] = relationship(back_populates="views")
     link: Mapped[Optional[DealPageLink]] = relationship(back_populates="views")
+
+
+class DealTask(Base):
+    """A to-do for a deal (send to title, collect EMD...). Due today or overdue
+    and not done = shown as a reminder on the Deals page and in the sidebar."""
+    __tablename__ = "deal_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="todo")  # todo / in_progress / waiting / done
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    deal: Mapped["WholesaleDeal"] = relationship(back_populates="tasks")
 
 
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
