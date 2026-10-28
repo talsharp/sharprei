@@ -206,10 +206,15 @@ def _channel_leads(fm: FinanceMonth) -> Dict[str, int]:
     }
 
 
-def build_month_summaries(db: Session) -> "OrderedDict[date, MonthSummary]":
+def _deals(db: Session, include_kept: bool = True) -> list:
+    deals = db.query(WholesaleDeal).all()
+    return deals if include_kept else [d for d in deals if d.status != "kept"]
+
+
+def build_month_summaries(db: Session, include_kept: bool = True) -> "OrderedDict[date, MonthSummary]":
     """Every month that has a finance row or a deal closing in it, newest first."""
     months = db.query(FinanceMonth).options(selectinload(FinanceMonth.expenses)).all()
-    deals = db.query(WholesaleDeal).all()
+    deals = _deals(db, include_kept)
 
     summaries: Dict[date, MonthSummary] = {}
 
@@ -293,7 +298,7 @@ class FinanceTotals:
         return self.closed_deals / self.leads if self.leads else None
 
 
-def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]") -> FinanceTotals:
+def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]", include_kept: bool = True) -> FinanceTotals:
     t = FinanceTotals()
     for s in summaries.values():
         t.wholesale_expenses += s.wholesale_expenses
@@ -304,7 +309,7 @@ def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]") -> F
         for ch, cs in s.channels.items():
             t.channels[ch].expenses += cs.expenses
             t.channels[ch].leads += cs.leads
-    deals = db.query(WholesaleDeal).all()
+    deals = _deals(db, include_kept)
     t.signed_agreements = len(deals)
     t.closed_deals = sum(1 for d in deals if d.status in ("closed", "kept"))
     t.under_contract = sum(1 for d in deals if d.status == "under_contract")
@@ -400,10 +405,22 @@ def start_month(db: Session, month: date) -> FinanceMonth:
     return fm
 
 
+def renegotiation_credit(deal) -> Optional[float]:
+    """Money made because of the renegotiation: the saving, but never more than
+    the deal's profit (without the renegotiation the deal would have made the
+    profit minus the saving - if that's below zero, the whole profit is thanks
+    to the renegotiation). None until the deal has closed (or was kept)."""
+    saved = deal.renegotiation_savings
+    if not saved or saved <= 0 or deal.status not in ("closed", "kept"):
+        return None
+    return max(0.0, min(saved, deal.profit or 0))
+
+
 def renegotiation_report(deals) -> dict:
-    """Money made by renegotiating the agreement price down. Counted when the
-    deal closes (closed or kept), in its closing quarter; under-contract deals
-    are pending, dead ones made nothing."""
+    """Money made by renegotiating the agreement price down (see
+    renegotiation_credit), counted when the deal closes (closed or kept), in its
+    closing quarter; under-contract deals are pending (their saving, not yet
+    capped), dead ones made nothing."""
     quarters: Dict[tuple, dict] = {}
     years: Dict[int, dict] = {}
     pending = {"count": 0, "saved": 0.0}
@@ -412,11 +429,12 @@ def renegotiation_report(deals) -> dict:
         if not saved:
             continue
         if d.status in ("closed", "kept") and d.closed_date:
+            made = renegotiation_credit(d) or 0.0
             key = (d.closed_date.year, (d.closed_date.month - 1) // 3 + 1)
             for bucket in (quarters.setdefault(key, {"count": 0, "saved": 0.0, "deals": []}),
                            years.setdefault(key[0], {"count": 0, "saved": 0.0})):
                 bucket["count"] += 1
-                bucket["saved"] += saved
+                bucket["saved"] += made
             quarters[key]["deals"].append(d)
         elif d.status == "under_contract":
             pending["count"] += 1

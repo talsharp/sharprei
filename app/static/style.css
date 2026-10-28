@@ -775,3 +775,10 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 /* The Finance reminder count only shows on the group line while it's collapsed. */
 .nav-badge-collapsed { display: none; }
 .nav-toggle.collapsed .nav-badge-collapsed { display: inline-flex; }
+.kept-switch { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 600; }
+.kept-switch:hover { color: var(--navy); }
+.switch-track { width: 34px; height: 20px; border-radius: 999px; background: #C9D3E0; position: relative; transition: background .15s; flex: none; }
+.switch-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: left .15s; }
+.kept-switch.on { color: var(--navy); }
+.kept-switch.on .switch-track { background: var(--accent); }
+.kept-switch.on .switch-knob { left: 16px; }

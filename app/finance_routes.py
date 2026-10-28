@@ -19,6 +19,7 @@ from app.finance import (
     TASK_STATUSES,
     due_tasks,
     local_today,
+    renegotiation_credit,
     renegotiation_report,
     WHOLESALE_CHANNELS,
     MonthSummary,
@@ -95,15 +96,18 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     templates.env.globals["BUYER_STATUSES"] = BUYER_STATUSES
     templates.env.globals["TASK_STATUSES"] = TASK_STATUSES
     templates.env.globals["local_today"] = local_today
+    templates.env.globals["renegotiation_credit"] = renegotiation_credit
     templates.env.globals["contract_clock"] = contract_clock
 
     # ---------- Overview ----------
 
     @router.get("")
-    def finance_overview(request: Request, channel: str = "", db: Session = Depends(get_db)):
-        summaries = build_month_summaries(db)
-        totals = build_totals(db, summaries)
+    def finance_overview(request: Request, channel: str = "", kept: str = "1", db: Session = Depends(get_db)):
+        include_kept = kept != "0"  # the "Include houses kept for portfolio" switch
+        summaries = build_month_summaries(db, include_kept)
+        totals = build_totals(db, summaries, include_kept)
         channel = channel if channel in LEAD_CHANNELS else ""
+        all_deals = [d for d in db.query(WholesaleDeal).all() if include_kept or d.status != "kept"]
         context = {
             "request": request,
             "active": "fin_overview",
@@ -112,13 +116,15 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             "lead_channels": LEAD_CHANNELS,
             "wholesale_channels": WHOLESALE_CHANNELS,
             "channel": channel,
-            "renegotiations": renegotiation_report(db.query(WholesaleDeal).all()),
+            "renegotiations": renegotiation_report(all_deals),
+            "include_kept": include_kept,
+            "kept_count": sum(1 for d in db.query(WholesaleDeal).all() if d.status == "kept"),
         }
         if channel:
             context["cs"] = totals.channels[channel]
             context["vendors"] = channel_vendors(db, channel)
             context["deals"] = sorted(
-                (d for d in db.query(WholesaleDeal).all() if d.channel == channel),
+                (d for d in all_deals if d.channel == channel),
                 key=lambda d: d.agreement_date or date.min, reverse=True,
             )
             context["shared_expenses"] = totals.channels["shared"].expenses
