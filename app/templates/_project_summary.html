@@ -1,0 +1,72 @@
+{% import "_finance_macros.html" as fx %}
+{% set rate = '%g'|format(s.rate) %}
+{% set this_year = s.years[-1] if s.years and not s.years[-1].finished else none %}
+{% if part == "kpis" %}
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg></div>
+    <div><div class="label">Tal's money in now</div><div class="value">{{ fx.money(s.tal_in - s.tal_back) }}</div>
+    <div class="kpi-sub">put in {{ fx.money(s.tal_in) }}{% if s.tal_back %} · back {{ fx.money(s.tal_back) }}{% endif %}</div></div></div>
+  <div class="kpi"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM12 10v4M8 12h.01M16 12h.01"/></svg></div>
+    <div><div class="label">Loan to {{ project.partners or "partners" }} today</div><div class="value">{{ fx.money(s.loan) }}</div>
+    <div class="kpi-sub">half of Tal's money in{% if s.loan_repaid %}, minus {{ fx.money(s.loan_repaid) }} repaid{% endif %}</div></div></div>
+  <div class="kpi"><div class="kpi-icon coral"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 3M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/></svg></div>
+    <div><div class="label">Annual payment still owed</div><div class="value {{ 'profit-down' if s.still_owed > 0.5 }}">{{ fx.money(s.still_owed if s.still_owed > 0.5 else 0) }}</div>
+    <div class="kpi-sub">{% if s.still_owed < -0.5 %}paid {{ fx.money(-s.still_owed) }} ahead{% else %}finished years {{ fx.money(s.owed_finished) }} · paid {{ fx.money(s.annual_paid) }}{% endif %}</div></div></div>
+  <div class="kpi"><div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/></svg></div>
+    <div><div class="label">Building up this year</div><div class="value">{{ fx.money(s.owed_this_year) }}</div>
+    <div class="kpi-sub">{% if this_year %}year {{ this_year.number }} ends {{ this_year.end.strftime('%b %d, %Y') }} · heading to {{ fx.money(this_year.full_year) }}{% else %}—{% endif %}</div></div></div>
+</div>
+{% else %}
+
+<div class="card">
+  <h3>Annual payment by year of the loan <span class="muted" style="font-weight:400; font-size:13px;">· {{ rate }}% a year on the loan, counted day by day</span></h3>
+  {% if s.years %}
+  <table class="loan-years">
+    <thead><tr><th>Year</th><th>Dates</th><th>Owed</th><th>Paid in that year</th></tr></thead>
+    <tbody>
+      {% for y in s.years %}
+      <tr class="loan-year">
+        <td><strong>Year {{ y.number }}</strong>{% if not y.finished %} <span class="badge">so far</span>{% endif %}</td>
+        <td>{{ y.start.strftime('%b %d, %Y') }} – {{ y.end.strftime('%b %d, %Y') }}</td>
+        <td>{{ fx.money(y.owed) }}{% if not y.finished %} <span class="muted">(full year ≈ {{ fx.money(y.full_year) }})</span>{% endif %}</td>
+        <td>{{ fx.money(y.paid) }}</td>
+      </tr>
+      {% for pd in y.periods if pd.days %}
+      <tr class="loan-period muted">
+        <td></td>
+        <td>{{ pd.start.strftime('%b %d, %Y') }} – {{ pd.end.strftime('%b %d, %Y') }} · {{ pd.days }} days</td>
+        <td colspan="2">loan {{ fx.money(pd.loan) }} × {{ rate }}% × {{ pd.days }}/365 = {{ fx.money(pd.owed) }}</td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Add Tal's first payment in (with a date) and the loan starts counting from there.</p>
+  {% endif %}
+  {% if s.unrecognised %}<p class="profit-down" style="font-size:13px;">{{ s.unrecognised }} payment{{ "s" if s.unrecognised != 1 }} without a date - add the date so the loan can count it.</p>{% endif %}
+  <p class="muted" style="font-size:12px; margin-bottom:0;">
+    How it works (agreement, clauses 21–22): half of the money Tal has in is a loan to {{ project.partners or "the partners" }}.
+    Money back to Tal (like the refinance) lowers the loan by half of it; a direct loan repayment lowers it in full.
+    The annual payment is {{ rate }}% of the loan and is due at the end of each year; when the loan changes mid-year, the payment changes from that day.
+    No interest on interest, no indexation. "Still owed" counts finished years only.
+  </p>
+</div>
+
+{% if s.by_year %}
+<div class="card">
+  <h3>For the accountant · by calendar year</h3>
+  <div style="overflow-x:auto;">
+  <table>
+    {% set used = [] %}{% for k in kinds %}{% for row in s.by_year.values() %}{% if row[k] and k not in used %}{% set _ = used.append(k) %}{% endif %}{% endfor %}{% endfor %}
+    <thead><tr><th>Year</th>{% for k in used %}<th>{{ kinds[k].label }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for year, row in s.by_year.items() %}
+      <tr><td><strong>{{ year }}</strong></td>{% for k in used %}<td>{{ fx.money(row[k]) if row[k] else "—" }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endif %}

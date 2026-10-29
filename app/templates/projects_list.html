@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}Projects · Rentals{% endblock %}
+{% block content %}
+<div class="top-actions">
+  {{ fx.page_header("Projects", "Deals outside the portfolio - each with its own payments ledger") }}
+</div>
+<div class="card">
+  <h3>New project</h3>
+  <form method="post" action="/rentals/projects/new" style="display:flex; gap:8px; flex-wrap:wrap;">
+    <input type="text" name="name" placeholder="Project name, e.g. Warner Robins" required style="flex:1; min-width:240px;">
+    <button type="submit">Create project</button>
+  </form>
+</div>
+{% if projects %}
+<div class="card">
+  <h3>Your projects</h3>
+  {% for p in projects %}
+  <p><a class="zip-link" href="/rentals/projects/{{ p.id }}">{{ p.name }}</a>{% if p.properties %} <span class="muted">· {{ p.properties }}</span>{% endif %} <span class="muted">· {{ p.payments|length }} payment{{ "s" if p.payments|length != 1 }}</span></p>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}{{ project.name }} · Rentals{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  {{ fx.page_header(project.name, project.properties or "Project outside the portfolio") }}
+  <a class="btn secondary" href="/rentals/projects/{{ project.id }}/payments.csv">Download payments for the accountant (CSV)</a>
+</div>
+
+<div id="project-kpis" hx-get="/rentals/projects/{{ project.id }}/summary?part=kpis" hx-trigger="project-changed from:body" hx-swap="innerHTML">
+  {% set part = "kpis" %}{% include "_project_summary.html" %}
+</div>
+
+<datalist id="project-parties">{% for x in parties %}<option value="{{ x }}">{% endfor %}</datalist>
+<datalist id="project-accounts">{% for x in accounts %}<option value="{{ x }}">{% endfor %}</datalist>
+
+<div class="card" id="payments">
+  <h3>Payments <span class="muted" style="font-weight:400; font-size:13px;">· every dollar in and out, with the account it came from</span></h3>
+  <form class="pay-add" hx-post="/rentals/projects/{{ project.id }}/payments/new" hx-target="#pay-rows" hx-swap="innerHTML"
+        hx-on="htmx:afterRequest: if (event.detail.successful && event.detail.elt === this) { this.reset(); this.querySelector('[name=kind]').dispatchEvent(new Event('change')); }">
+    <input type="date" name="paid_on" min="2000-01-01" max="2100-12-31" aria-label="Date" required>
+    <input type="text" name="amount" inputmode="decimal" placeholder="Amount $" aria-label="Amount" required>
+    <select name="kind" aria-label="Type">
+      {% for k, v in kinds.items() %}<option value="{{ k }}">{{ v.label }}</option>{% endfor %}
+    </select>
+    <input type="text" name="paid_by" list="project-parties" placeholder="Paid by" aria-label="Paid by">
+    <input type="text" name="paid_to" list="project-parties" placeholder="Paid to" aria-label="Paid to">
+    <input type="text" name="account" list="project-accounts" placeholder="From account" aria-label="From account">
+    <input type="text" name="description" placeholder="What was it for?" aria-label="Description" class="pay-desc">
+    <label class="pay-flag"><input type="checkbox" name="needs_recheck" value="1"> Recheck</label>
+    <label class="pay-flag" title="Taken off another payment - no money actually moved"><input type="checkbox" name="netted" value="1"> No money moved</label>
+    <button type="submit">Add payment</button>
+  </form>
+
+  <div style="overflow-x:auto;">
+  <table class="pay-table">
+    <thead>
+      <tr><th>Date</th><th>Amount</th><th>Type</th><th>Paid by → to</th><th>From account</th><th>What was it for</th><th>Flags</th><th></th></tr>
+    </thead>
+    <tbody id="pay-rows">{% include "_project_payment_rows.html" %}</tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:12px; margin-bottom:0;">Changes save as you type. Rows marked <span class="recheck-chip">Recheck</span> are ones you still need to confirm.</p>
+</div>
+
+<div id="project-tables" hx-get="/rentals/projects/{{ project.id }}/summary?part=tables" hx-trigger="project-changed from:body" hx-swap="innerHTML">
+  {% set part = "tables" %}{% include "_project_summary.html" %}
+</div>
+
+<div class="card">
+  <h3>Project details</h3>
+  <div class="project-fields">
+    {% for field, label, value, kind in [("name", "Name", project.name, "text"),
+                                         ("properties", "Properties", project.properties, "text"),
+                                         ("partners", "Partners", project.partners, "text"),
+                                         ("loan_rate", "Annual payment rate (% of the loan)", project.loan_rate, "number"),
+                                         ("loan_start", "Loan started", project.loan_start.isoformat() if project.loan_start else "", "date")] %}
+    <label>{{ label }}
+      <input type="{{ kind }}" name="{{ field }}" value="{{ '%g'|format(value|float) if kind == 'number' and value is not none else (value or '') }}"
+             {% if kind == 'number' %}step="any"{% endif %}{% if kind == 'date' %}min="2000-01-01" max="2100-12-31"{% endif %}
+             hx-post="/rentals/projects/{{ project.id }}" hx-trigger="change" hx-swap="none">
+    </label>
+    {% endfor %}
+    <label class="wide">Notes
+      <textarea name="notes" rows="3" hx-post="/rentals/projects/{{ project.id }}" hx-trigger="change" hx-swap="none">{{ project.notes or '' }}</textarea>
+    </label>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Fill "paid by / paid to" from the type, unless Tal already typed something else.
+  var defaults = {
+    tal_in: ['Tal', 'Project account'], tal_back: ['Project account', 'Tal'],
+    annual_payment: ['Gal & Ran', 'Tal'], loan_repay: ['Gal & Ran', 'Tal'],
+    partner_in: ['Gal & Ran', 'Project account'], partner_out: ['Project account', 'Gal & Ran'], other: ['', '']
+  };
+  var form = document.querySelector('.pay-add');
+  var kind = form.querySelector('[name=kind]'), by = form.querySelector('[name=paid_by]'), to = form.querySelector('[name=paid_to]');
+  var auto = ['', ''];
+  kind.addEventListener('change', function() {
+    var d = defaults[kind.value] || ['', ''];
+    if (!by.value || by.value === auto[0]) by.value = d[0];
+    if (!to.value || to.value === auto[1]) to.value = d[1];
+    auto = d;
+  });
+  kind.dispatchEvent(new Event('change'));
+})();
+</script>
+{% endblock %}

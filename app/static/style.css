@@ -782,3 +782,34 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .kept-switch.on { color: var(--navy); }
 .kept-switch.on .switch-track { background: var(--accent); }
 .kept-switch.on .switch-knob { left: 16px; }
+
+/* ---------- Rentals › Projects ---------- */
+.kpi-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pay-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.pay-add input[name=amount] { width: 120px; }
+.pay-add .pay-desc { flex: 1; min-width: 220px; }
+.pay-flag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pay-table { width: 100%; }
+.pay-table td { vertical-align: top; padding: 6px 4px; }
+.pay-table input, .pay-table select, .pay-table textarea { width: 100%; min-width: 0; font-size: 13px; padding: 6px 7px; }
+.pay-table td:nth-child(1) { width: 128px; }
+.pay-table td:nth-child(2) { width: 92px; }
+.pay-table td:nth-child(3) { width: 185px; }
+.pay-table td:nth-child(5) { width: 130px; }
+.pay-table td:nth-child(7) { width: 112px; }
+.pay-table td:nth-child(8) { width: 28px; }
+.pay-table td.pay-parties { width: 250px; display: table-cell; white-space: nowrap; }
+.pay-table td.pay-parties input { width: calc(50% - 10px); display: inline-block; }
+.pay-arrow { color: var(--muted); font-size: 12px; }
+.pay-table td:nth-child(6) { min-width: 180px; }
+.pay-table .pay-amount { text-align: right; font-variant-numeric: tabular-nums; }
+.pay-table textarea.pay-desc { resize: vertical; min-height: 32px; field-sizing: content; }
+.pay-table td.pay-flags .pay-flag { display: flex; }
+.pay-row.recheck td { background: var(--yellow-bg); }
+.recheck-chip { background: var(--yellow-bg); color: var(--yellow); border-radius: 6px; padding: 1px 6px; font-weight: 600; }
+.loan-years td { padding-top: 8px; padding-bottom: 8px; }
+.loan-period td { font-size: 12px; padding-top: 2px; padding-bottom: 2px; border-top: none; }
+.project-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.project-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.project-fields label.wide { grid-column: 1 / -1; }
+.nav-item.nav-add { color: var(--muted); font-size: 13px; }

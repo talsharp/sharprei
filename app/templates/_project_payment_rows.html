@@ -1,0 +1,26 @@
+{% for p in project.payments %}
+{% set url = "/rentals/project-payments/" ~ p.id %}
+<tr class="pay-row {{ 'recheck' if p.needs_recheck }}" id="pay-{{ p.id }}">
+  <td><input type="date" name="paid_on" min="2000-01-01" max="2100-12-31" value="{{ p.paid_on.isoformat() if p.paid_on else '' }}" aria-label="Date" hx-post="{{ url }}" hx-trigger="change" hx-swap="none"></td>
+  <td><input type="text" name="amount" inputmode="decimal" class="pay-amount" value="{{ '{:,.2f}'.format(p.amount|float).replace('.00', '') }}" aria-label="Amount" hx-post="{{ url }}" hx-trigger="change" hx-swap="none"></td>
+  <td><select name="kind" aria-label="Type" hx-post="{{ url }}" hx-trigger="change" hx-swap="none">
+    {% for k, v in kinds.items() %}<option value="{{ k }}" {{ 'selected' if k == p.kind }}>{{ v.label }}</option>{% endfor %}
+  </select></td>
+  <td class="pay-parties">
+    <input type="text" name="paid_by" list="project-parties" value="{{ p.paid_by or '' }}" aria-label="Paid by" placeholder="Paid by" hx-post="{{ url }}" hx-trigger="change" hx-swap="none">
+    <span class="pay-arrow">→</span>
+    <input type="text" name="paid_to" list="project-parties" value="{{ p.paid_to or '' }}" aria-label="Paid to" placeholder="Paid to" hx-post="{{ url }}" hx-trigger="change" hx-swap="none">
+  </td>
+  <td><input type="text" name="account" list="project-accounts" value="{{ p.account or '' }}" placeholder="Which account?" aria-label="From account" hx-post="{{ url }}" hx-trigger="change" hx-swap="none"></td>
+  <td><textarea name="description" rows="1" class="pay-desc" aria-label="What was it for" hx-post="{{ url }}" hx-trigger="change" hx-swap="none">{{ p.description or '' }}</textarea></td>
+  <td class="pay-flags">
+    <label class="pay-flag"><input type="checkbox" {{ 'checked' if p.needs_recheck }} hx-post="{{ url }}" hx-trigger="change" hx-swap="none"
+      hx-vals='js:{needs_recheck: event.target.checked ? "1" : "0"}' onchange="this.closest('tr').classList.toggle('recheck', this.checked)"> Recheck</label>
+    <label class="pay-flag" title="Taken off another payment - no money actually moved"><input type="checkbox" {{ 'checked' if p.netted }} hx-post="{{ url }}" hx-trigger="change" hx-swap="none"
+      hx-vals='js:{netted: event.target.checked ? "1" : "0"}'> No money moved</label>
+  </td>
+  <td><button type="button" class="dtask-delete" title="Delete" hx-post="{{ url }}/delete" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete this payment?">×</button></td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">No payments yet - add the first one above.</td></tr>
+{% endfor %}

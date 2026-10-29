@@ -22,6 +22,7 @@ from app.statement_routes import build_router as build_statement_router
 from app.task_routes import build_router as build_task_router
 from app.comp_routes import build_router as build_comp_router
 from app.deal_page_routes import build_router as build_deal_page_router
+from app.project_routes import build_router as build_project_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -115,6 +116,21 @@ def notifications() -> list:
 templates.env.globals["notifications"] = notifications
 
 
+def nav_projects() -> list:
+    """Rentals › projects listed in the sidebar (id, name)."""
+    from app.models import Project
+    db = SessionLocal()
+    try:
+        return [(p.id, p.name) for p in db.query(Project).order_by(Project.name).all()]
+    except Exception:
+        return []
+    finally:
+        db.close()
+
+
+templates.env.globals["nav_projects"] = nav_projects
+
+
 @app.post("/notifications/done")
 def notification_done(key: str = Form(""), db: Session = Depends(get_db)):
     from app.notifications import mark_done, today_items
@@ -133,6 +149,7 @@ app.include_router(build_statement_router(templates))
 app.include_router(build_task_router(templates))
 app.include_router(build_comp_router(templates))
 app.include_router(build_deal_page_router(templates))
+app.include_router(build_project_router(templates))
 auth.install(app, templates)
 
 
@@ -172,6 +189,8 @@ ACTIVITY_AREAS = {
     "renovation_expenses": "Rentals - renovation",
     "monthly_expenses": "Rentals - monthly",
     "property_owners": "Rentals - owners",
+    "projects": "Rentals - projects",
+    "project_payments": "Rentals - project payments",
     "finance_months": "Finance - months",
     "finance_expenses": "Finance - expenses",
     "finance_vendors": "Finance - vendors",

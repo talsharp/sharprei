@@ -788,5 +788,46 @@ class NotificationDismissal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class Project(Base):
+    """A deal outside the rental portfolio (e.g. Warner Robins with Gal & Ran):
+    a money ledger for the accountant plus the loan terms of the agreement."""
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    properties: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    partners: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    loan_rate: Mapped[Optional[float]] = mapped_column(Numeric(6, 3), nullable=True)  # % a year, e.g. 4.5
+    loan_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    payments: Mapped[list["ProjectPayment"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan",
+        order_by="(ProjectPayment.paid_on, ProjectPayment.id)")
+
+
+class ProjectPayment(Base):
+    """One money movement in a project. `kind` decides how it counts toward
+    the loan (see app/projects.py); `netted` = no money actually moved, it was
+    taken off another payment."""
+    __tablename__ = "project_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    paid_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    kind: Mapped[str] = mapped_column(String(20), default="other")
+    paid_by: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    paid_to: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    account: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    needs_recheck: Mapped[bool] = mapped_column(Boolean, default=False)
+    netted: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="payments")
+
+
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401

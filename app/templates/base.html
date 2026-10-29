@@ -59,6 +59,13 @@
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6"/></svg>
           Portfolio
         </a>
+        {% for pid, pname in nav_projects() %}
+        <a href="/rentals/projects/{{ pid }}" class="nav-item {{ 'active' if active == 'project-' ~ pid else '' }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11M4 20h16M9 20v-5h6v5M8 11h2M14 11h2"/></svg>
+          {{ pname }}
+        </a>
+        {% endfor %}
+        <a href="/rentals/projects" class="nav-item sub nav-add {{ 'active' if active == 'projects' else '' }}">+ New project</a>
 
         <button type="button" class="nav-section nav-toggle" data-group="wholesale" aria-expanded="true">Wholesale <svg class="nav-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="nav-collapse" data-group="wholesale">
