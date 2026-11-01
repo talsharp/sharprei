@@ -202,6 +202,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         sms_follow_up_leads: str = Form("0"),
         cold_call_leads: str = Form("0"),
         facebook_leads: str = Form("0"),
+        website_leads: str = Form("0"),
         db: Session = Depends(get_db),
     ):
         month = parse_month_key(key)
@@ -211,6 +212,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             fm.sms_follow_up_leads = _int(sms_follow_up_leads)
             fm.cold_call_leads = _int(cold_call_leads)
             fm.facebook_leads = _int(facebook_leads)
+            fm.website_leads = _int(website_leads)
             db.commit()
         return _month_body(request, db, month)
 

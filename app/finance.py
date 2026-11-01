@@ -22,11 +22,12 @@ CHANNELS = OrderedDict(
         ("sms", "SMS"),
         ("cold_call", "Cold Call"),
         ("facebook", "Facebook"),
+        ("website", "Website"),  # SEO / website leads (added 2026-11-01)
         ("shared", "Wholesale - Shared"),
         ("general", "General"),
     ]
 )
-LEAD_CHANNELS = ["sms", "cold_call", "facebook"]
+LEAD_CHANNELS = ["sms", "cold_call", "facebook", "website"]
 WHOLESALE_CHANNELS = [c for c in CHANNELS if c != "general"]
 
 # Which SMS round a deal's lead came from (Finance › Deals "From").
@@ -188,6 +189,7 @@ def _channel_leads(fm: FinanceMonth) -> Dict[str, int]:
         "sms": fm.sms_leads + fm.sms_follow_up_leads,
         "cold_call": fm.cold_call_leads,
         "facebook": fm.facebook_leads,
+        "website": fm.website_leads,
     }
 
 

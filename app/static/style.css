@@ -339,6 +339,7 @@ table tfoot td { font-weight: 600; color: var(--navy); background: #F1F4F9; bord
 .ch-sms { background: #EEEDFE; color: #3C3489; }
 .ch-cold_call { background: #E6F1FB; color: #0C447C; }
 .ch-facebook { background: #E1F5EE; color: #085041; }
+.ch-website { background: #FBEAF0; color: #72243E; }
 .ch-shared { background: var(--gray-bg); color: var(--gray); }
 .ch-general { background: var(--yellow-bg); color: var(--yellow); }
 

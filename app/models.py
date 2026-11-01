@@ -327,6 +327,7 @@ class FinanceMonth(Base):
     sms_follow_up_leads: Mapped[int] = mapped_column(default=0)
     cold_call_leads: Mapped[int] = mapped_column(default=0)
     facebook_leads: Mapped[int] = mapped_column(default=0)
+    website_leads: Mapped[int] = mapped_column(default=0, server_default="0")
 
     expenses: Mapped[list["FinanceExpense"]] = relationship(
         back_populates="finance_month", cascade="all, delete-orphan"
@@ -334,7 +335,7 @@ class FinanceMonth(Base):
 
     @property
     def total_leads(self) -> int:
-        return self.sms_leads + self.sms_follow_up_leads + self.cold_call_leads + self.facebook_leads
+        return self.sms_leads + self.sms_follow_up_leads + self.cold_call_leads + self.facebook_leads + self.website_leads
 
 
 class FinanceExpense(Base):
