@@ -15,6 +15,7 @@ those itself) are caught by the outside uptime monitor watching /health/public.
 
 import asyncio
 import logging
+import signal
 import sys
 import threading
 import time
@@ -85,6 +86,25 @@ def _watch_stuck(loop: asyncio.AbstractEventLoop, loop_thread: int) -> None:
         time.sleep(2)
 
 
+def _note_stop_request() -> None:
+    """A stop asked for by Render (deploy, restart) clears the mark right away -
+    uvicorn may still be closing connections when Render ends the process, and
+    that mustn't look like a crash."""
+    try:
+        uvicorn_handler = signal.getsignal(signal.SIGTERM)
+        if not callable(uvicorn_handler):
+            return
+
+        def handler(sig, frame):
+            RUNNING_MARK.unlink(missing_ok=True)
+            log.info("stop requested (deploy or restart)")
+            uvicorn_handler(sig, frame)
+
+        signal.signal(signal.SIGTERM, handler)
+    except ValueError:
+        pass  # not the main thread (tests)
+
+
 def on_startup() -> None:
     _setup_log_file()
     # The mark is removed on a normal stop (deploy or restart from Render).
@@ -94,6 +114,7 @@ def on_startup() -> None:
         record("restart", "The server restarted unexpectedly (crash or out of memory)",
                f"It had been running since {since}.")
     RUNNING_MARK.write_text(datetime.utcnow().isoformat())
+    _note_stop_request()
     log.info("server started")
     loop = asyncio.get_running_loop()
     threading.Thread(target=_watch_stuck, args=(loop, threading.get_ident()), name="stuck-watch", daemon=True).start()
