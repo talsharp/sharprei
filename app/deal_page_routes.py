@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFil
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.comps import fill_from_county
@@ -136,7 +137,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 skipped += 1
                 continue
             data = await upload.read(MAX_UPLOAD_BYTES + 1)
-            name = save_photo(page.id, data) if data and len(data) <= MAX_UPLOAD_BYTES else None
+            # Resizing runs on the side, so the server keeps answering investors meanwhile.
+            name = await run_in_threadpool(save_photo, page.id, data) if data and len(data) <= MAX_UPLOAD_BYTES else None
             if not name:
                 skipped += 1
                 continue
@@ -215,7 +217,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         if not page:
             return RedirectResponse("/finance/deals", status_code=303)
         data = await file.read(MAX_UPLOAD_BYTES + 1)
-        name = save_contact_photo(page.id, data) if data and len(data) <= MAX_UPLOAD_BYTES else None
+        name = await run_in_threadpool(save_contact_photo, page.id, data) if data and len(data) <= MAX_UPLOAD_BYTES else None
         if not name:
             return RedirectResponse(f"/finance/deals/{deal_id}/page?error=contact#details", status_code=303)
         if page.contact_photo:

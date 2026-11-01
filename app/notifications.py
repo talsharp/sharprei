@@ -5,7 +5,8 @@ stored - items appear and disappear by themselves as things are handled
 
 Included (Tal's list, 2026-10-28): deal tasks due today or late, today's
 walkthroughs, inspection periods ending today/tomorrow, closings
-today/tomorrow, and open tasks in today's group on Tools › Tasks.
+today/tomorrow, and open tasks in today's group on Tools › Tasks. Since
+2026-11-01 also server problems (app/monitor.py) until Tal marks them seen.
 """
 
 from datetime import datetime, timedelta
@@ -14,7 +15,7 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.finance import contract_clock, local_today
-from app.models import DealBuyer, NotificationDismissal, Task, WholesaleDeal
+from app.models import DealBuyer, NotificationDismissal, ServerProblem, Task, WholesaleDeal
 from app.task_logic import day_key, done_status, due_tasks, live_tasks
 
 STATUS_ICON = {"waiting": "⏳", "confirmed": "✓", "visited": "✓✓", "cant": "✕"}
@@ -33,6 +34,14 @@ def today_items(db: Session) -> List[dict]:
     today = local_today()
     tomorrow = today + timedelta(days=1)
     items: List[dict] = []
+
+    # Server problems first (an error on a page, the server stuck or restarted).
+    from app.monitor import open_problems
+    for p in open_problems(db):
+        items.append({"key": f"server:{p.id}", "kind": "Server", "title": p.message,
+                      "detail": p.created_at.strftime("%b %d, %H:%M UTC") + " · tell Claude to check it",
+                      "url": "/server-problems", "urgent": True})
+
     under_contract = db.query(WholesaleDeal).filter(WholesaleDeal.status == "under_contract").all()
 
     # Deadlines first: inspections and closings.
@@ -94,6 +103,11 @@ def mark_done(db: Session, key: str) -> bool:
         if not task or not done:
             return False
         task.status_id = done.id
+    elif kind == "server" and rest.isdigit():
+        problem = db.get(ServerProblem, int(rest))
+        if not problem:
+            return False
+        problem.seen = True
     elif kind in ("inspection", "closing", "walk"):
         if not db.query(NotificationDismissal).filter_by(key=key[:120]).first():
             db.add(NotificationDismissal(key=key[:120]))

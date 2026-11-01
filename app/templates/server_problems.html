@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_finance_macros.html" as fx %}
+{% block title %}Server problems{% endblock %}
+{% block content %}
+<div class="top-actions">
+  {{ fx.page_header("Server problems", "Errors on a page, the server getting stuck or restarting - each also shows in the bell") }}
+</div>
+<div class="card">
+  {% if problems %}
+  <p class="muted" style="margin-top:0;">Tell Claude "check the server problems" - the details below are for the fix.</p>
+  {% if problems|selectattr('seen', 'false')|list %}
+  <form method="post" action="/server-problems/seen" style="margin-bottom:12px;"><button type="submit" class="secondary small">Mark all as seen</button></form>
+  {% endif %}
+  <table>
+    <thead><tr><th style="width:150px;">When (UTC)</th><th>What happened</th></tr></thead>
+    <tbody>
+      {% for p in problems %}
+      <tr{% if not p.seen %} style="background:#FFF4F2;"{% endif %}>
+        <td class="muted" style="white-space:nowrap;">{{ p.created_at.strftime('%b %d, %H:%M') }}</td>
+        <td>{{ p.message }}{% if p.detail %}<details><summary class="muted" style="cursor:pointer; font-size:12px;">Details</summary><pre style="white-space:pre-wrap; font-size:11px; margin:6px 0 0;">{{ p.detail }}</pre></details>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="margin:0;">No problems recorded. 🎉</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.database import UPLOAD_ROOT, get_db
 from app.documents import save_uploads
@@ -48,7 +49,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         if not saved:
             return RedirectResponse("/finance/statements?error=" + ("too_big" if too_big else "empty"), status_code=303)
         try:
-            imp = create_import(db, file.filename, saved[0]["stored_name"], str(STATEMENTS_DIR / saved[0]["stored_name"]))
+            imp = await run_in_threadpool(create_import, db, file.filename, saved[0]["stored_name"],
+                                          str(STATEMENTS_DIR / saved[0]["stored_name"]))
         except Exception:
             db.rollback()
             (STATEMENTS_DIR / saved[0]["stored_name"]).unlink(missing_ok=True)

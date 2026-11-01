@@ -779,6 +779,19 @@ class DealPageView(Base):
     link: Mapped[Optional[DealPageLink]] = relationship(back_populates="views")
 
 
+class ServerProblem(Base):
+    """Something went wrong on the server (an error on a page, the server
+    stuck, an unexpected restart). Shown in the bell until Tal ticks it off."""
+    __tablename__ = "server_problems"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    message: Mapped[str] = mapped_column(String(255))
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    seen: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class NotificationDismissal(Base):
     """A bell reminder Tal ticked off. The key includes the day, so a reminder
     hidden today can come back tomorrow if it's still relevant."""

@@ -11,10 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app import config  # noqa: F401  (loads .env before anything else)
 from app import audit  # noqa: F401  (registers the audit log listener)
-from app import auth, scheduler
+from app import auth, monitor, scheduler
 from app.database import SessionLocal, backup_db, get_db
 from app.documents import MAX_FILE_MB, folder_for, save_uploads, serve, too_big_suffix
 from app.finance_routes import build_router as build_finance_router
@@ -151,6 +152,7 @@ app.include_router(build_comp_router(templates))
 app.include_router(build_deal_page_router(templates))
 app.include_router(build_project_router(templates))
 auth.install(app, templates)
+monitor.install(app)
 
 
 @app.get("/health")
@@ -160,6 +162,49 @@ def health(db: Session = Depends(get_db)):
     except Exception:
         return Response('{"status": "error"}', status_code=503, media_type="application/json")
     return {"status": "ok"}
+
+
+@app.get("/health/public")
+def health_public(request: Request, db: Session = Depends(get_db)):
+    """For the uptime monitor - what investors see: the newest published deal
+    page renders and its photos are on the disk. 503 says what's wrong."""
+    from app.deal_pages import page_folder, public_base
+    from app.models import DealPage
+
+    problem = None
+    try:
+        page = db.query(DealPage).filter(DealPage.published.is_(True)).order_by(DealPage.id.desc()).first()
+        if page:
+            templates.get_template("deal_page_public.html").render(
+                {"request": request, "page": page, "preview": False, "base": public_base(request), "token": page.token,
+                 "view_id": None, "photo_url": lambda p: f"/d/{page.token}/p/{p.id}",
+                 "contact_photo_url": f"/d/{page.token}/contact"})
+            missing = [p.id for p in page.photos if not (page_folder(page.id) / p.stored_name).exists()]
+            if missing:
+                problem = f"{len(missing)} photo file(s) missing on page {page.id}"
+    except Exception as exc:
+        problem = f"deal page failed: {exc.__class__.__name__}: {exc}"[:300]
+    if problem:
+        monitor.record("error", "Investor pages check failed", problem)
+        return Response(json.dumps({"status": "problem", "detail": problem}), status_code=503, media_type="application/json")
+    return {"status": "ok"}
+
+
+@app.get("/server-problems")
+def server_problems(request: Request, db: Session = Depends(get_db)):
+    from app.models import ServerProblem
+
+    problems = db.query(ServerProblem).order_by(ServerProblem.id.desc()).limit(100).all()
+    return templates.TemplateResponse("server_problems.html", {"request": request, "active": "", "problems": problems})
+
+
+@app.post("/server-problems/seen")
+def server_problems_seen(db: Session = Depends(get_db)):
+    from app.models import ServerProblem
+
+    db.query(ServerProblem).filter(ServerProblem.seen.is_(False)).update({"seen": True})
+    db.commit()
+    return RedirectResponse("/server-problems", status_code=303)
 
 
 @app.get("/health/backup")
@@ -547,7 +592,7 @@ async def weekly_import_preview(request: Request, file: UploadFile = File(...), 
         )
     token = save_workbook(file.filename, content)
     try:
-        sheets = read_workbook(token)
+        sheets = await run_in_threadpool(read_workbook, token)
     except Exception as exc:
         return templates.TemplateResponse(
             "weekly_import_upload.html",
@@ -602,7 +647,7 @@ async def weekly_import_preview(request: Request, file: UploadFile = File(...), 
 async def weekly_import_commit(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     token = form.get("token")
-    sheets = read_workbook(token)
+    sheets = await run_in_threadpool(read_workbook, token)
     changes = build_plan(db, sheets)
     changes = [c for c in changes if c.has_changes]
 
