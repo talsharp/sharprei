@@ -144,6 +144,11 @@ class ChannelStats:
         return self.profit - self.expenses
 
     @property
+    def avg_revenue(self) -> Optional[float]:
+        """Average revenue (assignment fee) per closed deal."""
+        return self.profit / self.closed_deals if self.closed_deals else None
+
+    @property
     def roi(self) -> Optional[float]:
         # Same definition as the overall ROI: (deal profit - spend) / spend.
         return self.net / self.expenses if self.expenses else None

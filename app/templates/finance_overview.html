@@ -72,9 +72,10 @@
       <th title="Closed and kept deals from this channel">Closed deals</th>
       <th title="Signed agreements ÷ leads">Lead → agreement</th>
       <th title="Closed deals ÷ signed agreements">Agreement → close</th>
-      <th title="Profit of this channel's closed deals">Deal profit</th>
-      <th title="Deal profit − spent on this channel">Net</th>
-      <th title="Net ÷ spent">ROI</th><th></th>
+      <th title="Profit of this channel's closed deals (assignment fees)">Revenue</th>
+      <th title="Revenue ÷ closed deals - the average assignment fee">Avg. deal revenue</th>
+      <th title="Revenue − spent on this channel">Net profit</th>
+      <th title="Net profit ÷ spent">ROI</th><th></th>
     </tr></thead>
     <tbody>
       {% for ch in lead_channels %}
@@ -89,6 +90,7 @@
         <td>{{ fm.pct(cs.lead_to_agreement) }}</td>
         <td>{{ fm.pct(cs.agreement_to_deal) }}</td>
         <td>{{ fm.money(cs.profit) }}</td>
+        <td>{{ fm.money(cs.avg_revenue) }}</td>
         <td class="{{ fm.signed_class(cs.net) }}">{{ fm.money(cs.net) }}</td>
         <td class="{{ fm.signed_class(cs.roi) }}">{{ fm.pct(cs.roi) }}</td>
         <td style="text-align:right;"><a class="zip-link" href="/finance?channel={{ ch }}{{ '&' ~ kq if kq }}">View →</a></td>
@@ -193,9 +195,10 @@
 {% set label = CHANNELS[channel] %}
 <div class="kpi-row">
   {% call kpi("Spent on " ~ label, fm.money(cs.expenses), "purple", title="All expenses on the " ~ label ~ " channel. Shared tools aren't included.") %}{{ ICON_SPEND }}{% endcall %}
-  {% call kpi("Deal profit", fm.money(cs.profit), "blue", title="Profit of closed deals from " ~ label ~ " (kept houses at est. wholesale profit).") %}{{ ICON_REV }}{% endcall %}
-  {% call kpi("Net", fm.money(cs.net), "teal", fm.signed_class(cs.net), "Deal profit − spent on " ~ label ~ ".") %}{{ ICON_PROFIT }}{% endcall %}
-  {% call kpi("ROI", fm.pct(cs.roi), "coral", fm.signed_class(cs.roi), "Net ÷ spent.") %}{{ ICON_ROI }}{% endcall %}
+  {% call kpi("Revenue", fm.money(cs.profit), "blue", title="Profit of closed deals from " ~ label ~ " (kept houses at est. wholesale profit).") %}{{ ICON_REV }}{% endcall %}
+  {% call kpi("Avg. deal revenue", fm.money(cs.avg_revenue), "blue", title="Revenue ÷ " ~ cs.closed_deals ~ " closed deals - the average assignment fee.") %}{{ ICON_REV }}{% endcall %}
+  {% call kpi("Net profit", fm.money(cs.net), "teal", fm.signed_class(cs.net), "Revenue − spent on " ~ label ~ ".") %}{{ ICON_PROFIT }}{% endcall %}
+  {% call kpi("ROI", fm.pct(cs.roi), "coral", fm.signed_class(cs.roi), "Net profit ÷ spent.") %}{{ ICON_ROI }}{% endcall %}
   {% call kpi("Leads · CPL", cs.leads ~ " · " ~ fm.cpl(cs.cpl), "blue", title="Spent ÷ leads.") %}{{ ICON_LEADS }}{% endcall %}
 </div>
 
@@ -208,7 +211,7 @@
   <h3>{{ label }} by month</h3>
   <div style="overflow-x:auto;">
   <table>
-    <thead><tr><th>Month</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Agreements signed this month (by agreement date)">Signed agreements</th><th title="Deals closed this month">Closed deals</th><th>Deal profit</th><th>Net</th></tr></thead>
+    <thead><tr><th>Month</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Agreements signed this month (by agreement date)">Signed agreements</th><th title="Deals closed this month">Closed deals</th><th>Revenue</th><th>Net profit</th></tr></thead>
     <tbody>
       {% for s in summaries %}
       {% set m = s.channels[channel] %}
