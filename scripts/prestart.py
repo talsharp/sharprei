@@ -5,13 +5,8 @@ brings the database structure up to date with Alembic.
 - Brand-new empty database: create all tables and mark them as current.
 - Database from before Alembic existed: mark it as the baseline, then upgrade.
 - Otherwise: apply any pending migrations.
-
-On Render it then starts the web server itself (SERVER_ARGS), so the server's
-settings live here in the code - Render's start command is set in its
-dashboard and doesn't follow render.yaml.
 """
 
-import os
 import sys
 from pathlib import Path
 
@@ -28,9 +23,6 @@ from app import models  # noqa: E402,F401
 from app.database import Base, backup_db, engine  # noqa: E402
 
 BASELINE = "01a81e5ba8d0"
-# Keep-alive above Render's proxy (uvicorn's default is 5s): otherwise the proxy
-# sometimes reuses a connection the app just closed and the visitor gets a 502.
-SERVER_ARGS = ["--host", "0.0.0.0", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-keep-alive", "120"]
 
 
 def main() -> None:
@@ -58,15 +50,5 @@ def main() -> None:
     print("prestart: database is up to date")
 
 
-def serve() -> None:
-    """Replaces this process with the web server (the start command's own
-    `&& uvicorn ...` never runs)."""
-    uvicorn = str(Path(sys.executable).parent / "uvicorn")
-    os.execv(uvicorn, [uvicorn, "app.main:app", "--port", os.environ.get("PORT", "10000"), *SERVER_ARGS])
-
-
 if __name__ == "__main__":
     main()
-    if os.environ.get("RENDER"):
-        sys.stdout.flush()
-        serve()
