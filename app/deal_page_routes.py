@@ -197,6 +197,16 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         db.commit()
         return RedirectResponse(f"/finance/deals/{deal_id}/page#links", status_code=303)
 
+    @router.post("/finance/deals/{deal_id}/page/views/clear")
+    def views_clear(deal_id: int, db: Session = Depends(get_db)):
+        """Clear views (e.g. Tal's own tests before promoting) - the page and its
+        links stay; counting starts over, so the next visit is "new" again."""
+        page = _page_for(db, deal_id)
+        if page:
+            db.query(DealPageView).filter(DealPageView.page_id == page.id).delete()
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}/page", status_code=303)
+
     @router.post("/finance/deals/{deal_id}/page/photos/order")
     async def photos_order(deal_id: int, request: Request, db: Session = Depends(get_db)):
         """Body: {"ids": [photo ids in the new order]} - the first is the cover."""

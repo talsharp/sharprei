@@ -35,7 +35,7 @@
         <input type="text" value="{{ base }}/d/{{ page.token }}" readonly onclick="this.select()">
         <button type="button" class="copy-btn" data-url="{{ base }}/d/{{ page.token }}">Copy</button>
       </div>
-      <div class="muted" style="font-size:12px;">{% set s = link_stats[None] %}{{ s.views }} view{{ "s" if s.views != 1 else "" }} · {{ s.people }} {{ "person" if s.people == 1 else "people" }} · last {{ ago(s.last) }}</div>
+      <div class="muted views-data" style="font-size:12px;">{% set s = link_stats[None] %}{{ s.views }} view{{ "s" if s.views != 1 else "" }} · {{ s.people }} {{ "person" if s.people == 1 else "people" }} · last {{ ago(s.last) }}</div>
     </div>
 
     <h4 style="margin:16px 0 6px;">Personal links <span class="muted" style="font-weight:400; font-size:12px;">- one per investor, so you see who looked</span></h4>
@@ -44,7 +44,7 @@
         {% for l in page.links %}
         {% set s = link_stats[l.id] %}
         <tr>
-          <td><strong>{{ l.name }}</strong><div class="muted" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
+          <td><strong>{{ l.name }}</strong><div class="muted views-data" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
           <td style="text-align:right; white-space:nowrap;">
             <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
             <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;" data-undo="Link turned off"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>
@@ -63,15 +63,22 @@
   </div>
 
   <div class="card" style="margin-bottom:0;">
-    <h3>Views</h3>
-    <div class="view-kpis">
+    <h3 style="display:flex; justify-content:space-between; align-items:center;">Views
+      {% if page.views %}
+      <form method="post" action="/finance/deals/{{ deal.id }}/page/views/clear" class="views-data" style="margin:0;"
+            data-undo="Views cleared" data-undo-hide="all:.views-data" data-undo-after="reload">
+        <button type="submit" class="secondary small" title="Start counting from zero, e.g. after your own tests">Clear views</button>
+      </form>
+      {% endif %}
+    </h3>
+    <div class="view-kpis views-data">
       <div><div class="value">{{ stats.views }}</div><div class="label">views</div></div>
       <div><div class="value">{{ stats.people }}</div><div class="label">people</div></div>
       <div><div class="value">{{ stats.returning }}</div><div class="label">came back</div></div>
       <div><div class="value">{{ stats.photo_people }}</div><div class="label">opened photos</div></div>
       <div><div class="value small">{{ ago(stats.last) }}</div><div class="label">last view</div></div>
     </div>
-    <div class="view-list">
+    <div class="view-list views-data">
       {% for v in page.views[:40] %}
       <div class="view-item">
         <span class="muted">{{ ago(v.created_at) }}</span>
