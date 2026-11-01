@@ -370,7 +370,7 @@ def copy_recurring(db: Session, fm: FinanceMonth) -> Optional[FinanceMonth]:
                     vendor_id=e.vendor_id,
                     amount=e.amount,
                     channel=e.channel,
-                    description=e.description,
+                    description=f"Copied from {source.month:%B} - replaced when this month's card statement is added",
                     source="recurring_copy",
                 )
             )

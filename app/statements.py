@@ -171,7 +171,10 @@ def pattern_matches(pattern: str, merchant: str) -> bool:
     if len(pattern) < 5:
         # Short names ("BOX") only match as a whole word, not inside "DROPBOX".
         return re.search(r"(?<!\w)" + re.escape(pattern) + r"(?!\w)", text) is not None
-    return pattern in text
+    # Some bank files cut the merchant name short (Oct 2026: 14 characters,
+    # "PAYPAL *KONING" for PAYPAL *KONINGVONIT) - a cut name still matches.
+    cut = text.strip()
+    return pattern in text or (len(cut) >= 10 and pattern.startswith(cut))
 
 
 def match_rule(merchant: str, rules: List[MatchRule]) -> Optional[MatchRule]:
@@ -340,6 +343,12 @@ def commit_import(db: Session, imp: StatementImport, remember: Dict[int, str]) -
         ))
         added_lines += 1
         added_total += total
+
+    # Copies from last month that this statement didn't replace: say so, so it's
+    # clear they weren't charged (remove them, or keep if paid another way).
+    for e in db.query(FinanceExpense).filter(FinanceExpense.finance_month_id == fm.id,
+                                             FinanceExpense.source == "recurring_copy"):
+        e.description = "Copied from last month - not on this card statement. Remove it if you didn't pay this month."
 
     imp.committed_at = datetime.utcnow()
     return {"lines": added_lines, "total": round(added_total, 2), "skipped": skipped}
