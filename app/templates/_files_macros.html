@@ -27,7 +27,7 @@
         <td class="muted" style="white-space:nowrap;">{{ "%.1f MB"|format(f.size_bytes / 1048576) if f.size_bytes >= 1048576 else "%d KB"|format((f.size_bytes / 1024)|round(0, 'ceil')) }}</td>
         <td class="muted" style="white-space:nowrap;">{{ f.uploaded_at.strftime('%b %d, %Y') }}</td>
         <td style="text-align:right;">
-          <form method="post" action="{{ base_url }}/{{ f.id }}/delete" onsubmit="return confirm('Delete {{ f.original_name|replace("'", "") }}?');">
+          <form method="post" action="{{ base_url }}/{{ f.id }}/delete" data-undo="File deleted" data-undo-confirm="Delete {{ f.original_name|replace('"', '') }}?">
             <button type="submit" class="danger small">Delete</button>
           </form>
         </td>

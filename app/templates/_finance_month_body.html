@@ -78,7 +78,7 @@
     <td class="month-actions" style="text-align:right;">
       <span class="row-view">
         <button type="button" class="secondary small" onclick="toggleRowEdit({{ e.id }})">Edit</button>
-        <button type="button" class="danger small" hx-post="/finance/expenses/{{ e.id }}/delete" hx-target="#month-body" hx-swap="outerHTML" hx-confirm="Delete {{ e.vendor.name }} ({{ fx.money(e.amount|float) }})?">Delete</button>
+        <button type="button" class="danger small" hx-post="/finance/expenses/{{ e.id }}/delete" hx-target="#month-body" hx-swap="outerHTML" data-undo="{{ e.vendor.name }} ({{ fx.money(e.amount|float) }}) deleted">Delete</button>
       </span>
       <span class="row-edit-actions">
         <button type="button" class="small" hx-post="/finance/expenses/{{ e.id }}/update" hx-include="closest tr" hx-target="#month-body" hx-swap="outerHTML">Save</button>

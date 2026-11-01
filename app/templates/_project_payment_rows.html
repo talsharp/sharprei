@@ -19,7 +19,7 @@
     <label class="pay-flag" title="Taken off another payment - no money actually moved"><input type="checkbox" {{ 'checked' if p.netted }} hx-post="{{ url }}" hx-trigger="change" hx-swap="none"
       hx-vals='js:{netted: event.target.checked ? "1" : "0"}'> No money moved</label>
   </td>
-  <td><button type="button" class="dtask-delete" title="Delete" hx-post="{{ url }}/delete" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete this payment?">×</button></td>
+  <td><button type="button" class="dtask-delete" title="Delete" hx-post="{{ url }}/delete" hx-target="closest tr" hx-swap="outerHTML" data-undo="Payment deleted">×</button></td>
 </tr>
 {% else %}
 <tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">No payments yet - add the first one above.</td></tr>

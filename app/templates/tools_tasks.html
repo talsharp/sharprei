@@ -5,7 +5,7 @@
 <div class="top-actions">
   <div>
     <h2 class="page-title">Tasks</h2>
-    <p class="page-subtitle">Click a task to open it. Drag by ⋮⋮ to reorder or move it to another day.</p>
+    <p class="page-subtitle">Click a task to open it. Drag by ⋮⋮ to reorder or move it to another day. Deal tasks show on their date's day.</p>
   </div>
   <button type="button" class="secondary" id="clear-done" {{ 'disabled' if not done_count }}>Clear done (<span id="done-count">{{ done_count }}</span>)</button>
 </div>
@@ -37,6 +37,20 @@
 </section>
 {% endfor %}
 
+{% if deleted %}
+<details class="card recently-deleted" id="recently-deleted">
+  <summary>Recently deleted ({{ deleted|length }}) · kept for 3 days</summary>
+  {% for t, ago in deleted %}
+  <div class="rd-row" data-id="{{ t.id }}">
+    <span class="rd-title">{{ t.title }}</span>
+    {% if t.deal %}<span class="task-deal-tag">{{ task_street(t.deal) }}</span>{% endif %}
+    <span class="muted" style="font-size:12px; white-space:nowrap;">deleted {{ ago }}</span>
+    <button type="button" class="secondary small rd-restore">Restore</button>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
 <div class="card" id="settings" style="margin-top:28px;">
   <h3>Statuses and labels</h3>
   <div class="grid-2">
@@ -49,7 +63,7 @@
         <input type="text" name="name" value="{{ o.name }}" maxlength="60" required>
         {% if kind == "status" %}<label class="muted" title="Tasks with this status are crossed out and removed by 'Clear done'"><input type="checkbox" name="is_done" value="1" {{ 'checked' if o.is_done }}> means done</label>{% endif %}
         <button type="submit" class="secondary small">Save</button>
-        <button type="submit" class="danger small" formaction="/tools/tasks/options/{{ kind }}/{{ o.id }}/delete" onclick="return confirm('Remove “{{ o.name }}”? Tasks using it will be left blank.');">Remove</button>
+        <button type="submit" class="danger small" formaction="/tools/tasks/options/{{ kind }}/{{ o.id }}/delete" data-undo="“{{ o.name }}” removed" data-undo-hide="closest .option-row" data-undo-after="reload">Remove</button>
       </form>
       {% endfor %}
       <form method="post" action="/tools/tasks/options/{{ kind }}/new" class="option-row">
@@ -80,6 +94,11 @@
     </div>
   </div>
   <input type="text" id="drawer-title" class="drawer-title" maxlength="255" aria-label="Task name">
+  <div class="drawer-deal">
+    <div class="drawer-label">Deal</div>
+    <select id="drawer-deal" aria-label="Deal"><option value="">Not related to a deal</option></select>
+    <div class="drawer-due muted" id="drawer-due"></div>
+  </div>
   <div class="drawer-fields">
     <div><div class="drawer-label">Status</div><button type="button" class="task-pill drawer-pill" id="drawer-status" data-kind="status"></button></div>
     <div><div class="drawer-label">Label</div><button type="button" class="task-pill drawer-pill" id="drawer-label" data-kind="label"></button></div>
@@ -92,7 +111,7 @@
 <script>
 (function() {
   var OPTIONS = {{ options_json|tojson }};
-  var DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  var TODAY = OPTIONS.today, WEEK = OPTIONS.week;
   var labelFilter = 'all';
 
   function post(url, data) {
@@ -108,9 +127,9 @@
 
   function refreshCounts() {
     document.querySelectorAll('.task-group').forEach(function(g) {
-      g.querySelector('.task-count').textContent = g.querySelectorAll('.task-row').length;
+      g.querySelector('.task-count').textContent = g.querySelectorAll('.task-row:not([hidden])').length;
     });
-    var done = document.querySelectorAll('.task-row.is-done').length;
+    var done = document.querySelectorAll('.task-row.is-done:not([hidden])').length;
     document.getElementById('done-count').textContent = done;
     document.getElementById('clear-done').disabled = !done;
   }
@@ -133,17 +152,39 @@
     var data = {}; data[kind + '_id'] = id;
     return save(row, data).then(function() {
       paintPill(row.querySelector('.' + kind + '-pill'), kind, id);
-      if (kind === 'status') { var o = option(kind, id); row.classList.toggle('is-done', !!(o && o.done)); }
+      if (kind === 'status') { var o = option(kind, id); row.classList.toggle('is-done', !!(o && o.done)); paintDeal(row); }
       if (kind === 'label') { row.dataset.label = id; applyFilter(); }
       if (openRow === row) paintPill(document.getElementById('drawer-' + kind), kind, id);
       refreshCounts();
     });
   }
   function deleteRow(row) {
-    post('/tools/tasks/' + row.dataset.id + '/delete').then(function() {
+    var id = row.dataset.id;
+    post('/tools/tasks/' + id + '/delete').then(function() {
       if (openRow === row) closeDrawer(true);
-      row.remove(); refreshCounts();
+      row.hidden = true; refreshCounts();
+      undoable('Task deleted', {
+        undo: function() { post('/tools/tasks/' + id + '/restore').then(function() { row.hidden = false; refreshCounts(); }); },
+        commit: function() { row.remove(); }
+      });
     });
+  }
+
+  // Deal tasks: the deal's tag, and "N days late" while it's late (it sits in today's group).
+  function paintDeal(row) {
+    var tag = row.querySelector('.task-deal-tag'), late = row.querySelector('.task-late');
+    var due = row.dataset.due, isDeal = !!row.dataset.deal;
+    tag.hidden = !isDeal;
+    if (isDeal) { tag.textContent = row.dataset.dealName; tag.href = '/finance/deals/' + row.dataset.deal + '#tasks-card'; }
+    var days = isDeal && due && !row.classList.contains('is-done') && due < TODAY ? Math.round((new Date(TODAY) - new Date(due)) / 86400000) : 0;
+    late.hidden = !days;
+    late.textContent = days === 1 ? '1 day late' : days + ' days late';
+  }
+  // A deal task moved to another group gets that day's date (Later = no date).
+  function movedTo(row, fromDay, toDay) {
+    if (!row.dataset.deal || fromDay === toDay) return;
+    row.dataset.due = WEEK[toDay] || '';
+    paintDeal(row);
   }
 
   // ----- one row -----
@@ -153,13 +194,14 @@
       pill.addEventListener('click', function(e) { e.stopPropagation(); openMenu(pill, row); });
     });
     row.querySelector('.task-delete').addEventListener('click', function() { deleteRow(row); });
+    paintDeal(row);
 
     // Drag only from the handle.
     var handle = row.querySelector('.task-handle');
     handle.addEventListener('mousedown', function() { row.draggable = true; });
     handle.addEventListener('mouseup', function() { row.draggable = false; });
     row.addEventListener('dragstart', function(e) {
-      dragging = row; row.classList.add('dragging');
+      dragging = row; dragFrom = row.parentElement.dataset.day; row.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.id);
     });
     row.addEventListener('dragend', function() {
@@ -173,6 +215,23 @@
   var drawer = document.getElementById('task-drawer'), overlay = document.getElementById('drawer-overlay');
   var dTitle = document.getElementById('drawer-title'), dDesc = document.getElementById('drawer-description');
   var dDay = document.getElementById('drawer-day'), dSaved = document.getElementById('drawer-saved');
+  var dDeal = document.getElementById('drawer-deal'), dDue = document.getElementById('drawer-due');
+  function fillDeals(row) {
+    var html = '<option value="">Not related to a deal</option>', have = false;
+    OPTIONS.deal.forEach(function(d) {
+      if (String(d.id) === row.dataset.deal) have = true;
+      html += '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>';
+    });
+    if (row.dataset.deal && !have) html += '<option value="' + row.dataset.deal + '">' + escapeHtml(row.dataset.dealName) + '</option>';
+    dDeal.innerHTML = html;
+    dDeal.value = row.dataset.deal;
+  }
+  function paintDue(row) {
+    if (!row.dataset.deal) { dDue.textContent = ''; return; }
+    dDue.textContent = row.dataset.due
+      ? 'Date: ' + new Date(row.dataset.due + 'T12:00:00').toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'}) + (row.querySelector('.task-late').hidden ? '' : ' · ' + row.querySelector('.task-late').textContent)
+      : 'No date - it waits in Later';
+  }
   var openRow = null, descTimer = null;
 
   function flashSaved() { dSaved.hidden = false; clearTimeout(flashSaved.t); flashSaved.t = setTimeout(function() { dSaved.hidden = true; }, 1500); }
@@ -184,6 +243,7 @@
     dTitle.value = dTitle.defaultValue = row.querySelector('.task-title-text').textContent;
     dDesc.value = dDesc.defaultValue = row.querySelector('.task-description-data').value;
     dDay.value = row.closest('.task-list').dataset.day;
+    fillDeals(row); paintDue(row);
     paintPill(document.getElementById('drawer-status'), 'status', row.querySelector('.status-pill').dataset.value);
     paintPill(document.getElementById('drawer-label'), 'label', row.querySelector('.label-pill').dataset.value);
     document.getElementById('drawer-created').textContent = row.dataset.created ? 'Created ' + row.dataset.created : '';
@@ -227,10 +287,25 @@
   dDesc.addEventListener('blur', saveDescription);
   dDay.addEventListener('change', function() {
     var row = openRow, day = dDay.value;
-    save(row, {day: day}).then(function() {
-      document.querySelector('.task-list[data-day="' + day + '"]').appendChild(row);
-      refreshCounts(); flashSaved();
-    });
+    save(row, {day: day}).then(function(r) { return r.json(); }).then(function(res) { placeRow(row, res); flashSaved(); });
+  });
+  // After the server answers: the row's deal, date and group.
+  function placeRow(row, res) {
+    row.dataset.deal = res.deal_id || '';
+    row.dataset.dealName = res.deal || '';
+    row.dataset.due = res.due || '';
+    paintDeal(row);
+    if (res.day) {
+      var list = document.querySelector('.task-list[data-day="' + res.day + '"]');
+      if (list && row.parentElement !== list) list.appendChild(row);
+      if (openRow === row) dDay.value = res.day;
+    }
+    if (openRow === row) paintDue(row);
+    refreshCounts();
+  }
+  dDeal.addEventListener('change', function() {
+    var row = openRow;
+    save(row, {deal_id: dDeal.value}).then(function(r) { return r.json(); }).then(function(res) { placeRow(row, res); flashSaved(); });
   });
   document.querySelectorAll('.drawer-pill').forEach(function(pill) {
     pill.addEventListener('click', function(e) { e.stopPropagation(); if (openRow) openMenu(pill, openRow); });
@@ -265,7 +340,7 @@
   });
 
   // ----- drag and drop between days -----
-  var dragging = null;
+  var dragging = null, dragFrom = null;
   function rowAfter(list, y) {
     var rows = Array.prototype.filter.call(list.querySelectorAll('.task-row:not(.dragging)'), function(r) { return r.style.display !== 'none'; });
     for (var i = 0; i < rows.length; i++) {
@@ -293,11 +368,12 @@
   function finishDrag() {
     var row = dragging, list = row.parentElement;
     dragging = null;
+    movedTo(row, dragFrom, list.dataset.day);
     var ids = Array.prototype.map.call(list.querySelectorAll('.task-row'), function(r) { return r.dataset.id; });
     fetch('/tools/tasks/move', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({day: list.dataset.day, ids: ids})})
       .then(function(r) { if (!r.ok) throw new Error(r.status); })
       .catch(function() { alert('Could not save the move - reload the page and try again.'); });
-    if (openRow === row) dDay.value = list.dataset.day;
+    if (openRow === row) { dDay.value = list.dataset.day; paintDue(row); }
     refreshCounts();
   }
 
@@ -323,7 +399,7 @@
   // ----- groups: collapse, today -----
   var collapsed = {};
   try { collapsed = JSON.parse(localStorage.getItem('tasks.collapsed') || '{}'); } catch (e) {}
-  var today = DAY_KEYS[new Date().getDay()];
+  var today = '{{ today_key }}';
   document.querySelectorAll('.task-group').forEach(function(group) {
     var day = group.dataset.day, toggle = group.querySelector('.task-group-toggle');
     if (day === today) { group.classList.add('is-today'); group.querySelector('.today-badge').hidden = false; }
@@ -347,12 +423,27 @@
 
   // ----- clear done -----
   document.getElementById('clear-done').addEventListener('click', function() {
-    var n = document.querySelectorAll('.task-row.is-done').length;
-    if (!n || !confirm('Delete ' + n + ' done task' + (n === 1 ? '' : 's') + ' for good?')) return;
-    post('/tools/tasks/clear-done').then(function() {
+    if (!document.querySelectorAll('.task-row.is-done:not([hidden])').length) return;
+    post('/tools/tasks/clear-done').then(function(r) { return r.json(); }).then(function(res) {
       if (openRow && openRow.classList.contains('is-done')) closeDrawer(true);
-      document.querySelectorAll('.task-row.is-done').forEach(function(r) { r.remove(); });
+      var rows = res.ids.map(function(id) { return document.querySelector('.task-row[data-id="' + id + '"]'); }).filter(Boolean);
+      rows.forEach(function(r) { r.hidden = true; });
       refreshCounts();
+      undoable(rows.length + ' done task' + (rows.length === 1 ? '' : 's') + ' cleared', {
+        undo: function() {
+          fetch('/tools/tasks/restore', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids: res.ids})})
+            .then(function() { rows.forEach(function(r) { r.hidden = false; }); refreshCounts(); });
+        },
+        commit: function() { rows.forEach(function(r) { r.remove(); }); }
+      });
+    });
+  });
+
+  // ----- recently deleted -----
+  document.querySelectorAll('.rd-restore').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = btn.closest('.rd-row').dataset.id;
+      post('/tools/tasks/' + id + '/restore').then(function() { location.reload(); });
     });
   });
 

@@ -16,8 +16,6 @@ from app.finance import (
     SMS_SOURCES,
     BUYER_STATUSES,
     contract_clock,
-    TASK_STATUSES,
-    due_tasks,
     local_today,
     renegotiation_credit,
     renegotiation_report,
@@ -33,8 +31,12 @@ from app.finance import (
     start_month,
 )
 from app.statements import charges_by_expense
+from app.task_logic import (
+    default_status, deal_tasks, due_tasks, next_board_position, place_by_date, set_deal_order, set_due_date, sort_by_date,
+)
+from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
-from app.models import DealBuyer, DealFile, DealPage, DealTask, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.models import DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -94,7 +96,6 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     templates.env.globals["DEAL_STATUSES"] = DEAL_STATUSES
     templates.env.globals["SMS_SOURCES"] = SMS_SOURCES
     templates.env.globals["BUYER_STATUSES"] = BUYER_STATUSES
-    templates.env.globals["TASK_STATUSES"] = TASK_STATUSES
     templates.env.globals["local_today"] = local_today
     templates.env.globals["renegotiation_credit"] = renegotiation_credit
     templates.env.globals["contract_clock"] = contract_clock
@@ -324,8 +325,15 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
              "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal),
-             "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal)},
+             "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal), "statuses": _statuses(db)},
         )
+
+    def _statuses(db: Session):
+        return db.query(TaskStatus).order_by(TaskStatus.position, TaskStatus.id).all()
+
+    def _task_rows(request: Request, db: Session, deal_id: int):
+        return templates.TemplateResponse("_deal_task_rows.html", {
+            "request": request, "tasks": deal_tasks(db, deal_id), "statuses": _statuses(db)})
 
     def _landing(request: Request, db: Session, deal: WholesaleDeal):
         page = db.query(DealPage).filter(DealPage.deal_id == deal.id).first()
@@ -366,40 +374,55 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/deals/{deal_id}/tasks/new")
     def finance_task_new(request: Request, deal_id: int, title: str = Form(""), due_date: str = Form(""), db: Session = Depends(get_db)):
+        """Adds a task in its date's spot and returns the whole list."""
         deal = db.get(WholesaleDeal, deal_id)
         if not deal or not title.strip():
             return Response(status_code=204)
-        task = DealTask(deal_id=deal.id, title=title.strip()[:255], due_date=_optional_date(due_date))
+        status = default_status(db)
+        task = Task(deal_id=deal.id, title=title.strip()[:255], due_date=_optional_date(due_date), day="later",
+                    status_id=status.id if status else None, position=next_board_position(db))
         db.add(task)
+        place_by_date(db, task)
         db.commit()
-        return templates.TemplateResponse("_deal_task_row.html", {"request": request, "t": task})
+        return _task_rows(request, db, deal.id)
 
     @router.post("/deal-tasks/{task_id}")
     async def finance_task_update(task_id: int, request: Request, db: Session = Depends(get_db)):
-        task = db.get(DealTask, task_id)
-        if not task:
+        """Saves the fields sent. Returns the deal's task order, which changes
+        when the date does (the task jumps to its date's spot)."""
+        task = db.get(Task, task_id)
+        if not task or not task.deal_id:
             return Response(status_code=404)
         form = await request.form()
         if form.get("title", "").strip():
             task.title = form["title"].strip()[:255]
-        if "details" in form:
-            task.details = form["details"].strip() or None
+        if "description" in form:
+            task.description = form["description"].strip() or None
         if "due_date" in form:
             due = _optional_date(form["due_date"])
             if due is None or due.year >= 2000:  # ignore a half-typed year
-                task.due_date = due
-        if form.get("status") in TASK_STATUSES:
-            task.status = form["status"]
+                set_due_date(db, task, due)
+        if "status_id" in form:
+            status = db.get(TaskStatus, int(form["status_id"])) if form["status_id"].isdigit() else None
+            task.status_id = status.id if status else None
+            if not task.is_done:
+                task.board_hidden = False
+        db.commit()
+        return {"order": [t.id for t in deal_tasks(db, task.deal_id)], "done": task.is_done}
+
+    @router.post("/deals/{deal_id}/tasks/order")
+    async def finance_task_order(deal_id: int, request: Request, db: Session = Depends(get_db)):
+        """Body: {"ids": [3, 1, 2]} - Tal's order after dragging."""
+        data = await request.json()
+        set_deal_order(db, deal_id, [int(i) for i in data.get("ids", []) if str(i).isdigit()])
         db.commit()
         return Response(status_code=204)
 
-    @router.post("/deal-tasks/{task_id}/delete")
-    def finance_task_delete(task_id: int, db: Session = Depends(get_db)):
-        task = db.get(DealTask, task_id)
-        if task:
-            db.delete(task)
-            db.commit()
-        return Response(status_code=204)
+    @router.post("/deals/{deal_id}/tasks/sort")
+    def finance_task_sort(request: Request, deal_id: int, db: Session = Depends(get_db)):
+        sort_by_date(db, deal_id)
+        db.commit()
+        return _task_rows(request, db, deal_id)
 
     @router.post("/deals/{deal_id}/buyers/new")
     def finance_buyer_new(request: Request, deal_id: int, name: str = Form(""), visit_at: str = Form(""), db: Session = Depends(get_db)):
@@ -486,6 +509,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     def finance_deal_delete(deal_id: int, db: Session = Depends(get_db)):
         deal = db.get(WholesaleDeal, deal_id)
         if deal:
+            db.query(Task).filter(Task.deal_id == deal.id).delete(synchronize_session=False)
             db.delete(deal)
             db.commit()
             shutil.rmtree(_deal_dir(deal_id), ignore_errors=True)

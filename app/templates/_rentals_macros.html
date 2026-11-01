@@ -30,7 +30,7 @@
       <button type="button" class="danger" style="font-size:12px;"
         hx-post="/rentals/{{ prop.id }}/renovations/{{ r.id }}/delete"
         hx-target="#reno-{{ r.id }}" hx-swap="outerHTML"
-        hx-confirm="Delete this expense?">Delete</button>
+        data-undo="Expense deleted">Delete</button>
     </span>
     <span class="row-edit-actions">
       <button type="submit" form="reno-form-{{ r.id }}" style="font-size:12px;">Save</button>
@@ -72,7 +72,7 @@
       <button type="button" class="danger" style="font-size:12px;"
         hx-post="/rentals/{{ prop.id }}/months/{{ m.id }}/delete"
         hx-target="#month-{{ m.id }}" hx-swap="outerHTML"
-        hx-confirm="Delete this month's data?">Delete</button>
+        data-undo="Month deleted">Delete</button>
     </span>
   </td>
 </tr>

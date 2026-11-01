@@ -138,7 +138,7 @@
 </div>
 </form>
 
-<form method="post" action="/finance/statements/{{ imp.id }}/delete" onsubmit="return confirm('Discard this upload? Nothing has been added to Finance.');" style="margin-top:18px;">
+<form method="post" action="/finance/statements/{{ imp.id }}/delete" data-undo="Discarding this upload" data-undo-confirm="Discard this upload? Nothing has been added to Finance." data-undo-hide="none" data-undo-after="follow" style="margin-top:18px;">
   <button type="submit" class="danger small">Discard this upload</button>
 </form>
 

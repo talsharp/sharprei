@@ -19,7 +19,7 @@
       <td>{{ fx.channel_badge(r.channel or r.vendor.default_channel) if r.vendor else "—" }}</td>
       <td class="muted">{{ r.label or "" }}</td>
       <td style="text-align:right;">
-        <form method="post" action="/finance/rules/{{ r.id }}/delete" onsubmit="return confirm('Stop recognizing &quot;{{ r.pattern }}&quot;? Charges from it will show as new next time.');">
+        <form method="post" action="/finance/rules/{{ r.id }}/delete" data-undo="Rule removed">
           <button type="submit" class="danger small">Remove</button>
         </form>
       </td>

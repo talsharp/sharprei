@@ -453,9 +453,11 @@ class WholesaleDeal(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     zip_code: Mapped[Optional[ZipCode]] = relationship()
-    tasks: Mapped[list["DealTask"]] = relationship(
-        back_populates="deal", cascade="all, delete-orphan",
-        order_by="(DealTask.status == 'done', DealTask.due_date.is_(None), DealTask.due_date, DealTask.id)",
+    # The deal's tasks in Tal's order (deleted ones left out). Read-only: tasks
+    # are added/removed through Task.deal_id (see app/task_logic.py).
+    tasks: Mapped[list["Task"]] = relationship(
+        primaryjoin="and_(WholesaleDeal.id == Task.deal_id, Task.deleted_at.is_(None))",
+        order_by="(Task.deal_position, Task.id)", viewonly=True,
     )
     buyers: Mapped[list["DealBuyer"]] = relationship(
         back_populates="deal", cascade="all, delete-orphan",
@@ -572,20 +574,35 @@ class TaskLabel(Base):
 
 
 class Task(Base):
+    """A task on the Tools › Tasks board. With deal_id set it's also a deal task:
+    then its date (due_date) decides its day on the board, and deal_position is
+    its place in the deal's own list."""
     __tablename__ = "tasks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Fixed weekday groups, not dates: "sun".."sat" or "later".
+    # Fixed weekday groups, not dates: "sun".."sat" or "later". Ignored for deal tasks.
     day: Mapped[str] = mapped_column(String(10), default="later", index=True)
     position: Mapped[int] = mapped_column(default=0)
     status_id: Mapped[Optional[int]] = mapped_column(ForeignKey("task_statuses.id", ondelete="SET NULL"), nullable=True)
     label_id: Mapped[Optional[int]] = mapped_column(ForeignKey("task_labels.id", ondelete="SET NULL"), nullable=True)
+    deal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("wholesale_deals.id"), nullable=True, index=True)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    deal_position: Mapped[int] = mapped_column(default=0)
+    # "Clear done" on a deal task only takes it off the board - the deal keeps it.
+    board_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Deleted tasks wait 3 days in "Recently deleted" before they're gone.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     status: Mapped[Optional[TaskStatus]] = relationship()
     label: Mapped[Optional[TaskLabel]] = relationship()
+    deal: Mapped[Optional["WholesaleDeal"]] = relationship()
+
+    @property
+    def is_done(self) -> bool:
+        return bool(self.status and self.status.is_done)
 
 
 class CompAnalysis(Base):
@@ -760,22 +777,6 @@ class DealPageView(Base):
 
     page: Mapped[DealPage] = relationship(back_populates="views")
     link: Mapped[Optional[DealPageLink]] = relationship(back_populates="views")
-
-
-class DealTask(Base):
-    """A to-do for a deal (send to title, collect EMD...). Due today or overdue
-    and not done = shown as a reminder on the Deals page and in the sidebar."""
-    __tablename__ = "deal_tasks"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), index=True)
-    title: Mapped[str] = mapped_column(String(255))
-    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
-    status: Mapped[str] = mapped_column(String(20), default="todo")  # todo / in_progress / waiting / done
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    deal: Mapped["WholesaleDeal"] = relationship(back_populates="tasks")
 
 
 class NotificationDismissal(Base):

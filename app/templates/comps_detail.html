@@ -68,7 +68,7 @@
     <button type="submit" id="save-btn">{{ "Save changes" if a.saved_at else "Save" }}</button>
   </form>
   <span class="muted" style="font-size:13px;">{% if a.saved_at %}Saved {{ a.saved_at.strftime('%b %d, %Y') }} · {% endif %}Saves everything and takes you to the Comps list.</span>
-  <form method="post" action="/tools/comps/{{ a.id }}/delete" onsubmit="return confirm('Delete this whole comp analysis?');" style="margin-left:auto;">
+  <form method="post" action="/tools/comps/{{ a.id }}/delete" data-undo="Deleting this comp analysis" data-undo-confirm="Delete this whole comp analysis?" data-undo-hide="none" data-undo-after="follow" style="margin-left:auto;">
     <button type="submit" class="danger small">Delete analysis</button>
   </form>
 </div>

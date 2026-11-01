@@ -88,7 +88,7 @@ templates.env.globals["UNSET_DATE"] = UNSET_DATE
 
 def due_task_count() -> int:
     """For the sidebar reminder badge on every page."""
-    from app.finance import due_tasks
+    from app.task_logic import due_tasks
     db = SessionLocal()
     try:
         return len(due_tasks(db))

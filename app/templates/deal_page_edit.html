@@ -47,7 +47,7 @@
           <td><strong>{{ l.name }}</strong><div class="muted" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
           <td style="text-align:right; white-space:nowrap;">
             <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
-            <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>
+            <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;" data-undo="Link turned off"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>
           </td>
         </tr>
         {% else %}
@@ -108,7 +108,7 @@
         <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Your photo (shown on the right of the page, above your name)</div>
         <div style="display:flex; gap:8px; align-items:center;">
           <label class="btn secondary small" style="margin:0;">{{ "Change photo" if page.contact_photo else "Add photo" }}<input type="file" accept="image/*,.heic,.heif" hidden form="contact-photo-form" name="file" onchange="document.getElementById('contact-photo-form').submit();"></label>
-          {% if page.contact_photo %}<button type="submit" form="contact-photo-delete" class="secondary small">Remove</button>{% endif %}
+          {% if page.contact_photo %}<button type="submit" form="contact-photo-delete" class="secondary small" data-undo="Photo removed" data-undo-hide="all:.contact-photo-row img.contact-photo" data-undo-after="reload">Remove</button>{% endif %}
         </div>
       </div>
     </div>
@@ -147,7 +147,7 @@
       <div class="photo-actions">
         <button type="button" class="small secondary move-left" title="Move earlier">◀</button>
         <button type="button" class="small secondary move-right" title="Move later">▶</button>
-        <form method="post" action="/finance/deal-photos/{{ p.id }}/delete" style="margin-left:auto;"><button type="submit" class="small secondary" title="Remove photo">Remove</button></form>
+        <form method="post" action="/finance/deal-photos/{{ p.id }}/delete" style="margin-left:auto;" data-undo="Photo removed" data-undo-hide="closest .photo-tile" data-undo-after="reload"><button type="submit" class="small secondary" title="Remove photo">Remove</button></form>
       </div>
     </div>
     {% else %}

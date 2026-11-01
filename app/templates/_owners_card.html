@@ -8,7 +8,7 @@
       <button type="button" class="danger" style="padding:2px 6px; font-size:11px;"
         hx-post="/rentals/{{ prop.id }}/owners/{{ o.id }}/delete"
         hx-target="#owners-card" hx-swap="outerHTML"
-        hx-confirm="Remove {{ o.name }}?">✕</button>
+        data-undo="{{ o.name }} removed" data-undo-hide="closest span.btn">✕</button>
     </span>
     {% else %}
     <span class="muted">No owners added yet</span>

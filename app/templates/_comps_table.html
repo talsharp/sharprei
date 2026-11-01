@@ -36,7 +36,7 @@
             <button type="submit" class="secondary small">Refresh data</button>
           </form>
           {% if not h.is_subject %}
-          <form method="post" action="/tools/comps/houses/{{ h.id }}/delete">
+          <form method="post" action="/tools/comps/houses/{{ h.id }}/delete" data-undo="Comp removed" data-undo-hide="all:[data-house='{{ h.id }}']" data-undo-after="reload">
             <button type="submit" class="secondary small">Remove</button>
           </form>
           {% endif %}

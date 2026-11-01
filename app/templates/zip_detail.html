@@ -56,7 +56,7 @@
           <button type="submit" style="padding:2px 6px; font-size:11px;">Set as main</button>
         </form>
         {% endif %}
-        <form method="post" action="/zip/{{ zc.id }}/neighborhoods/{{ link.id }}/remove" style="display:inline;">
+        <form method="post" action="/zip/{{ zc.id }}/neighborhoods/{{ link.id }}/remove" style="display:inline;" data-undo="{{ link.neighborhood.name }} removed" data-undo-hide="closest span.btn">
           <button type="submit" class="danger" style="padding:2px 6px; font-size:11px;">✕</button>
         </form>
       </span>
@@ -249,7 +249,7 @@
             <input type="date" name="closed_date" value="{{ today }}" required style="width:120px;">
             <button type="submit" class="secondary" style="font-size:12px;">Add Deal</button>
           </form>
-          <form method="post" action="/zip/{{ zc.id }}/runs/{{ run.id }}/delete">
+          <form method="post" action="/zip/{{ zc.id }}/runs/{{ run.id }}/delete" data-undo="Run deleted" data-undo-after="reload">
             <button type="submit" class="danger" style="font-size:12px;">Delete</button>
           </form>
         </td>

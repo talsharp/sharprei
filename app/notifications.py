@@ -13,10 +13,10 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
-from app.finance import contract_clock, due_tasks, local_today
-from app.models import DealBuyer, DealTask, NotificationDismissal, Task, TaskStatus, WholesaleDeal
+from app.finance import contract_clock, local_today
+from app.models import DealBuyer, NotificationDismissal, Task, WholesaleDeal
+from app.task_logic import day_key, done_status, due_tasks, live_tasks
 
-WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]  # date.weekday() order
 STATUS_ICON = {"waiting": "⏳", "confirmed": "✓", "visited": "✓✓", "cant": "✕"}
 
 
@@ -71,10 +71,9 @@ def today_items(db: Session) -> List[dict]:
                       "detail": f"{_street(t.deal.address)} · " + ("due today" if late == 0 else f"{late} day{'s' if late != 1 else ''} late"),
                       "url": f"/finance/deals/{t.deal_id}#tasks-card", "urgent": late > 0})
 
-    # Open tasks in today's group on the Tasks board.
-    day_key = WEEKDAY_KEYS[today.weekday()]
-    for t in db.query(Task).filter(Task.day == day_key).order_by(Task.position, Task.id).all():
-        if t.status and t.status.is_done:
+    # Open tasks in today's group on the Tasks board (deal tasks are listed above).
+    for t in live_tasks(db).filter(Task.day == day_key(today), Task.deal_id.is_(None)).order_by(Task.position, Task.id).all():
+        if t.is_done:
             continue
         items.append({"key": f"task:{t.id}", "done_label": "Done",
                       "kind": "Task", "title": t.title,
@@ -89,14 +88,9 @@ def mark_done(db: Session, key: str) -> bool:
     """The ✓ in the bell. Tasks are really marked Done; reminders (walkthrough,
     inspection, closing) are hidden for today."""
     kind, _, rest = key.partition(":")
-    if kind == "dealtask" and rest.isdigit():
-        task = db.get(DealTask, int(rest))
-        if not task:
-            return False
-        task.status = "done"
-    elif kind == "task" and rest.isdigit():
+    if kind in ("dealtask", "task") and rest.isdigit():
         task = db.get(Task, int(rest))
-        done = db.query(TaskStatus).filter(TaskStatus.is_done.is_(True)).order_by(TaskStatus.position).first()
+        done = done_status(db)
         if not task or not done:
             return False
         task.status_id = done.id

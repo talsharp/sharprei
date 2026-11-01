@@ -49,10 +49,6 @@ DEAL_STATUSES = OrderedDict(
 )
 
 
-TASK_STATUSES = OrderedDict(
-    [("todo", "To do"), ("in_progress", "In progress"), ("waiting", "Waiting"), ("done", "Done")]
-)
-
 BUYER_STATUSES = OrderedDict(
     [("waiting", "Waiting"), ("confirmed", "Confirmed"), ("visited", "Visited"), ("cant", "Can't make it")]
 )
@@ -66,17 +62,6 @@ def local_today() -> date:
         return _dt.now(ZoneInfo("Asia/Jerusalem")).date()
     except Exception:
         return date.today()
-
-
-def due_tasks(db: Session) -> list:
-    """Deal tasks that are due today or overdue and not done - the reminders."""
-    from app.models import DealTask
-    return (
-        db.query(DealTask)
-        .filter(DealTask.status != "done", DealTask.due_date.isnot(None), DealTask.due_date <= local_today())
-        .order_by(DealTask.due_date, DealTask.id)
-        .all()
-    )
 
 
 def add_business_days(start: date, days: int) -> date:

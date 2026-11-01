@@ -1,10 +1,15 @@
-<div class="task-row{{ ' is-done' if t.status and t.status.is_done }}" data-id="{{ t.id }}" data-label="{{ t.label_id or '' }}" data-created="{{ t.created_at.strftime('%b %d, %Y') if t.created_at else '' }}">
+<div class="task-row{{ ' is-done' if t.is_done }}" data-id="{{ t.id }}" data-label="{{ t.label_id or '' }}" data-created="{{ t.created_at.strftime('%b %d, %Y') if t.created_at else '' }}"
+     data-deal="{{ t.deal_id or '' }}" data-deal-name="{{ task_street(t.deal) }}" data-due="{{ t.due_date.isoformat() if t.due_date else '' }}">
   <div class="task-main">
     <span class="task-handle" title="Drag to reorder or move to another day">⋮⋮</span>
+    <div class="task-name-cell">
     <button type="button" class="task-open" title="Open task">
       <span class="task-title-text">{{ t.title }}</span>
       <svg class="task-desc-icon" viewBox="0 0 24 24" aria-label="Has a description" {{ 'hidden' if not t.description }}><path d="M5 7h14M5 12h14M5 17h9"/></svg>
     </button>
+    <span class="task-late" hidden></span>
+    <a class="task-deal-tag" href="/finance/deals/{{ t.deal_id or '' }}#tasks-card" title="Open the deal" {{ 'hidden' if not t.deal_id }}>{{ task_street(t.deal) }}</a>
+    </div>
     <button type="button" class="task-pill status-pill" data-kind="status" data-value="{{ t.status_id or '' }}"
             style="background:{{ t.status.color if t.status else '#C4C4C4' }};">{{ t.status.name if t.status else '' }}</button>
     <button type="button" class="task-pill label-pill{{ ' empty' if not t.label }}" data-kind="label" data-value="{{ t.label_id or '' }}"

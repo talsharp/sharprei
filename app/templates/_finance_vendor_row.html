@@ -16,7 +16,7 @@
   <td>{{ fx.money(st.get('total', 0)) }}</td>
   <td style="text-align:right;">
     {% if not st.get('count') %}
-    <button type="button" class="danger small" hx-post="/finance/vendors/{{ v.id }}/delete" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete {{ v.name }}?" hx-trigger="click consume">Delete</button>
+    <button type="button" class="danger small" hx-post="/finance/vendors/{{ v.id }}/delete" hx-target="closest tr" hx-swap="outerHTML" data-undo="{{ v.name }} deleted" hx-trigger="click consume">Delete</button>
     {% endif %}
   </td>
 </tr>
