@@ -99,8 +99,9 @@
       commit: function(leaving) {
         undoPost(action, leaving, new FormData(form)).then(function(r) {
           if (leaving) return;
-          if (after === 'follow') location.href = r.url;
-          else if (after === 'reload') location.reload();
+          // A page with unsaved boxes (deal page editor) saves them before it reloads.
+          var go = function() { if (after === 'follow') location.href = r.url; else if (after === 'reload') location.reload(); };
+          if (after && window.saveTextThen) window.saveTextThen(go); else go();
         });
       }
     });
