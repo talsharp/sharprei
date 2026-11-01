@@ -22,7 +22,7 @@
   <div class="card" style="margin-bottom:0;">
     <h3>By channel</h3>
     <table>
-      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th></tr></thead>
+      <thead><tr><th>Channel</th><th>Spent</th><th>Leads</th><th>CPL</th><th title="Agreements signed this month, by the deal's source">Signed</th></tr></thead>
       <tbody>
         {% for ch in wholesale_channels %}
         {% set cs = summary.channels[ch] %}
@@ -31,8 +31,13 @@
           <td>{{ fx.money(cs.expenses) }}</td>
           <td>{{ cs.leads if ch in lead_channels else "—" }}</td>
           <td>{{ fx.cpl(cs.cpl) if ch in lead_channels else "—" }}</td>
+          <td>{{ (cs.agreements or "") if ch in lead_channels else "—" }}</td>
         </tr>
         {% endfor %}
+        {% set no_source = summary.signed_deals|rejectattr('channel', 'in', lead_channels)|list %}
+        {% if no_source %}
+        <tr><td class="muted">No source yet</td><td></td><td></td><td></td><td>{{ no_source|length }}</td></tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
@@ -48,6 +53,27 @@
       <button type="submit">Save leads</button>
     </form>
   </div>
+</div>
+
+<div class="card">
+  <h3>Signed agreements this month{% if summary.signed_deals %} · {{ summary.signed_deals|length }}{% endif %}</h3>
+  {% if summary.signed_deals %}
+  <table>
+    <thead><tr><th>Deal</th><th>Source</th><th>Signed</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for d in summary.signed_deals|sort(attribute='agreement_date') %}
+      <tr>
+        <td><a class="zip-link" href="/finance/deals/{{ d.id }}">{{ d.address.split(',')[0] }}</a></td>
+        <td>{% if d.channel in lead_channels %}{{ fx.channel_badge(d.channel) }}{% else %}<a class="muted" href="/finance/deals/{{ d.id }}" title="Open the deal to set where the lead came from">No source - set it</a>{% endif %}</td>
+        <td>{{ d.agreement_date.strftime('%b %d') }}</td>
+        <td>{{ fx.status_badge(d.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="margin:0;">No agreements signed in {{ month.strftime('%B') }}. They come from the Deals list (agreement date).</p>
+  {% endif %}
 </div>
 
 <datalist id="vendor-list">
