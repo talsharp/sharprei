@@ -309,16 +309,17 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         return response
 
     @router.post("/d/{token}/seen")
-    async def photos_seen(token: str, request: Request, db: Session = Depends(get_db)):
-        """The photo viewer reports how many different photos this visit opened."""
+    def photos_seen(token: str, request: Request, view: str = Form(""), count: str = Form(""),
+                    db: Session = Depends(get_db)):
+        """The photo viewer reports how many different photos this visit opened.
+        (A plain def, so the database work stays off the main loop.)"""
         page, _ = _resolve(db, token)
-        form = await request.form()
-        view = db.get(DealPageView, int(form.get("view", "0"))) if page and str(form.get("view", "")).isdigit() else None
+        record = db.get(DealPageView, int(view)) if page and view.isdigit() else None
         # Only the visitor who made the view can update it (their own cookie).
-        if view and view.page_id == page.id and view.visitor_id == request.cookies.get(VISITOR_COOKIE):
-            count = min(int(form.get("count", "0")) if str(form.get("count", "")).isdigit() else 0, len(page.photos))
-            if count > view.photos_seen:
-                view.photos_seen = count
+        if record and record.page_id == page.id and record.visitor_id == request.cookies.get(VISITOR_COOKIE):
+            seen = min(int(count) if count.isdigit() else 0, len(page.photos))
+            if seen > record.photos_seen:
+                record.photos_seen = seen
                 db.commit()
         return Response(status_code=204)
 
