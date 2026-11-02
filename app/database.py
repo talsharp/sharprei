@@ -5,10 +5,14 @@ from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import NullPool
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("DB_PATH", ROOT / "data.db"))
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+# No connection pool: opening a SQLite file is nearly free, and a pool's limit
+# (15) once ran out when a page loaded ~35 photos at once - every request then
+# waited for a connection and the server froze (502, 2026-11-02).
+engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False}, poolclass=NullPool)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", ROOT / "backups"))

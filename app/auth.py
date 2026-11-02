@@ -5,6 +5,7 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import config
@@ -47,6 +48,17 @@ def _same_origin(request: Request) -> bool:
     return urlparse(source).netloc in allowed
 
 
+def _load_user(user_id: int):
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user:
+            db.expunge(user)
+        return user
+    finally:
+        db.close()
+
+
 def install(app: FastAPI, templates: Jinja2Templates) -> None:
     @app.middleware("http")
     async def auth_gate(request: Request, call_next):
@@ -68,14 +80,9 @@ def install(app: FastAPI, templates: Jinja2Templates) -> None:
         if _is_public(path):
             return await call_next(request)
 
-        user = None
         user_id = request.session.get("user_id")
-        if user_id:
-            db = SessionLocal()
-            try:
-                user = db.get(User, user_id)
-            finally:
-                db.close()
+        # Off the main loop: a slow database here must never freeze every page.
+        user = await run_in_threadpool(_load_user, user_id) if user_id else None
         if not user or not user.active:
             request.session.clear()
             if request.headers.get("HX-Request") == "true":
