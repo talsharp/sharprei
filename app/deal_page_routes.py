@@ -293,7 +293,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 visitor = uuid4().hex
             seen = db.query(DealPageView.id).filter(DealPageView.page_id == page.id, DealPageView.visitor_id == visitor).first()
             view = DealPageView(page_id=page.id, link_id=link.id if link else None, visitor_id=visitor,
-                                is_return=seen is not None, device=device_of(user_agent), created_at=datetime.utcnow())
+                                is_return=seen is not None, device=device_of(user_agent), on_screen=False,
+                                user_agent=user_agent[:300], created_at=datetime.utcnow())
             db.add(view)
             db.commit()
         response = templates.TemplateResponse(
@@ -308,15 +309,30 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                                 httponly=True, samesite="lax", secure=request.url.scheme == "https")
         return response
 
+    def _own_view(db: Session, request: Request, token: str, view: str):
+        """(page, view) - only the visitor who made the view can update it (their own cookie)."""
+        page, _ = _resolve(db, token)
+        record = db.get(DealPageView, int(view)) if page and view.isdigit() else None
+        if record and record.page_id == page.id and record.visitor_id == request.cookies.get(VISITOR_COOKIE):
+            return page, record
+        return page, None
+
+    @router.post("/d/{token}/on-screen")
+    def page_on_screen(token: str, request: Request, view: str = Form(""), db: Session = Depends(get_db)):
+        """The page really was on screen for a moment: a person, not a link checker."""
+        _, record = _own_view(db, request, token, view)
+        if record and not record.on_screen:
+            record.on_screen = True
+            db.commit()
+        return Response(status_code=204)
+
     @router.post("/d/{token}/seen")
     def photos_seen(token: str, request: Request, view: str = Form(""), count: str = Form(""),
                     db: Session = Depends(get_db)):
         """The photo viewer reports how many different photos this visit opened.
         (A plain def, so the database work stays off the main loop.)"""
-        page, _ = _resolve(db, token)
-        record = db.get(DealPageView, int(view)) if page and view.isdigit() else None
-        # Only the visitor who made the view can update it (their own cookie).
-        if record and record.page_id == page.id and record.visitor_id == request.cookies.get(VISITOR_COOKIE):
+        page, record = _own_view(db, request, token, view)
+        if record:
             seen = min(int(count) if count.isdigit() else 0, len(page.photos))
             if seen > record.photos_seen:
                 record.photos_seen = seen

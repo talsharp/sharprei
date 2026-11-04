@@ -117,5 +117,24 @@
   })();
   </script>
   {% endif %}
+  {% if view_id %}
+  <script>
+  // Tells you this visit is a person: the page stayed on screen for 2 seconds.
+  // Automatic link checkers fetch the page but never show it.
+  (function() {
+    var timer = null, sent = false;
+    function send() {
+      sent = true;
+      fetch('/d/{{ token }}/on-screen', {method: 'POST', body: new URLSearchParams({view: {{ view_id|tojson }}}), keepalive: true}).catch(function() {});
+    }
+    function check() {
+      clearTimeout(timer);
+      if (!sent && document.visibilityState === 'visible') timer = setTimeout(send, 2000);
+    }
+    document.addEventListener('visibilitychange', check);
+    check();
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>

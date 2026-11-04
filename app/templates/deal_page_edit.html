@@ -41,9 +41,9 @@
     <h4 style="margin:16px 0 6px;">Personal links <span class="muted" style="font-weight:400; font-size:12px;">- one per investor, so you see who looked</span></h4>
     <table class="personal-links">
       <tbody>
-        {% for l in page.links %}
+        {% for l in page.links|reverse|list %}
         {% set s = link_stats[l.id] %}
-        <tr>
+        <tr data-link>
           <td><strong>{{ l.name }}</strong><div class="muted views-data" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
           <td style="text-align:right; white-space:nowrap;">
             <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
@@ -55,6 +55,11 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="links-pager" id="links-pager" hidden>
+      <button type="button" class="secondary small" id="links-newer">‹ Newer</button>
+      <span class="muted" id="links-range"></span>
+      <button type="button" class="secondary small" id="links-older">Older ›</button>
+    </div>
     <datalist id="investor-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
     <form method="post" action="/finance/deals/{{ deal.id }}/page/links" class="comps-paste-form" style="margin-top:8px;">
       <input type="text" name="name" list="investor-names" placeholder="Investor's name" required maxlength="120">
@@ -74,21 +79,47 @@
     <div class="view-kpis views-data">
       <div><div class="value">{{ stats.views }}</div><div class="label">views</div></div>
       <div><div class="value">{{ stats.people }}</div><div class="label">people</div></div>
-      <div><div class="value">{{ stats.returning }}</div><div class="label">came back</div></div>
-      <div><div class="value">{{ stats.photo_people }}</div><div class="label">opened photos</div></div>
+      <button type="button" class="kpi-open" data-panel="panel-came-back" aria-expanded="false" title="See who came back"><span class="value">{{ stats.returning }}</span><span class="label">came back</span></button>
+      <button type="button" class="kpi-open" data-panel="panel-photos" aria-expanded="false" title="See who opened photos"><span class="value">{{ stats.photo_people }}</span><span class="label">opened photos</span></button>
       <div><div class="value small">{{ ago(stats.last) }}</div><div class="label">last view</div></div>
     </div>
     <div class="view-list views-data">
-      {% for v in page.views[:40] %}
+      {% for v in stats.visits[:40] %}
       <div class="view-item">
-        <span class="muted">{{ ago(v.created_at) }}</span>
-        <strong>{{ v.link.name if v.link else "General link" }}</strong>
-        {% if v.is_return %}<span class="badge deal-closed">returning</span>{% else %}<span class="badge deal-under_contract">new</span>{% endif %}
+        <span class="muted">{{ ago(v.last) }}</span>
+        <strong>{{ v.name }}</strong>
+        {% if v.returning %}<span class="badge deal-closed">returning</span>{% else %}<span class="badge deal-under_contract">new</span>{% endif %}
         <span class="muted">{{ v.device or "" }}</span>
-        {% if v.photos_seen %}<span class="photos-seen" title="Opened the photo viewer">📷 {{ v.photos_seen }} of {{ page.photos|length }} photos</span>{% endif %}
+        {% if v.photos %}<span class="photos-seen" title="Opened the photo viewer">📷 {{ v.photos }} of {{ page.photos|length }} photos</span>{% endif %}
       </div>
       {% else %}
-      <p class="muted" style="margin:0; font-size:13px;">No views yet. Link previews in WhatsApp/iMessage don't count, and neither do you when you're logged in - use Preview to look at it yourself.</p>
+      <p class="muted" style="margin:0; font-size:13px;">No views yet. Automatic link checks don't count - only visits where the page really showed on screen. Use Preview to look at it yourself.</p>
+      {% endfor %}
+    </div>
+    <div class="view-list view-panel views-data" id="panel-came-back" hidden>
+      <div class="view-panel-title"><strong>Came back</strong><button type="button" class="secondary small kpi-close">All views</button></div>
+      {% for p in stats.came_back %}
+      <div class="view-item">
+        <span class="muted local-time" data-utc="{{ p.last.isoformat() }}Z">{{ ago(p.last) }}</span>
+        <strong>{{ p.name }}</strong>
+        <span class="muted">{{ p.device or "" }}</span>
+        <span class="photos-seen">came back {{ p.visits - 1 }} time{{ "s" if p.visits != 2 else "" }}</span>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0; font-size:13px;">Nobody has come back yet.</p>
+      {% endfor %}
+    </div>
+    <div class="view-list view-panel views-data" id="panel-photos" hidden>
+      <div class="view-panel-title"><strong>Opened photos</strong><button type="button" class="secondary small kpi-close">All views</button></div>
+      {% for p in stats.opened_photos %}
+      <div class="view-item">
+        <span class="muted local-time" data-utc="{{ p.last.isoformat() }}Z">{{ ago(p.last) }}</span>
+        <strong>{{ p.name }}</strong>
+        <span class="muted">{{ p.device or "" }}</span>
+        <span class="photos-seen">📷 {{ p.photos }} of {{ page.photos|length }} photos</span>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0; font-size:13px;">Nobody has opened the photos yet.</p>
       {% endfor %}
     </div>
   </div>
@@ -291,6 +322,40 @@
     });
     tile.querySelector('.move-left').addEventListener('click', function() { if (tile.previousElementSibling) { grid.insertBefore(tile, tile.previousElementSibling); saveOrder(); } });
     tile.querySelector('.move-right').addEventListener('click', function() { if (tile.nextElementSibling) { grid.insertBefore(tile.nextElementSibling, tile); saveOrder(); } });
+  });
+
+  // ----- personal links: newest first, a few at a time -----
+  var linkRows = document.querySelectorAll('tr[data-link]'), linkPage = 0, LINKS_PER_PAGE = 5;
+  function showLinks() {
+    var first = linkPage * LINKS_PER_PAGE, last = Math.min(first + LINKS_PER_PAGE, linkRows.length);
+    linkRows.forEach(function(row, i) { row.hidden = i < first || i >= last; });
+    document.getElementById('links-range').textContent = (first + 1) + '-' + last + ' of ' + linkRows.length;
+    document.getElementById('links-newer').disabled = first === 0;
+    document.getElementById('links-older').disabled = last === linkRows.length;
+  }
+  if (linkRows.length > LINKS_PER_PAGE) {
+    document.getElementById('links-pager').hidden = false;
+    document.getElementById('links-newer').addEventListener('click', function() { linkPage--; showLinks(); });
+    document.getElementById('links-older').addEventListener('click', function() { linkPage++; showLinks(); });
+    showLinks();
+  }
+
+  // ----- views: click "came back" / "opened photos" to see who -----
+  var allViews = document.querySelector('.view-list:not(.view-panel)');
+  function openPanel(tile) {
+    var opening = tile && tile.getAttribute('aria-expanded') !== 'true';
+    document.querySelectorAll('.kpi-open').forEach(function(t) {
+      var on = opening && t === tile;
+      t.setAttribute('aria-expanded', on ? 'true' : 'false');
+      t.classList.toggle('active', on);
+      document.getElementById(t.dataset.panel).hidden = !on;
+    });
+    allViews.hidden = opening;
+  }
+  document.querySelectorAll('.kpi-open').forEach(function(t) { t.addEventListener('click', function() { openPanel(t); }); });
+  document.querySelectorAll('.kpi-close').forEach(function(b) { b.addEventListener('click', function() { openPanel(null); }); });
+  document.querySelectorAll('.local-time').forEach(function(el) {
+    el.textContent = new Date(el.dataset.utc).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
   });
 
   document.querySelectorAll('.copy-btn').forEach(function(btn) {

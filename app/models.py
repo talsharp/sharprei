@@ -762,8 +762,8 @@ class DealPageLink(Base):
 
 
 class DealPageView(Base):
-    """One visit to a deal page. visitor_id is an anonymous browser cookie, so a
-    later visit from the same browser counts as returning."""
+    """One open of a deal page. visitor_id is an anonymous browser cookie. See
+    deal_pages.view_visits for how opens become the visits Tal sees."""
     __tablename__ = "deal_page_views"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -774,6 +774,11 @@ class DealPageView(Base):
     device: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # How many different photos they opened in the photo viewer (0 = didn't open it).
     photos_seen: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Did the page really show on screen? False until the browser says so, which
+    # filters out automatic link checkers. None = from before this check existed.
+    on_screen: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # What opened it, to see which apps check links. Not shown anywhere.
+    user_agent: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     page: Mapped[DealPage] = relationship(back_populates="views")

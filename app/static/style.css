@@ -614,6 +614,13 @@ p.sale-spread { margin: 10px 0 0; font-size: 14px; }
 .view-kpis .value.small { font-size: 14px; padding: 6px 0; }
 .view-kpis .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .view-list { max-height: 260px; overflow-y: auto; }
+.view-kpis .kpi-open { display: block; width: 100%; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; text-align: center; cursor: pointer; font: inherit; color: inherit; box-shadow: none; }
+.view-kpis .kpi-open:hover { background: #EEF4FB; border-color: var(--accent); transform: none; }
+.view-kpis .kpi-open.active { background: #EEF4FB; border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.view-kpis .kpi-open .value, .view-kpis .kpi-open .label { display: block; }
+.view-panel-title { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.links-pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
+.links-pager[hidden] { display: none; }
 .view-item { display: flex; gap: 10px; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .view-item .muted:first-child { min-width: 90px; }
 .page-form { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }

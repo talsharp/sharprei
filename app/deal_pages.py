@@ -3,16 +3,19 @@ Deal landing pages: a public page per deal (photos, price, facts, contact)
 shared by link - one general link plus a personal link per investor, so the
 views show who looked.
 
-Visits: an anonymous cookie marks the browser, so a later visit is
-"returning". Link-preview fetchers (WhatsApp, iMessage, Facebook...) and
-other bots don't count as views.
+Visits: link-preview fetchers (WhatsApp, iMessage, Facebook...) and other bots
+that say what they are aren't recorded. Every other open is recorded, but only
+counts once the page really was on screen for a moment - automatic link checkers
+look like browsers, yet they never show the page. Opens of the same link within
+30 minutes are one visit; someone who returns later "came back". One person is
+one personal link or, on the general link, one browser (an anonymous cookie).
 """
 
 import io
 import re
 import secrets
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -32,6 +35,7 @@ PHOTO_MAX_SIDE = 1800
 PHOTO_QUALITY = 82
 MAX_PHOTOS = 60
 VISITOR_COOKIE = "sr_visitor"
+SAME_VISIT = timedelta(minutes=30)
 
 BOT_PATTERN = re.compile(
     r"bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|skype|"
@@ -99,15 +103,62 @@ def device_of(user_agent: str) -> str:
     return "computer"
 
 
+def is_real(view) -> bool:
+    """False for automatic link checkers: the page was never on screen. Views from
+    before this check existed (on_screen None) count; a checker never opens photos."""
+    return view.on_screen is not False or bool(view.photos_seen)
+
+
+def _visit(person, opens: list, number: int) -> dict:
+    """One visit from its opens (oldest first). Its device is the open that looked at the most photos."""
+    main = max(reversed(opens), key=lambda v: v.photos_seen)
+    return {"person": person, "name": main.link.name if main.link else "General link", "device": main.device,
+            "photos": main.photos_seen, "returning": number > 1, "last": opens[-1].created_at}
+
+
+def view_visits(views) -> list:
+    """The real views as visits, newest first."""
+    by_person = defaultdict(list)
+    for v in sorted((v for v in views if is_real(v)), key=lambda v: v.created_at):
+        by_person[v.link_id or v.visitor_id].append(v)
+    visits = []
+    for person, opens in by_person.items():
+        current, number = [opens[0]], 1
+        for v in opens[1:]:
+            if v.created_at - current[-1].created_at > SAME_VISIT:
+                visits.append(_visit(person, current, number))
+                current, number = [], number + 1
+            current.append(v)
+        visits.append(_visit(person, current, number))
+    return sorted(visits, key=lambda visit: visit["last"], reverse=True)
+
+
+def view_people(visits: list) -> list:
+    """One row per person, from visits (newest first): latest visit, number of visits, most photos."""
+    people = {}
+    for visit in visits:
+        row = people.setdefault(visit["person"], {"name": visit["name"], "device": visit["device"],
+                                                  "last": visit["last"], "visits": 0, "photos": 0})
+        row["visits"] += 1
+        row["photos"] = max(row["photos"], visit["photos"])
+    return list(people.values())
+
+
 def view_stats(views) -> dict:
-    """Totals for a list of views (newest first)."""
-    visitors = {v.visitor_id for v in views}
+    """Totals for a list of views, plus the visits and who came back or opened photos."""
+    visits = view_visits(views)
+    people = view_people(visits)
+    came_back = [p for p in people if p["visits"] > 1]
+    opened_photos = [p for p in people if p["photos"]]
     return {
-        "views": len(views),
-        "people": len(visitors),
-        "returning": len({v.visitor_id for v in views if v.is_return}),
-        "photo_people": len({v.visitor_id for v in views if v.photos_seen}),
-        "last": views[0].created_at if views else None,
+        "views": len(visits),
+        "people": len(people),
+        "returning": len(came_back),
+        "photo_people": len(opened_photos),
+        "last": visits[0]["last"] if visits else None,
+        "visits": visits,
+        "came_back": came_back,
+        "opened_photos": opened_photos,
     }
 
 
