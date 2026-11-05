@@ -109,6 +109,26 @@ def contract_clock(deal: WholesaleDeal, today: Optional[date] = None) -> Contrac
     return clock
 
 
+def expected_closing(deal: WholesaleDeal) -> Optional[date]:
+    """The signing date plus the closing days (calendar days)."""
+    if deal.agreement_date and deal.closing_days:
+        return deal.agreement_date + timedelta(days=deal.closing_days)
+    return None
+
+
+def follow_expected_closing(deal: WholesaleDeal, previous: Optional[date]) -> bool:
+    """The closing days or signing date may have changed (previous = the date
+    expected before): moves the closing date along, unless Tal set it by hand -
+    it's neither empty nor the date that was expected. True if it moved."""
+    expected = expected_closing(deal)
+    if deal.status != "under_contract" or expected is None or expected == previous:
+        return False
+    if deal.closed_date is None or deal.closed_date == previous:
+        deal.closed_date = expected
+        return True
+    return False
+
+
 def month_start(d: date) -> date:
     return date(d.year, d.month, 1)
 

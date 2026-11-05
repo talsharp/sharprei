@@ -3,9 +3,9 @@
 
   {# Saves on change into the boxes above. A date is only sent once its year is complete. #}
   <form class="contract-inputs" hx-post="/finance/deals/{{ deal.id }}/contract" hx-target="#contract-stats" hx-swap="outerHTML"
-        hx-trigger="change[event.target.type !== 'date' || !event.target.value || event.target.value.slice(0, 4) >= '2000']"
-        hx-on::after-request="if(event.detail.successful){window.syncContractFields && window.syncContractFields();}">
+        hx-trigger="change[event.target.type !== 'date' || !event.target.value || event.target.value.slice(0, 4) >= '2000']">
     <label>Inspection<span class="input-suffix"><input type="number" min="0" max="90" name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10"> business days</span></label>
+    <label title="Counted from the signing date. Sets the closing date - you can still change that date yourself.">Closing<span class="input-suffix"><input type="number" min="0" max="365" name="closing_days" value="{{ deal.closing_days or '' }}" placeholder="e.g. 30"> days</span></label>
     <label title="Leave empty if there was no renegotiation">Renegotiated price ($)<input type="number" step="any" name="renegotiated_price" value="{{ '%g'|format(deal.renegotiated_price|float) if deal.renegotiated_price is not none else '' }}" placeholder="if renegotiated"></label>
     <span class="contract-divider"></span>
     <label>Buyer<input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" placeholder="Found a buyer?" maxlength="120"></label>

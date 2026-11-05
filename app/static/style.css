@@ -596,7 +596,8 @@ tr.row-highlight td { background: #EAF6EC; }
 
 .contract-inputs { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .contract-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
-.contract-inputs input[name=inspection_days] { width: 80px; }
+.contract-inputs input[name=inspection_days], .contract-inputs input[name=closing_days] { width: 80px; }
+.contract-stat .link-btn { padding: 0; font-size: inherit; }
 .contract-inputs input[name=renegotiated_price], .contract-inputs input[name=sell_price] { width: 140px; }
 .contract-inputs input[name=buyer_name] { width: 190px; }
 .input-suffix { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }

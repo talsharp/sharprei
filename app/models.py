@@ -448,6 +448,9 @@ class WholesaleDeal(Base):
     sms_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # Inspection period in business days, counted from the agreement date.
     inspection_days: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Days until closing (calendar days), counted from the agreement date. They set
+    # closed_date, which Tal can still change by hand (see finance.follow_expected_closing).
+    closing_days: Mapped[Optional[int]] = mapped_column(nullable=True)
     # The end buyer once one is found. Their price is sell_price; closed_date
     # is the scheduled closing date until the deal closes.
     buyer_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)

@@ -16,6 +16,8 @@ from app.finance import (
     SMS_SOURCES,
     BUYER_STATUSES,
     contract_clock,
+    expected_closing,
+    follow_expected_closing,
     local_today,
     renegotiation_credit,
     renegotiation_report,
@@ -99,6 +101,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     templates.env.globals["local_today"] = local_today
     templates.env.globals["renegotiation_credit"] = renegotiation_credit
     templates.env.globals["contract_clock"] = contract_clock
+    templates.env.globals["expected_closing"] = expected_closing
 
     # ---------- Overview ----------
 
@@ -351,14 +354,17 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/deals/{deal_id}/contract")
     async def finance_deal_contract(request: Request, deal_id: int, db: Session = Depends(get_db)):
-        """The under-contract inputs (inspection days, renegotiated price, buyer,
-        buyer's price, closing date). Saves whichever were sent; returns the boxes."""
+        """The under-contract inputs (inspection days, closing days, renegotiated price,
+        buyer, buyer's price, closing date). Saves whichever were sent; returns the boxes."""
         deal = db.get(WholesaleDeal, deal_id)
         if not deal:
             return Response(status_code=404)
         form = await request.form()
+        was_expected = expected_closing(deal)
         if "inspection_days" in form:
             deal.inspection_days = _int(form["inspection_days"]) or None
+        if "closing_days" in form:
+            deal.closing_days = _int(form["closing_days"]) or None
         if "renegotiated_price" in form:
             deal.renegotiated_price = _optional_money(form["renegotiated_price"])
         if "buyer_name" in form:
@@ -369,8 +375,13 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             closing = _optional_date(form["closed_date"])
             if closing is None or closing.year >= 2000:  # a half-typed year never lands
                 deal.closed_date = closing
+        moved = follow_expected_closing(deal, was_expected)
+        # "Use it": Tal chooses the calculated date over the one he set by hand.
+        if "use_expected" in form and expected_closing(deal):
+            deal.closed_date = expected_closing(deal)
+            moved = True
         db.commit()
-        return templates.TemplateResponse("_deal_contract_stats.html", {"request": request, "deal": deal})
+        return templates.TemplateResponse("_deal_contract_stats.html", {"request": request, "deal": deal, "closing_moved": moved})
 
     # ---------- Deal tasks ----------
 
@@ -486,6 +497,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     ):
         deal = db.get(WholesaleDeal, deal_id)
         if deal:
+            was_expected = expected_closing(deal)
             deal.address = address.strip()
             deal.agreement_date = _optional_date(agreement_date)
             deal.agreement_price = _optional_money(agreement_price)
@@ -504,6 +516,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.sms_source = sms_source if sms_source in SMS_SOURCES else None
             deal.buyer_name = buyer_name.strip()[:120] or None
             deal.notes = notes.strip() or None
+            follow_expected_closing(deal, was_expected)
             db.commit()
         return RedirectResponse("/finance/deals", status_code=303)
 

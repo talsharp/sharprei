@@ -19,11 +19,16 @@
 window.syncContractFields = function() {
   var card = document.getElementById('contract-card'), form = document.querySelector('form[action$="/update"]');
   if (!card || !form) return;
+  // The closing days moved the closing date: show it in the box.
+  var stats = document.getElementById('contract-stats');
+  if (stats.dataset.closingDate) card.querySelector('[name=closed_date]').value = stats.dataset.closingDate;
+  delete stats.dataset.closingDate;
   ['renegotiated_price', 'buyer_name', 'sell_price', 'closed_date'].forEach(function(n) {
     var src = card.querySelector('[name=' + n + ']'), dst = form.querySelector('[name=' + n + ']');
     if (src && dst) dst.value = src.value;
   });
 };
+document.addEventListener('htmx:afterSwap', function(e) { if (e.detail.target.id === 'contract-stats') window.syncContractFields(); });
 
 </script>
 

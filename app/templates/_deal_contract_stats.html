@@ -1,7 +1,8 @@
 {# Display-only boxes of the under-contract card. Re-rendered after every save -
    the inputs live outside this block so they never redraw while typing. #}
 {% set c = contract_clock(deal) %}
-<div id="contract-stats">
+{% set expected = expected_closing(deal) %}
+<div id="contract-stats"{% if closing_moved %} data-closing-date="{{ deal.closed_date.isoformat() }}"{% endif %}>
   <div class="contract-stats">
     <div class="contract-stat">
       <div class="label">Signed</div>
@@ -35,15 +36,18 @@
       {% endif %}
     </div>
     <div class="contract-stat {{ 'urgent' if c.days_to_closing is not none and 0 <= c.days_to_closing <= 3 }}">
-      <div class="label">Closing</div>
+      <div class="label">Closing{% if deal.closing_days %} · {{ deal.closing_days }} days{% endif %}</div>
       {% if c.days_to_closing is none %}
-      <div class="value muted">—</div><div class="muted sub">Set the closing date below</div>
+      <div class="value muted">—</div><div class="muted sub">{{ "Needs the agreement date" if deal.closing_days and not deal.agreement_date else "Set the closing days or date below" }}</div>
       {% elif c.days_to_closing > 0 %}
       <div class="value">in {{ c.days_to_closing }} day{{ "s" if c.days_to_closing != 1 else "" }}</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}{% if deal.buyer_name %} · {{ deal.buyer_name }}{% endif %}</div>
       {% elif c.days_to_closing == 0 %}
       <div class="value">Today</div><div class="muted sub">{{ deal.closed_date.strftime('%a, %b %d') }}</div>
       {% else %}
       <div class="value">{{ -c.days_to_closing }} day{{ "s" if c.days_to_closing != -1 else "" }} ago</div><div class="muted sub">mark the deal Closed below</div>
+      {% endif %}
+      {% if expected and expected != deal.closed_date %}
+      <div class="muted sub">{{ deal.closing_days }} days would be {{ expected.strftime('%a, %b %d') }} · <button type="button" class="link-btn" hx-post="/finance/deals/{{ deal.id }}/contract" hx-vals='{"use_expected": "1"}' hx-target="#contract-stats" hx-swap="outerHTML">Use it</button></div>
       {% endif %}
     </div>
   </div>
