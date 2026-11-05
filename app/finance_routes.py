@@ -63,6 +63,18 @@ def _int(value: str) -> int:
         return 0
 
 
+def _commission(value: str, revenue: float):
+    """A commission box: "15%" is a % of revenue, anything else dollars. Returns (pct, dollars)."""
+    value = (value or "").replace(",", "").replace("$", "").strip()
+    if value.endswith("%"):
+        try:
+            pct = max(0.0, float(value[:-1]))
+        except ValueError:
+            return None, 0.0
+        return pct, round(revenue * pct / 100, 2)
+    return None, _money(value)
+
+
 def _datetime(value: str) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(value) if value else None
@@ -354,13 +366,20 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/deals/{deal_id}/contract")
     async def finance_deal_contract(request: Request, deal_id: int, db: Session = Depends(get_db)):
-        """The under-contract inputs (inspection days, closing days, renegotiated price,
-        buyer, buyer's price, closing date). Saves whichever were sent; returns the boxes."""
+        """The fields behind the under-contract boxes (signed date, price, inspection days,
+        closing days, renegotiated price, buyer, sell price, closing date). Saved as they
+        change, whichever were sent; returns the boxes."""
         deal = db.get(WholesaleDeal, deal_id)
         if not deal:
             return Response(status_code=404)
         form = await request.form()
         was_expected = expected_closing(deal)
+        if "agreement_date" in form:
+            signed = _optional_date(form["agreement_date"])
+            if signed is None or signed.year >= 2000:  # a half-typed year never lands
+                deal.agreement_date = signed
+        if "agreement_price" in form:
+            deal.agreement_price = _optional_money(form["agreement_price"])
         if "inspection_days" in form:
             deal.inspection_days = _int(form["inspection_days"]) or None
         if "closing_days" in form:
@@ -479,12 +498,16 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         agreement_date: str = Form(""),
         agreement_price: str = Form(""),
         renegotiated_price: str = Form(""),
+        inspection_days: str = Form(""),
+        closing_days: str = Form(""),
         sell_price: str = Form(""),
         status: str = Form("under_contract"),
         closed_date: str = Form(""),
         revenue: str = Form(""),
         realtor_commission: str = Form(""),
+        realtor_name: str = Form(""),
         acquisition_commission: str = Form(""),
+        acquisition_name: str = Form(""),
         closing_costs: str = Form(""),
         additional_costs: str = Form(""),
         estimated_value: str = Form(""),
@@ -502,12 +525,16 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.agreement_date = _optional_date(agreement_date)
             deal.agreement_price = _optional_money(agreement_price)
             deal.renegotiated_price = _optional_money(renegotiated_price)
+            deal.inspection_days = _int(inspection_days) or None
+            deal.closing_days = _int(closing_days) or None
             deal.sell_price = _optional_money(sell_price)
             deal.status = status if status in DEAL_STATUSES else "under_contract"
             deal.closed_date = _optional_date(closed_date)
             deal.revenue = _money(revenue)
-            deal.realtor_commission = _money(realtor_commission)
-            deal.acquisition_commission = _money(acquisition_commission)
+            deal.realtor_pct, deal.realtor_commission = _commission(realtor_commission, float(deal.revenue))
+            deal.realtor_name = realtor_name.strip()[:120] or None
+            deal.acquisition_pct, deal.acquisition_commission = _commission(acquisition_commission, float(deal.revenue))
+            deal.acquisition_name = acquisition_name.strip()[:120] or None
             deal.closing_costs = _money(closing_costs)
             deal.additional_costs = _money(additional_costs)
             deal.estimated_value = _optional_money(estimated_value)

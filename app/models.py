@@ -435,6 +435,12 @@ class WholesaleDeal(Base):
     revenue: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     realtor_commission: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     acquisition_commission: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    # A commission entered as a % of revenue (None = a dollar amount was typed).
+    # The commission above is always the dollars, worked out again on every save.
+    realtor_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    acquisition_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    realtor_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    acquisition_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     closing_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     additional_costs: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     # For deals kept for the portfolio: the estimated profit it would have made

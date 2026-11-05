@@ -15,21 +15,11 @@
 <datalist id="buyer-names">{% for n in buyer_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
 {% if deal.status == 'under_contract' %}{% include "_deal_contract_card.html" %}{% endif %}
 <script>
-// The under-contract card and the deal form below edit the same fields - keep them in step.
-window.syncContractFields = function() {
-  var card = document.getElementById('contract-card'), form = document.querySelector('form[action$="/update"]');
-  if (!card || !form) return;
-  // The closing days moved the closing date: show it in the box.
-  var stats = document.getElementById('contract-stats');
-  if (stats.dataset.closingDate) card.querySelector('[name=closed_date]').value = stats.dataset.closingDate;
-  delete stats.dataset.closingDate;
-  ['renegotiated_price', 'buyer_name', 'sell_price', 'closed_date'].forEach(function(n) {
-    var src = card.querySelector('[name=' + n + ']'), dst = form.querySelector('[name=' + n + ']');
-    if (src && dst) dst.value = src.value;
-  });
-};
-document.addEventListener('htmx:afterSwap', function(e) { if (e.detail.target.id === 'contract-stats') window.syncContractFields(); });
-
+// The boxes on top were re-rendered: if the closing days moved the closing date, show it in its box.
+document.addEventListener('htmx:afterSwap', function(e) {
+  var moved = e.detail.target.id === 'contract-stats' && document.getElementById('contract-stats').dataset.closingDate;
+  if (moved) document.querySelector('form[action$="/update"] [name=closed_date]').value = moved;
+});
 </script>
 
 {% if deal.status == 'under_contract' or deal.tasks %}
@@ -87,22 +77,24 @@ document.addEventListener('htmx:afterSwap', function(e) { if (e.detail.target.id
 </div>
 
 <form method="post" action="/finance/deals/{{ deal.id }}/update">
-<div class="grid-2">
+{# Under contract, the fields marked data-live save as they change and update the boxes on top. A date is only sent once its year is complete. #}
+<div class="grid-2"{% if deal.status == 'under_contract' %} hx-post="/finance/deals/{{ deal.id }}/contract" hx-target="#contract-stats" hx-swap="outerHTML"
+     hx-trigger="change[event.target.dataset.live !== undefined && (event.target.type !== 'date' || !event.target.value || event.target.value.slice(0, 4) >= '2000')]"{% endif %}>
   <div class="card">
     <h3>Agreement</h3>
     <div class="form-row"><label>Address</label><input type="text" name="address" value="{{ deal.address }}" required></div>
-    <div class="form-row"><label>Agreement date</label><input type="date" name="agreement_date" value="{{ deal.agreement_date.isoformat() if deal.agreement_date else '' }}"></div>
-    <div class="form-row"><label>Agreement price - 1st ($)</label><input type="number" step="any" name="agreement_price" value="{{ '%g'|format(deal.agreement_price|float) if deal.agreement_price is not none else '' }}"></div>
-    <div class="form-row"><label>Renegotiated price ($) <span class="muted" style="font-weight:400;">- leave empty if there was no renegotiation</span></label><input type="number" step="any" name="renegotiated_price" value="{{ '%g'|format(deal.renegotiated_price|float) if deal.renegotiated_price is not none else '' }}"></div>
-    <div class="form-row"><label>Buyer</label><input type="text" name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" maxlength="120"></div>
-    <div class="form-row"><label>Sell price ($)</label><input type="number" step="any" name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}"></div>
+    <div class="form-row"><label>Signed date</label><input type="date" data-live name="agreement_date" min="2000-01-01" max="2100-12-31" value="{{ deal.agreement_date.isoformat() if deal.agreement_date else '' }}"></div>
+    <div class="form-row"><label>Price ($)</label><input type="number" step="any" data-live name="agreement_price" value="{{ '%g'|format(deal.agreement_price|float) if deal.agreement_price is not none else '' }}"></div>
+    <div class="form-row"><label>Renegotiated price ($) <span class="muted" style="font-weight:400;">- leave empty if there was no renegotiation</span></label><input type="number" step="any" data-live name="renegotiated_price" value="{{ '%g'|format(deal.renegotiated_price|float) if deal.renegotiated_price is not none else '' }}"></div>
+    <div class="form-row"><label>Inspection days <span class="muted" style="font-weight:400;">- business days from the signed date</span></label><input type="number" min="0" max="90" data-live name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10"></div>
+    <div class="form-row"><label>Closing days <span class="muted" style="font-weight:400;">- from the signed date, sets the closing date</span></label><input type="number" min="0" max="365" data-live name="closing_days" value="{{ deal.closing_days or '' }}" placeholder="e.g. 30"></div>
     <div class="form-row">
       <label>Status</label>
       <select name="status">
         {% for k, label in DEAL_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == deal.status else '' }}>{{ label }}</option>{% endfor %}
       </select>
     </div>
-    <div class="form-row"><label>Closing date</label><input type="date" name="closed_date" min="2000-01-01" max="2100-12-31" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></div>
+    <div class="form-row"><label>Closing date</label><input type="date" data-live name="closed_date" min="2000-01-01" max="2100-12-31" value="{{ deal.closed_date.isoformat() if deal.closed_date else '' }}"></div>
     <div class="form-row">
       <label>Lead source (channel)</label>
       <select name="channel">
@@ -137,10 +129,37 @@ document.addEventListener('htmx:afterSwap', function(e) { if (e.detail.target.id
   </div>
 
   <div class="card">
-    <h3>Money</h3>
+    <h3>Wholesale</h3>
+    <div class="form-row"><label>Buyer</label><input type="text" data-live name="buyer_name" value="{{ deal.buyer_name or '' }}" list="buyer-names" maxlength="120"></div>
+    <div class="form-row"><label>Sell price ($)</label><input type="number" step="any" data-live name="sell_price" value="{{ '%g'|format(deal.sell_price|float) if deal.sell_price is not none else '' }}"></div>
     <div class="form-row"><label>Revenue - assignment fee / spread ($)</label><input type="number" step="any" name="revenue" value="{{ '%g'|format(deal.revenue|float) }}"></div>
-    <div class="form-row"><label>Realtor commission ($)</label><input type="number" step="any" name="realtor_commission" value="{{ '%g'|format(deal.realtor_commission|float) }}"></div>
-    <div class="form-row"><label>Acquisition commission ($)</label><input type="number" step="any" name="acquisition_commission" value="{{ '%g'|format(deal.acquisition_commission|float) }}"></div>
+    {% for key, label, pct, amount, name in [('realtor', 'Realtor', deal.realtor_pct, deal.realtor_commission, deal.realtor_name), ('acquisition', 'Acquisition', deal.acquisition_pct, deal.acquisition_commission, deal.acquisition_name)] %}
+    <div class="commission-row">
+      <div class="form-row">
+        <label>{{ label }} commission ($ or %)</label>
+        <input type="text" class="commission-input" name="{{ key }}_commission" pattern="[$0-9.,\s]*%?" title="A dollar amount like 2500, or a % of revenue like 15%" placeholder="e.g. 2500 or 15%" value="{{ '%g%%'|format(pct|float) if pct is not none else '%.10g'|format(amount|float) }}">
+        <div class="muted commission-calc"></div>
+      </div>
+      <div class="form-row"><label>{{ label }} name</label><input type="text" name="{{ key }}_name" value="{{ name or '' }}" maxlength="120"></div>
+    </div>
+    {% endfor %}
+    <script>
+    // "15%" shows the dollars it comes to, from the revenue box.
+    (function() {
+      var revenue = document.querySelector('input[name=revenue]'), boxes = document.querySelectorAll('.commission-input');
+      function show() {
+        boxes.forEach(function(box) {
+          var value = box.value.trim(), calc = box.parentNode.querySelector('.commission-calc');
+          calc.textContent = /%$/.test(value) && !isNaN(parseFloat(value))
+            ? '= $' + ((parseFloat(revenue.value) || 0) * parseFloat(value) / 100).toLocaleString('en-US', {maximumFractionDigits: 2}) + ' (' + value + ' of revenue' + (parseFloat(revenue.value) ? '' : ' - add the revenue above') + ')'
+            : '';
+        });
+      }
+      revenue.addEventListener('input', show);
+      boxes.forEach(function(box) { box.addEventListener('input', show); });
+      show();
+    })();
+    </script>
     <div class="form-row"><label>Closing costs ($)</label><input type="number" step="any" name="closing_costs" value="{{ '%g'|format(deal.closing_costs|float) }}"></div>
     <div class="form-row"><label>Additional costs ($)</label><input type="number" step="any" name="additional_costs" value="{{ '%g'|format(deal.additional_costs|float) }}"></div>
     <div class="form-row"><label>Est. wholesale profit if kept for portfolio ($) - counted as this deal's wholesale profit</label><input type="number" step="any" name="estimated_value" value="{{ '%g'|format(deal.estimated_value|float) if deal.estimated_value is not none else '' }}"></div>
