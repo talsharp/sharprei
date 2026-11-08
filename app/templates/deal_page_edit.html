@@ -44,7 +44,9 @@
         {% for l in page.links|reverse|list %}
         {% set s = link_stats[l.id] %}
         <tr data-link>
-          <td><strong>{{ l.name }}</strong><div class="muted views-data" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div></td>
+          <td><strong>{{ l.name }}</strong><div class="muted views-data" style="font-size:12px;">{% if s.views %}{{ s.views }} view{{ "s" if s.views != 1 else "" }}{% if s.returning %} · came back{% endif %}{% if s.photo_people %} · opened photos{% endif %} · {{ ago(s.last) }}{% else %}not opened yet{% endif %}</div>
+            {% if l.buyer_id %}<div class="muted" style="font-size:12px;">Buyer: <a class="zip-link" href="/dispo/buyers/{{ l.buyer_id }}">on the buyer list</a></div>
+            {% else %}<form method="post" action="/finance/deal-links/{{ l.id }}/buyer" class="link-buyer-form"><input type="text" name="name" list="investor-names" placeholder="Not on the buyer list - pick the buyer" aria-label="Buyer" onchange="this.form.submit()"></form>{% endif %}</td>
           <td style="text-align:right; white-space:nowrap;">
             <button type="button" class="small copy-btn" data-url="{{ base }}/d/{{ l.token }}">Copy link</button>
             <form method="post" action="/finance/deal-links/{{ l.id }}/delete" style="display:inline;" data-undo="Link turned off"><button type="submit" class="secondary small" title="Turn this link off">×</button></form>

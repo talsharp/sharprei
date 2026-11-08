@@ -38,6 +38,7 @@ from app.task_logic import (
 )
 from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
+from app.buyer_activity import deal_reach
 from app.buyers import GRADES, NEARBY_MILES, suggest_buyers
 from app.models import Buyer, DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
@@ -344,7 +345,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
              "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal),
              "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal), "statuses": _statuses(db),
-             "suggested": suggest_buyers(db, deal) if deal.status == "under_contract" else None, "nearby_miles": NEARBY_MILES},
+             "suggested": suggest_buyers(db, deal) if deal.status == "under_contract" else None, "nearby_miles": NEARBY_MILES,
+             "reach": deal_reach(db, deal)},
         )
 
     def _statuses(db: Session):
@@ -505,6 +507,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         closing_days: str = Form(""),
         bedrooms: str = Form(""),
         neighborhood_grade: str = Form(""),
+        neighborhood: str = Form(""),
         sell_price: str = Form(""),
         status: str = Form("under_contract"),
         closed_date: str = Form(""),
@@ -534,6 +537,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.closing_days = _int(closing_days) or None
             deal.bedrooms = _optional_money(bedrooms)
             deal.neighborhood_grade = neighborhood_grade if neighborhood_grade in GRADES else None
+            deal.neighborhood = neighborhood.strip()[:120] or None
             deal.sell_price = _optional_money(sell_price)
             deal.status = status if status in DEAL_STATUSES else "under_contract"
             deal.closed_date = _optional_date(closed_date)

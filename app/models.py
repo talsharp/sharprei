@@ -457,6 +457,8 @@ class WholesaleDeal(Base):
     # Days until closing (calendar days), counted from the agreement date. They set
     # closed_date, which Tal can still change by hand (see finance.follow_expected_closing).
     closing_days: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # The neighborhood as Tal calls it (e.g. "Lawrenceville") - shown with the deal's activity.
+    neighborhood: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     # For matching buyers: bedrooms (else the landing page's) and Tal's A-D grade of the area.
     bedrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
     neighborhood_grade: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
@@ -801,6 +803,8 @@ class DealPageLink(Base):
     page_id: Mapped[int] = mapped_column(ForeignKey("deal_pages.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     token: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    # The buyer on the buyer list this link was sent to (matched by name).
+    buyer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("buyers.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     page: Mapped[DealPage] = relationship(back_populates="links")
@@ -897,3 +901,33 @@ class ProjectPayment(Base):
 
 # Registers the audit-log listener wherever the models are used (web app and scripts alike).
 from app import audit  # noqa: E402,F401
+
+
+class GhlEmail(Base):
+    """One deal email Tal sent from GHL, from the stats file he uploads."""
+    __tablename__ = "ghl_emails"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("wholesale_deals.id", ondelete="SET NULL"), nullable=True, index=True)
+    address: Mapped[str] = mapped_column(String(255))  # as written in the file
+    subject: Mapped[str] = mapped_column(String(255))
+    sent_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    deal: Mapped[Optional[WholesaleDeal]] = relationship()
+    recipients: Mapped[list["GhlEmailRecipient"]] = relationship(back_populates="email", cascade="all, delete-orphan")
+
+
+class GhlEmailRecipient(Base):
+    """One buyer who received a GHL deal email, and whether they opened or clicked it."""
+    __tablename__ = "ghl_email_recipients"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email_id: Mapped[int] = mapped_column(ForeignKey("ghl_emails.id"), index=True)
+    buyer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("buyers.id", ondelete="SET NULL"), nullable=True, index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    address: Mapped[str] = mapped_column(String(200), index=True)  # their email address
+    opened: Mapped[bool] = mapped_column(Boolean, default=False)
+    clicked: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # GHL's: Delivered, Opened, Clicked, Replied, Unsubscribed
+
+    email: Mapped[GhlEmail] = relationship(back_populates="recipients")

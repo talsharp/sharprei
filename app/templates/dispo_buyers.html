@@ -7,7 +7,10 @@
     <h2 class="page-title">Buyers</h2>
     <p class="page-subtitle">{{ buyers|length }} buyers · {{ with_buybox }} with a buybox · each deal suggests who to contact</p>
   </div>
-  <a class="btn" href="/dispo/buyers/new">+ Add buyer</a>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn secondary" href="/dispo/buyers/email-history">GHL email stats</a>
+    <a class="btn" href="/dispo/buyers/new">+ Add buyer</a>
+  </div>
 </div>
 
 <div class="card buyer-filters">
@@ -17,12 +20,13 @@
     {% for k, label in CONTACT_CHANNELS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
   </select>
   <label class="muted"><input type="checkbox" id="buyer-buybox"> Only with a buybox</label>
+  <label class="muted"><input type="checkbox" id="buyer-sort"> Most clicks first</label>
   <span class="muted" id="buyer-count"></span>
 </div>
 
 <div style="overflow-x:auto;">
 <table class="sticky-table buyers-list">
-  <thead><tr><th>Buyer</th><th>Contact</th><th>Channel</th><th>Buybox</th><th>Notes</th></tr></thead>
+  <thead><tr><th>Buyer</th><th>Contact</th><th>Channel</th><th title="Deal emails from GHL: deals received · opened · clicked">GHL<br><span class="muted th-sub">received · opened · clicked</span></th><th title="Personal links to the deal page: links received · page viewed · photos opened">SharpREI<br><span class="muted th-sub">received · opened · photos</span></th><th>Buybox</th><th>Notes</th></tr></thead>
   <tbody>
     {% for b in buyers %}
     {% set has_box = b.zip_codes or b.neighborhoods or b.areas %}
@@ -30,6 +34,9 @@
       <td><a class="zip-link" href="/dispo/buyers/{{ b.id }}"><strong>{{ b.name }}</strong></a></td>
       <td class="buyer-contact">{% if b.email %}<div>{{ b.email }}</div>{% endif %}{% if b.phone %}<div class="muted">{{ b.phone }}</div>{% endif %}{% if not b.email and not b.phone %}<span class="muted">-</span>{% endif %}</td>
       <td>{% for c in b.channel_list %}<span class="badge contact-{{ c }}">{{ CONTACT_CHANNELS[c] }}</span> {% endfor %}</td>
+      {% set a = activity.get(b.id) %}
+      <td class="act" data-sort="{{ a.ghl.clicked * 1000 + a.ghl.opened if a else -1 }}">{% if a and a.ghl.deals %}{{ a.ghl.deals }} · {{ a.ghl.opened }} · <strong>{{ a.ghl.clicked }}</strong>{% if a.unsubscribed %} <span class="match-warn">unsubscribed</span>{% endif %}{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td class="act">{% if a and a.sharp.deals %}{{ a.sharp.deals }} · {{ a.sharp.opened }} · <strong>{{ a.sharp.clicked }}</strong>{% else %}<span class="muted">-</span>{% endif %}</td>
       <td class="buybox">
         {% if b.zip_codes %}<div><span class="muted">Zips</span> {{ b.zip_codes }}</div>{% endif %}
         {% if b.neighborhoods %}<div><span class="muted">Neighborhoods</span> {{ b.neighborhoods }}</div>{% endif %}
@@ -45,7 +52,7 @@
       <td class="buyer-notes">{{ b.notes or "" }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5" class="muted">No buyers yet. Click <strong>+ Add buyer</strong>.</td></tr>
+    <tr><td colspan="7" class="muted">No buyers yet. Click <strong>+ Add buyer</strong>.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -67,6 +74,12 @@
     document.getElementById('buyer-count').textContent = shown === rows.length ? '' : shown + ' of ' + rows.length;
   }
   [search, channel, box].forEach(function(el) { el.addEventListener('input', filter); el.addEventListener('change', filter); });
+  // Most clicks first (GHL clicks, then opens), or back to A-Z.
+  var body = document.querySelector('.buyers-list tbody'), az = Array.prototype.slice.call(rows);
+  document.getElementById('buyer-sort').addEventListener('change', function() {
+    var order = this.checked ? az.slice().sort(function(a, b) { return b.querySelector('.act').dataset.sort - a.querySelector('.act').dataset.sort; }) : az;
+    order.forEach(function(tr) { body.appendChild(tr); });
+  });
 })();
 </script>
 {% endblock %}

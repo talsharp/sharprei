@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}GHL email stats · Buyers{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">GHL email stats</h2>
+    <p class="page-subtitle">Who received, opened and clicked each deal email - shown on every buyer and deal</p>
+  </div>
+  <a class="btn secondary" href="/dispo/buyers">Back to buyers</a>
+</div>
+
+{% if error %}<div class="card login-error">{{ error }}</div>{% endif %}
+{% if result %}
+<div class="card saved-note">
+  ✓ {{ result.rows }} rows read · {{ result.new_emails }} new email{{ "s" if result.new_emails != 1 }} · {{ result.added }} recipients added · {{ result.updated }} updated
+  {% if result.no_deal %}<div style="color:var(--red);">No deal in SharpREI for: {{ result.no_deal|join(", ") }} - they're saved, but not shown on a deal.</div>{% endif %}
+  {% if result.no_buyer %}<div class="muted">{{ result.no_buyer }} email address{{ "es" if result.no_buyer != 1 }} aren't on the buyer list - they'll connect once that buyer is added with the same email.</div>{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Upload stats</h3>
+  <p class="muted" style="font-size:13px; margin:-4px 0 10px;">After each deal email, upload the export (Excel or CSV) with the columns {{ columns|join(", ") }} - plus Neighborhood and GHL status if you have them. Uploading the same email again with newer stats updates it; nothing is counted twice.</p>
+  <form method="post" action="/dispo/buyers/email-history" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input type="file" name="file" accept=".xlsx,.csv" required>
+    <button type="submit">Upload</button>
+  </form>
+</div>
+
+<div style="overflow-x:auto;">
+<table class="sticky-table">
+  <thead><tr><th>Sent</th><th>Deal</th><th>Subject</th><th>Received</th><th>Opened</th><th>Clicked</th></tr></thead>
+  <tbody>
+    {% for e in emails %}
+    {% set rs = e.recipients %}{% set opened = rs|selectattr("opened")|list|length %}{% set clicked = rs|selectattr("clicked")|list|length %}
+    <tr>
+      <td style="white-space:nowrap;">{{ e.sent_on.strftime('%b %d, %Y') if e.sent_on else "" }}</td>
+      <td>{% if e.deal %}<a class="zip-link" href="/finance/deals/{{ e.deal.id }}">{{ e.address }}</a>{% else %}{{ e.address }} <span class="muted">(no deal)</span>{% endif %}</td>
+      <td>{{ e.subject }}</td>
+      <td>{{ rs|length }}</td>
+      <td>{{ opened }} <span class="muted">({{ (100 * opened / rs|length)|round|int if rs else 0 }}%)</span></td>
+      <td>{{ clicked }} <span class="muted">({{ (100 * clicked / rs|length)|round|int if rs else 0 }}%)</span></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">No stats yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

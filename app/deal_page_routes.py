@@ -32,7 +32,7 @@ from app.deal_pages import (
     save_photo,
     view_stats,
 )
-from app.models import CompHouse, DealBuyer, DealPage, DealPageLink, DealPageView, DealPhoto, WholesaleDeal
+from app.models import Buyer, CompHouse, DealBuyer, DealPage, DealPageLink, DealPageView, DealPhoto, WholesaleDeal
 
 MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 TEXT_FIELDS = {"title": 255, "property_type": 60, "rent": 120, "walkthrough": 255,
@@ -77,7 +77,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     def _editor(request: Request, db: Session, page: DealPage):
         base = public_base(request)
-        names = [b.name for b in page.deal.buyers] + sorted({b.name for b in db.query(DealBuyer).all()}, key=str.lower)
+        names = [b.name for b in page.deal.buyers] + sorted({b.name for b in db.query(DealBuyer).all()} | {n for (n,) in db.query(Buyer.name).all()}, key=str.lower)
         return templates.TemplateResponse(
             "deal_page_edit.html",
             {"request": request, "active": "fin_deals", "page": page, "deal": page.deal,
@@ -183,9 +183,21 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     def link_new(deal_id: int, name: str = Form(""), db: Session = Depends(get_db)):
         page = _page_for(db, deal_id)
         if page and name.strip():
-            page.links.append(DealPageLink(name=name.strip()[:120], token=new_token()))
+            buyer = db.query(Buyer).filter(func.lower(Buyer.name) == name.strip().lower()).first()
+            page.links.append(DealPageLink(name=name.strip()[:120], token=new_token(), buyer_id=buyer.id if buyer else None))
             db.commit()
         return RedirectResponse(f"/finance/deals/{deal_id}/page#links", status_code=303)
+
+    @router.post("/finance/deal-links/{link_id}/buyer")
+    def link_buyer(link_id: int, name: str = Form(""), db: Session = Depends(get_db)):
+        """Connects a personal link to a buyer on the buyer list (picked by name)."""
+        link = db.get(DealPageLink, link_id)
+        if not link:
+            return RedirectResponse("/finance/deals", status_code=303)
+        buyer = db.query(Buyer).filter(func.lower(Buyer.name) == name.strip().lower()).first() if name.strip() else None
+        link.buyer_id = buyer.id if buyer else None
+        db.commit()
+        return RedirectResponse(f"/finance/deals/{link.page.deal_id}/page#links", status_code=303)
 
     @router.post("/finance/deal-links/{link_id}/delete")
     def link_delete(link_id: int, db: Session = Depends(get_db)):

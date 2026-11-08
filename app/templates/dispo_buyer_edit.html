@@ -13,6 +13,32 @@
 {% if request.query_params.get('saved') %}<div class="card saved-note">✓ Saved</div>{% endif %}
 {% if unknown %}<div class="card login-error">Not on the map, so these don't match deals: <strong>{{ unknown|join(", ") }}</strong>. Check the spelling, or use one of the suggested names.</div>{% endif %}
 
+{% if activity %}{% set a = activity %}
+<div class="card">
+  <h3>Where they see your deals</h3>
+  <div class="view-kpis act-kpis">
+    <div><div class="label">GHL emails</div><div class="value">{{ a.ghl.deals }} · {{ a.ghl.opened }} · {{ a.ghl.clicked }}</div><div class="label">deals received · opened · clicked</div></div>
+    <div><div class="label">SharpREI page</div><div class="value">{{ a.sharp.deals }} · {{ a.sharp.opened }} · {{ a.sharp.clicked }}</div><div class="label">links received · viewed · photos</div></div>
+  </div>
+  {% if a.unsubscribed %}<p class="match-warn">Unsubscribed from GHL emails.</p>{% endif %}
+  <div style="overflow-x:auto;">
+  <table class="suggested-table">
+    <thead><tr><th>Deal</th><th>GHL email</th><th>SharpREI page</th></tr></thead>
+    <tbody>
+      {% for d in a.deals.values()|sort(attribute="last", reverse=True) %}
+      <tr>
+        <td>{% if d.deal %}<a class="zip-link" href="/finance/deals/{{ d.deal.id }}">{{ d.deal.address.split(",")[0] }}</a>{% if d.deal.neighborhood %} <span class="muted">· {{ d.deal.neighborhood }}</span>{% endif %}{% else %}{{ d.address }}{% endif %}
+          {% if d.last %}<div class="muted">{{ d.last.strftime('%b %d, %Y') }}</div>{% endif %}</td>
+        <td>{% if d.ghl_emails %}{{ "Clicked" if d.ghl_clicked else "Opened" if d.ghl_opened else "Not opened" }}{% if d.ghl_emails > 1 %} <span class="muted">({{ d.ghl_emails }} emails)</span>{% endif %}{% else %}<span class="muted">-</span>{% endif %}</td>
+        <td>{% if d.sharp %}{{ "Opened photos" if d.sharp_clicked else "Viewed" if d.sharp_opened else "Not opened" }}{% else %}<span class="muted">-</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
 <form method="post" action="/dispo/buyers/save" class="card buyer-form">
   <input type="hidden" name="buyer_id" value="{{ buyer.id if buyer else '' }}">
   <h3>Contact</h3>
