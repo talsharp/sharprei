@@ -18,7 +18,8 @@ from app.finance import contract_clock, local_today
 from app.models import DealBuyer, NotificationDismissal, ServerProblem, Task, WholesaleDeal
 from app.task_logic import day_key, done_status, due_tasks, live_tasks
 
-STATUS_ICON = {"waiting": "⏳", "confirmed": "✓", "visited": "✓✓", "cant": "✕"}
+STATUS_ICON = {"interested": "☆", "waiting": "⏳", "confirmed": "✓", "visited": "✓✓", "cant": "✕",
+               "offer": "$", "bought": "★", "passed": "–"}
 
 
 def _street(address: str) -> str:
@@ -63,7 +64,7 @@ def today_items(db: Session) -> List[dict]:
     deal_ids = [d.id for d in under_contract]
     if deal_ids:
         for b in db.query(DealBuyer).filter(DealBuyer.deal_id.in_(deal_ids), DealBuyer.visit_at.isnot(None)).all():
-            if b.visit_at.date() == today and b.status != "cant":
+            if b.visit_at.date() == today and b.status not in ("cant", "passed"):
                 walk.setdefault((b.deal_id, b.visit_at), []).append(b)
     for (deal_id, at), buyers in sorted(walk.items(), key=lambda kv: kv[0][1]):
         deal = buyers[0].deal

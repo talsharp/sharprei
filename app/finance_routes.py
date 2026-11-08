@@ -34,13 +34,14 @@ from app.finance import (
 )
 from app.statements import charges_by_expense
 from app.task_logic import (
-    default_status, deal_tasks, due_tasks, next_board_position, place_by_date, set_deal_order, set_due_date, sort_by_date,
+    default_status, deal_tasks, due_tasks, next_board_position, place_by_date, set_deal_order, set_due_date, soft_delete,
+    sort_by_date,
 )
 from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
 from app.buyer_activity import deal_reach
 from app.buyers import GRADES, NEARBY_MILES, suggest_buyers
-from app.models import Buyer, DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.models import Buyer, DealBuyer, DealFile, DealShowing, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -466,7 +467,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         deal = db.get(WholesaleDeal, deal_id)
         if not deal or not name.strip():
             return Response(status_code=204)
-        buyer = DealBuyer(deal_id=deal.id, name=name.strip()[:120], visit_at=_datetime(visit_at))
+        when = _datetime(visit_at)
+        # Without a showing they're someone to follow up with; with one, waiting to confirm.
+        buyer = DealBuyer(deal_id=deal.id, name=name.strip()[:120], visit_at=when, status="waiting" if when else "interested")
         db.add(buyer)
         db.commit()
         return templates.TemplateResponse("_deal_buyer_row.html", {"request": request, "b": buyer})
@@ -483,10 +486,54 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             buyer.visit_at = _datetime(form["visit_at"])
         if form.get("status") in BUYER_STATUSES:
             buyer.status = form["status"]
+        if "offer_amount" in form:
+            buyer.offer_amount = _optional_money(form["offer_amount"])
         if "note" in form:
             buyer.note = form["note"].strip() or None
         db.commit()
         return Response(status_code=204)
+
+    # ---------- Showings ----------
+
+    def _showing_title(at: datetime) -> str:
+        return "Showing - " + at.strftime("%-I:%M%p" if at.minute else "%-I%p")
+
+    @router.post("/deals/{deal_id}/showings/new")
+    def finance_showing_new(deal_id: int, at: str = Form(""), db: Session = Depends(get_db)):
+        """A showing time, plus its task on the Tasks board (an open deal's, from today on).
+        A "Showing" task already on that date is used instead of adding a second one."""
+        deal, when = db.get(WholesaleDeal, deal_id), _datetime(at)
+        if deal and when and when.year >= 2000 and not any(sh.at == when for sh in deal.showings):
+            showing = DealShowing(deal_id=deal.id, at=when)
+            if deal.status == "under_contract" and when.date() >= local_today():
+                task = next((t for t in deal_tasks(db, deal.id) if t.due_date == when.date()
+                             and t.title.lower().startswith("showing") and not t.is_done
+                             and not any(sh.task_id == t.id for sh in deal.showings)), None)
+                if not task:
+                    status = default_status(db)
+                    task = Task(deal_id=deal.id, title=_showing_title(when), due_date=when.date(), day="later",
+                                status_id=status.id if status else None, position=next_board_position(db))
+                    db.add(task)
+                    db.flush()
+                    place_by_date(db, task)
+                showing.task_id = task.id
+            db.add(showing)
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}#buyers-card", status_code=303)
+
+    @router.post("/deals/showings/{showing_id}/delete")
+    def finance_showing_delete(showing_id: int, db: Session = Depends(get_db)):
+        """Removes the showing and its board task (to Recently deleted). Buyers keep their time."""
+        showing = db.get(DealShowing, showing_id)
+        if not showing:
+            return RedirectResponse("/finance/deals", status_code=303)
+        deal_id = showing.deal_id
+        task = db.get(Task, showing.task_id) if showing.task_id else None
+        if task and task.deleted_at is None:
+            soft_delete(task)
+        db.delete(showing)
+        db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}#buyers-card", status_code=303)
 
     @router.post("/deals/buyers/{buyer_id}/delete")
     def finance_buyer_delete(buyer_id: int, db: Session = Depends(get_db)):

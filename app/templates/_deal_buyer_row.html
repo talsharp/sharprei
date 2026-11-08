@@ -1,11 +1,21 @@
 <tr class="buyer-row status-{{ b.status }}" data-id="{{ b.id }}">
   <td><input type="text" class="buyer-name" data-field="name" value="{{ b.name }}" maxlength="120" aria-label="Buyer"></td>
-  <td><input type="datetime-local" data-field="visit_at" value="{{ b.visit_at.strftime('%Y-%m-%dT%H:%M') if b.visit_at else '' }}" aria-label="Visit"></td>
   <td>
-    <select data-field="status" class="buyer-status" aria-label="Walkthrough status">
-      {% for k, label in BUYER_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == b.status }}>{{ label }}</option>{% endfor %}
+    {% set visit = b.visit_at.strftime('%Y-%m-%dT%H:%M') if b.visit_at else '' %}
+    <select data-field="visit_at" aria-label="Showing">
+      <option value="">No showing</option>
+      {% set ns = namespace(found=false) %}
+      {% for sh in b.deal.showings %}{% set v = sh.at.strftime('%Y-%m-%dT%H:%M') %}{% if v == visit %}{% set ns.found = true %}{% endif %}<option value="{{ v }}" {{ 'selected' if v == visit }}>{{ sh.at.strftime('%a, %b %-d · %-I:%M %p') }}</option>{% endfor %}
+      {% if visit and not ns.found %}<option value="{{ visit }}" selected>{{ b.visit_at.strftime('%a, %b %-d · %-I:%M %p') }} (not a showing)</option>{% endif %}
     </select>
   </td>
+  <td>
+    <select data-field="status" class="buyer-status" aria-label="Status">
+      {% for k, label in BUYER_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if k == b.status }}>{{ label }}</option>{% endfor %}
+      {% if b.status not in BUYER_STATUSES %}<option value="{{ b.status }}" selected>{{ b.status }}</option>{% endif %}
+    </select>
+  </td>
+  <td><input type="text" inputmode="decimal" class="offer-input" data-field="offer_amount" value="{{ '{:,.0f}'.format(b.offer_amount|float) if b.offer_amount is not none else '' }}" placeholder="-" aria-label="Offer"></td>
   <td><input type="text" data-field="note" value="{{ b.note or '' }}" placeholder="Where they stand…" aria-label="Note"></td>
   <td><button type="button" class="buyer-delete" title="Remove">×</button></td>
 </tr>

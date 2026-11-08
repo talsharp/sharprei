@@ -478,6 +478,7 @@ class WholesaleDeal(Base):
         back_populates="deal", cascade="all, delete-orphan",
         order_by="(DealBuyer.visit_at.is_(None), DealBuyer.visit_at, DealBuyer.id)",
     )
+    showings: Mapped[list["DealShowing"]] = relationship(cascade="all, delete-orphan", order_by="DealShowing.at")
     files: Mapped[list["DealFile"]] = relationship(
         back_populates="deal", cascade="all, delete-orphan", order_by="DealFile.uploaded_at.desc()"
     )
@@ -738,7 +739,8 @@ class DealBuyer(Base):
     # Each buyer has their own visit time: same time = a group walkthrough,
     # different times = a second walkthrough or a vacant house.
     visit_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="waiting")  # waiting / confirmed / visited / cant
+    status: Mapped[str] = mapped_column(String(20), default="waiting")  # a key of finance.BUYER_STATUSES
+    offer_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -943,3 +945,14 @@ class DealBuyerContact(Base):
     buyer_id: Mapped[int] = mapped_column(ForeignKey("buyers.id", ondelete="CASCADE"), index=True)
     contacted: Mapped[bool] = mapped_column(Boolean)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DealShowing(Base):
+    """A showing time Tal set on a deal; buyers pick it as their visit time.
+    Its Tasks board task (task_id) is made with it and removed with it."""
+    __tablename__ = "deal_showings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime)
+    task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)

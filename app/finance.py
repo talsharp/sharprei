@@ -51,7 +51,8 @@ DEAL_STATUSES = OrderedDict(
 
 
 BUYER_STATUSES = OrderedDict(
-    [("waiting", "Waiting"), ("confirmed", "Confirmed"), ("visited", "Visited"), ("cant", "Can't make it")]
+    [("interested", "Interested - Follow Up"), ("waiting", "Waiting to Confirm"), ("confirmed", "Confirmed"),
+     ("visited", "Visited"), ("cant", "Can't Make It"), ("offer", "Made Offer"), ("bought", "Bought"), ("passed", "Passed")]
 )
 
 

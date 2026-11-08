@@ -39,13 +39,24 @@ document.addEventListener('htmx:afterSwap', function(e) {
 </div>
 {% endif %}
 
-{% if deal.status == 'under_contract' or deal.buyers %}
 <div class="card" id="buyers-card">
   <h3>Buyers &amp; walkthroughs</h3>
+  <div class="showings-bar">
+    <span class="showings-label">Showings</span>
+    {% for sh in deal.showings %}
+    <span class="showing-chip">{{ sh.at.strftime('%a, %b %-d · %-I:%M %p') }}
+      <form method="post" action="/finance/deals/showings/{{ sh.id }}/delete" style="display:inline; margin:0;" data-undo="Showing removed" data-undo-hide="closest .showing-chip" data-undo-after="reload"><button type="submit" class="showing-x" title="Remove this showing (and its task)">×</button></form>
+    </span>
+    {% else %}<span class="muted" style="font-size:13px;">None yet</span>{% endfor %}
+    <form method="post" action="/finance/deals/{{ deal.id }}/showings/new" class="showing-add">
+      <input type="datetime-local" name="at" required aria-label="Showing date and time">
+      <button type="submit" class="small">+ Add showing</button>
+    </form>
+  </div>
   <div id="visit-summary" class="visit-summary"></div>
   <div style="overflow-x:auto;">
   <table class="buyers-table">
-    <thead><tr><th>Buyer</th><th>Visit</th><th>Status</th><th>Note</th><th></th></tr></thead>
+    <thead><tr><th>Buyer</th><th>Showing</th><th>Status</th><th>Offer ($)</th><th>Note</th><th></th></tr></thead>
     <tbody id="buyer-rows">
       {% for b in deal.buyers %}{% include "_deal_buyer_row.html" %}{% endfor %}
     </tbody>
@@ -54,9 +65,8 @@ document.addEventListener('htmx:afterSwap', function(e) {
   <form id="buyer-add" class="buyer-add" autocomplete="off">
     <input type="text" name="name" list="buyer-names" placeholder="+ Add buyer (type a name, press Enter)" maxlength="120">
   </form>
-  <p class="muted" style="font-size:12px; margin:8px 0 0;">Same visit time = one walkthrough together. A new buyer gets the last visit time you used - change it for a second walkthrough or a vacant house. Everything saves as you type.</p>
+  <p class="muted" style="font-size:12px; margin:8px 0 0;">Add the showing times first, then pick each buyer's showing. Each showing is also a task on Tools › Tasks. A new buyer gets the last showing you picked. Everything saves as you type.</p>
 </div>
-{% endif %}
 {% if suggested %}{% include "_deal_suggested_buyers.html" %}{% endif %}
 
 {% if reach.emails or reach.sharp %}{% include "_deal_reach.html" %}{% endif %}
@@ -199,11 +209,11 @@ document.addEventListener('htmx:afterSwap', function(e) {
   <button type="submit" class="danger">Delete deal</button>
 </form>
 
-{% if deal.status == 'under_contract' or deal.buyers %}
+
 <script>
 (function() {
   var STATUS = {{ BUYER_STATUSES|tojson }};
-  var ICON = {waiting: '⏳', confirmed: '✓', visited: '✓✓', cant: '✕'};
+  var ICON = {interested: '☆', waiting: '⏳', confirmed: '✓', visited: '✓✓', cant: '✕', offer: '$', bought: '★', passed: '–'};
   var rows = document.getElementById('buyer-rows');
 
   function post(url, data) {
@@ -216,7 +226,7 @@ document.addEventListener('htmx:afterSwap', function(e) {
 
   // Groups buyers by visit time: "Sat, Oct 26 · 11:00 AM - John ✓, Sarah ⏳"
   function summarize() {
-    var groups = {}, order = [], counts = {waiting: 0, confirmed: 0, visited: 0, cant: 0};
+    var groups = {}, order = [], counts = {interested: 0, waiting: 0, confirmed: 0, visited: 0, cant: 0, offer: 0, bought: 0, passed: 0};
     rows.querySelectorAll('.buyer-row:not([hidden])').forEach(function(tr) {
       var when = tr.querySelector('[data-field=visit_at]').value, status = tr.querySelector('[data-field=status]').value;
       counts[status]++;
@@ -226,11 +236,13 @@ document.addEventListener('htmx:afterSwap', function(e) {
     });
     order.sort(function(a, b) { return a === 'none' ? 1 : b === 'none' ? -1 : a.localeCompare(b); });
     var html = order.map(function(key) {
-      var label = key === 'none' ? 'No visit time yet' : new Date(key).toLocaleString('en-US', {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+      var label = key === 'none' ? 'No showing yet' : new Date(key).toLocaleString('en-US', {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
       return '<div><strong>' + label + '</strong> - ' + groups[key].join(', ') + '</div>';
     }).join('');
     var total = rows.querySelectorAll('.buyer-row').length;
-    var tally = total ? '<div class="muted vs-tally">' + total + ' buyer' + (total === 1 ? '' : 's') + ' · ' + counts.confirmed + ' confirmed · ' + counts.waiting + ' waiting' + (counts.visited ? ' · ' + counts.visited + ' visited' : '') + (counts.cant ? ' · ' + counts.cant + " can't make it" : '') + '</div>' : '<div class="muted">No buyers yet.</div>';
+    var parts = [['interested', 'interested'], ['waiting', 'waiting'], ['confirmed', 'confirmed'], ['visited', 'visited'], ['cant', "can't make it"], ['offer', 'made an offer'], ['bought', 'bought'], ['passed', 'passed']]
+      .filter(function(p) { return counts[p[0]]; }).map(function(p) { return counts[p[0]] + ' ' + p[1]; });
+    var tally = total ? '<div class="muted vs-tally">' + total + ' buyer' + (total === 1 ? '' : 's') + (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>' : '<div class="muted">No buyers yet.</div>';
     document.getElementById('visit-summary').innerHTML = html + tally;
   }
 
@@ -270,7 +282,6 @@ document.addEventListener('htmx:afterSwap', function(e) {
   summarize();
 })();
 </script>
-{% endif %}
 
 {% if deal.status == 'under_contract' or deal.tasks %}
 <script>
