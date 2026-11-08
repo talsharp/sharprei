@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ buyer.name if buyer else "New buyer" }} · Buyers{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">{{ buyer.name if buyer else "New buyer" }}</h2>
+    <p class="page-subtitle">Their buybox decides which deals suggest them</p>
+  </div>
+  <a class="btn secondary" href="/dispo/buyers">Back to buyers</a>
+</div>
+
+{% if request.query_params.get('saved') %}<div class="card saved-note">✓ Saved</div>{% endif %}
+{% if unknown %}<div class="card login-error">Not on the map, so these don't match deals: <strong>{{ unknown|join(", ") }}</strong>. Check the spelling, or use one of the suggested names.</div>{% endif %}
+
+<form method="post" action="/dispo/buyers/save" class="card buyer-form">
+  <input type="hidden" name="buyer_id" value="{{ buyer.id if buyer else '' }}">
+  <h3>Contact</h3>
+  <div class="buyer-form-grid">
+    <div class="form-row"><label for="b-name">Full name</label><input id="b-name" type="text" name="name" value="{{ buyer.name if buyer else '' }}" required maxlength="120"></div>
+    <div class="form-row"><label for="b-email">Email</label><input id="b-email" type="email" name="email" value="{{ buyer.email or '' if buyer else '' }}" maxlength="200"></div>
+    <div class="form-row"><label for="b-phone">Phone</label><input id="b-phone" type="text" name="phone" value="{{ buyer.phone or '' if buyer else '' }}" maxlength="40"></div>
+    <div class="form-row"><label>How they want deals</label>
+      <div class="check-row">{% for k, label in CONTACT_CHANNELS.items() %}<label><input type="checkbox" name="channels" value="{{ k }}" {{ 'checked' if (buyer and k in buyer.channel_list) or (not buyer and k == 'email') }}> {{ label }}</label>{% endfor %}</div>
+    </div>
+  </div>
+
+  <h3>Buybox</h3>
+  <p class="muted" style="font-size:12px; margin:-4px 0 12px;">Separate with commas. Deals in these places show the buyer as <strong>In their area</strong>; deals within a few miles show them as <strong>Nearby</strong>.</p>
+  <div class="buyer-form-grid">
+    <div class="form-row"><label for="b-zips">Zip codes</label><input id="b-zips" type="text" name="zip_codes" value="{{ buyer.zip_codes or '' if buyer else '' }}" placeholder="e.g. 15202, 15237"></div>
+    <div class="form-row"><label for="b-nb">Neighborhoods</label><input id="b-nb" type="text" name="neighborhoods" value="{{ buyer.neighborhoods or '' if buyer else '' }}" placeholder="e.g. Ross, Bellevue" list="nb-names"></div>
+    <div class="form-row"><label for="b-areas">Areas</label><input id="b-areas" type="text" name="areas" value="{{ buyer.areas or '' if buyer else '' }}" placeholder="e.g. North Pittsburgh, East End" list="area-names"></div>
+    <div class="form-row"><label for="b-max">Max price ($)</label><input id="b-max" type="text" name="max_price" inputmode="decimal" value="{{ '{:,.0f}'.format(buyer.max_price|float) if buyer and buyer.max_price is not none else '' }}" placeholder="e.g. 100,000"></div>
+    <div class="form-row wide"><label>Property types <span class="muted" style="font-weight:400;">- none = any</span></label>
+      <div class="check-row">{% for t in property_types %}<label><input type="checkbox" name="property_types" value="{{ t }}" {{ 'checked' if buyer and t in split_list(buyer.property_types) }}> {{ t }}</label>{% endfor %}</div>
+    </div>
+    <div class="form-row wide"><label for="b-notes">Notes</label><textarea id="b-notes" name="notes" rows="3">{{ buyer.notes or '' if buyer else '' }}</textarea></div>
+  </div>
+  {% if buyer and buyer.original_notes %}<p class="muted" style="font-size:12px;">From GHL: {{ buyer.original_notes }}</p>{% endif %}
+  <datalist id="nb-names">{% for n in neighborhood_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
+  <datalist id="area-names">{% for r in regions %}<option value="{{ r }}"></option>{% endfor %}<option value="North Pittsburgh"></option><option value="City of Pittsburgh"></option><option value="Greater Pittsburgh"></option></datalist>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <button type="submit">Save buyer</button>
+    <a class="btn secondary" href="/dispo/buyers">Cancel</a>
+  </div>
+</form>
+{% if buyer %}
+<form method="post" action="/dispo/buyers/{{ buyer.id }}/delete" data-undo="Buyer deleted" data-undo-hide="all:.buyer-form" data-undo-after="follow" style="margin-top:12px;">
+  <button type="submit" class="danger small">Delete buyer</button>
+</form>
+{% endif %}
+{% endblock %}

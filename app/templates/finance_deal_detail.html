@@ -57,6 +57,7 @@ document.addEventListener('htmx:afterSwap', function(e) {
   <p class="muted" style="font-size:12px; margin:8px 0 0;">Same visit time = one walkthrough together. A new buyer gets the last visit time you used - change it for a second walkthrough or a vacant house. Everything saves as you type.</p>
 </div>
 {% endif %}
+{% if suggested %}{% include "_deal_suggested_buyers.html" %}{% endif %}
 
 <div class="card deal-page-card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">

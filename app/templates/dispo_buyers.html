@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Buyers · Dispo{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Buyers</h2>
+    <p class="page-subtitle">{{ buyers|length }} buyers · {{ with_buybox }} with a buybox · each deal suggests who to contact</p>
+  </div>
+  <a class="btn" href="/dispo/buyers/new">+ Add buyer</a>
+</div>
+
+<div class="card buyer-filters">
+  <input type="search" id="buyer-search" placeholder="Search name, email, zip, neighborhood, notes…" aria-label="Search buyers">
+  <select id="buyer-channel" aria-label="Channel">
+    <option value="">All channels</option>
+    {% for k, label in CONTACT_CHANNELS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
+  </select>
+  <label class="muted"><input type="checkbox" id="buyer-buybox"> Only with a buybox</label>
+  <span class="muted" id="buyer-count"></span>
+</div>
+
+<div style="overflow-x:auto;">
+<table class="sticky-table buyers-list">
+  <thead><tr><th>Buyer</th><th>Contact</th><th>Channel</th><th>Buybox</th><th>Notes</th></tr></thead>
+  <tbody>
+    {% for b in buyers %}
+    {% set has_box = b.zip_codes or b.neighborhoods or b.areas %}
+    <tr data-channels="{{ b.channels }}" data-buybox="{{ 1 if has_box else 0 }}">
+      <td><a class="zip-link" href="/dispo/buyers/{{ b.id }}"><strong>{{ b.name }}</strong></a></td>
+      <td class="buyer-contact">{% if b.email %}<div>{{ b.email }}</div>{% endif %}{% if b.phone %}<div class="muted">{{ b.phone }}</div>{% endif %}{% if not b.email and not b.phone %}<span class="muted">-</span>{% endif %}</td>
+      <td>{% for c in b.channel_list %}<span class="badge contact-{{ c }}">{{ CONTACT_CHANNELS[c] }}</span> {% endfor %}</td>
+      <td class="buybox">
+        {% if b.zip_codes %}<div><span class="muted">Zips</span> {{ b.zip_codes }}</div>{% endif %}
+        {% if b.neighborhoods %}<div><span class="muted">Neighborhoods</span> {{ b.neighborhoods }}</div>{% endif %}
+        {% if b.areas %}<div><span class="muted">Areas</span> {{ b.areas }}</div>{% endif %}
+        {% if b.max_price is not none %}<div><span class="muted">Max</span> ${{ "{:,.0f}".format(b.max_price|float) }}</div>{% endif %}
+        {% if b.property_types %}<div><span class="muted">Types</span> {{ b.property_types }}</div>{% endif %}
+        {% if unknown[b.id] %}<div class="buybox-unknown" title="SharpREI can't place these on the map, so they don't match deals">Not on the map: {{ unknown[b.id]|join(", ") }}</div>{% endif %}
+        {% if not has_box %}<span class="muted">No buybox yet</span>{% endif %}
+      </td>
+      <td class="buyer-notes">{{ b.notes or "" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">No buyers yet. Click <strong>+ Add buyer</strong>.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+(function() {
+  var rows = document.querySelectorAll('.buyers-list tbody tr[data-channels]');
+  var search = document.getElementById('buyer-search'), channel = document.getElementById('buyer-channel'), box = document.getElementById('buyer-buybox');
+  function filter() {
+    var q = search.value.trim().toLowerCase(), shown = 0;
+    rows.forEach(function(tr) {
+      var ok = (!q || tr.textContent.toLowerCase().indexOf(q) >= 0)
+        && (!channel.value || tr.dataset.channels.split(',').indexOf(channel.value) >= 0)
+        && (!box.checked || tr.dataset.buybox === '1');
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    document.getElementById('buyer-count').textContent = shown === rows.length ? '' : shown + ' of ' + rows.length;
+  }
+  [search, channel, box].forEach(function(el) { el.addEventListener('input', filter); el.addEventListener('change', filter); });
+})();
+</script>
+{% endblock %}

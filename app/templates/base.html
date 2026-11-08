@@ -70,18 +70,15 @@
 
         <button type="button" class="nav-section nav-toggle" data-group="wholesale" aria-expanded="true">Wholesale <svg class="nav-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="nav-collapse" data-group="wholesale">
-          {% set in_finance = active in ['fin_overview', 'fin_month', 'fin_statements', 'fin_deals', 'fin_vendors'] %}
           {% set due_n = due_task_count() if request.state.user is defined and request.state.user else 0 %}
-          <button type="button" class="nav-group nav-toggle {{ 'current' if in_finance else '' }}" data-group="finance" aria-expanded="true">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg>
-            Finance{% if due_n %} <span class="nav-badge nav-badge-collapsed" title="{{ due_n }} deal task{{ 's' if due_n != 1 else '' }} due today or overdue">{{ due_n }}</span>{% endif %} <svg class="nav-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          {% set in_dispo = active in ['buyers', 'fin_deals'] %}
+          <button type="button" class="nav-group nav-toggle {{ 'current' if in_dispo else '' }}" data-group="dispo" aria-expanded="true">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6M22 19v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8"/></svg>
+            Dispo{% if due_n %} <span class="nav-badge nav-badge-collapsed" title="{{ due_n }} deal task{{ 's' if due_n != 1 else '' }} due today or overdue">{{ due_n }}</span>{% endif %} <svg class="nav-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="nav-collapse" data-group="finance">
-            <a href="/finance" class="nav-item sub {{ 'active' if active == 'fin_overview' else '' }}">Overview</a>
-            <a href="/finance/month" class="nav-item sub {{ 'active' if active == 'fin_month' else '' }}">Monthly Expenses</a>
-            <a href="/finance/statements" class="nav-item sub {{ 'active' if active == 'fin_statements' else '' }}">Card Statements</a>
+          <div class="nav-collapse" data-group="dispo">
+            <a href="/dispo/buyers" class="nav-item sub {{ 'active' if active == 'buyers' else '' }}">Buyers</a>
             <a href="/finance/deals" class="nav-item sub {{ 'active' if active == 'fin_deals' else '' }}">Deals{% if due_n %} <span class="nav-badge" title="{{ due_n }} deal task{{ 's' if due_n != 1 else '' }} due today or overdue">{{ due_n }}</span>{% endif %}</a>
-            <a href="/finance/vendors" class="nav-item sub {{ 'active' if active == 'fin_vendors' else '' }}">Vendors</a>
           </div>
 
           {% set in_sms = active in ['list', 'followups', 'weekly_import'] %}
@@ -93,6 +90,18 @@
             <a href="/zips" class="nav-item sub {{ 'active' if active == 'list' else '' }}">Zip Codes</a>
             <a href="/followups" class="nav-item sub {{ 'active' if active == 'followups' else '' }}">Follow-ups</a>
             <a href="/import/weekly" class="nav-item sub {{ 'active' if active == 'weekly_import' else '' }}">Weekly Update</a>
+          </div>
+
+          {% set in_finance = active in ['fin_overview', 'fin_month', 'fin_statements', 'fin_vendors'] %}
+          <button type="button" class="nav-group nav-toggle {{ 'current' if in_finance else '' }}" data-group="finance" aria-expanded="true">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7"/></svg>
+            Finance <svg class="nav-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-collapse" data-group="finance">
+            <a href="/finance" class="nav-item sub {{ 'active' if active == 'fin_overview' else '' }}">Overview</a>
+            <a href="/finance/month" class="nav-item sub {{ 'active' if active == 'fin_month' else '' }}">Monthly Expenses</a>
+            <a href="/finance/statements" class="nav-item sub {{ 'active' if active == 'fin_statements' else '' }}">Card Statements</a>
+            <a href="/finance/vendors" class="nav-item sub {{ 'active' if active == 'fin_vendors' else '' }}">Vendors</a>
           </div>
         </div>
 

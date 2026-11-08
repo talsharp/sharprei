@@ -38,7 +38,8 @@ from app.task_logic import (
 )
 from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
-from app.models import DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.buyers import NEARBY_MILES, suggest_buyers
+from app.models import Buyer, DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -342,7 +343,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             {"request": request, "active": "fin_deals", "deal": deal, "zip_codes": zip_codes, "lead_channels": LEAD_CHANNELS,
              "too_big": [n for n in request.query_params.get("too_big", "").split(",") if n],
              "max_mb": MAX_FILE_MB, "portfolio_property": _matching_property(db, deal),
-             "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal), "statuses": _statuses(db)},
+             "buyer_names": _buyer_names(db), "landing": _landing(request, db, deal), "statuses": _statuses(db),
+             "suggested": suggest_buyers(db, deal) if deal.status == "under_contract" else None, "nearby_miles": NEARBY_MILES},
         )
 
     def _statuses(db: Session):
@@ -361,8 +363,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     # ---------- Under contract: inspection clock + buyers / walkthroughs ----------
 
     def _buyer_names(db: Session):
-        """Names used on any deal before - suggested when adding a buyer."""
-        return sorted({b.name for b in db.query(DealBuyer).all()}, key=str.lower)
+        """Names on the buyer list or used on any deal before - suggested when adding a buyer."""
+        names = {b.name for b in db.query(DealBuyer).all()} | {name for (name,) in db.query(Buyer.name).all()}
+        return sorted(names, key=str.lower)
 
     @router.post("/deals/{deal_id}/contract")
     async def finance_deal_contract(request: Request, deal_id: int, db: Session = Depends(get_db)):

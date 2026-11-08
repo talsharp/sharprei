@@ -689,6 +689,32 @@ class ApiUsage(Base):
     calls: Mapped[int] = mapped_column(default=0)
 
 
+class Buyer(Base):
+    """An investor on Tal's buyer list (Dispo › Buyers) and their buybox. Lists
+    are comma-separated text, as typed - app/buyers.py turns places into zips."""
+    __tablename__ = "buyers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    # How they want to hear about deals: "email", "sms", "messenger", comma-separated.
+    channels: Mapped[str] = mapped_column(String(40), default="email")
+    zip_codes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    neighborhoods: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    areas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    max_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    property_types: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # The buyer's notes as they were in GHL, before being split into the buybox.
+    original_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    @property
+    def channel_list(self) -> list:
+        return [c for c in (self.channels or "email").split(",") if c]
+
+
 class DealBuyer(Base):
     """An investor Tal is trying to sell an under-contract deal to, and their walkthrough."""
     __tablename__ = "deal_buyers"
@@ -696,6 +722,8 @@ class DealBuyer(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
+    # The buyer on the buyer list, when added from the suggestions.
+    buyer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("buyers.id", ondelete="SET NULL"), nullable=True, index=True)
     # Each buyer has their own visit time: same time = a group walkthrough,
     # different times = a second walkthrough or a vacant house.
     visit_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

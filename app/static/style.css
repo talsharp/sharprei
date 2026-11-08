@@ -864,3 +864,28 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .rd-row:first-of-type { margin-top: 8px; }
 .rd-row .rd-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-name-cell { align-self: stretch; padding-right: 8px; } .task-name-cell .task-open { align-self: stretch; }
+
+/* Dispo › Buyers */
+.buyer-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.buyer-filters input[type=search] { flex: 1 1 260px; }
+.buyer-filters label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.buyers-list td { vertical-align: top; font-size: 13px; }
+.buyers-list .buybox div, .buyer-contact div { line-height: 1.5; }
+.buyers-list .buyer-notes { max-width: 260px; color: var(--muted); }
+.buybox-unknown { color: var(--red); font-size: 12px; }
+.contact-email { background: var(--gray-bg); color: var(--gray); }
+.contact-sms { background: #EEEDFE; color: #3C3489; }
+.contact-messenger { background: #E6F1FB; color: #0C447C; }
+.buyer-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.buyer-form-grid .wide { grid-column: 1 / -1; }
+.check-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 6px 0; }
+.check-row label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--text); }
+.saved-note { background: var(--green-bg); color: var(--green); padding: 10px 14px; }
+.suggested-table { width: 100%; border-collapse: collapse; }
+.suggested-table td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13px; }
+.suggested-table tr.is-warn td { opacity: .75; }
+.suggested-table tr.match-group td { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 14px; }
+.match-area { color: var(--green); font-weight: 600; }
+.match-nearby { color: var(--accent); font-weight: 600; }
+.match-warn { color: var(--red); font-size: 12px; }
+@media (max-width: 700px) { .buyer-form-grid { grid-template-columns: 1fr; } }

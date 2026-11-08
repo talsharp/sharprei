@@ -24,6 +24,7 @@ from app.task_routes import build_router as build_task_router
 from app.comp_routes import build_router as build_comp_router
 from app.deal_page_routes import build_router as build_deal_page_router
 from app.project_routes import build_router as build_project_router
+from app.buyer_routes import build_router as build_buyer_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -151,6 +152,7 @@ app.include_router(build_task_router(templates))
 app.include_router(build_comp_router(templates))
 app.include_router(build_deal_page_router(templates))
 app.include_router(build_project_router(templates))
+app.include_router(build_buyer_router(templates))
 auth.install(app, templates)
 monitor.install(app)
 
