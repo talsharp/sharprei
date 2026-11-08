@@ -189,44 +189,32 @@ def buybox_checks(buyer: Buyer, facts: dict) -> List[tuple]:
 
 
 def _engagement(act: Optional[dict], deal: WholesaleDeal, here: Optional[tuple]) -> dict:
-    """What the buyer did with this deal and with past deals within NEARBY_MILES of it."""
-    lines, strong, weak = [], False, False
-    if not act:
-        return {"lines": lines, "strong": strong, "weak": weak}
-    this = act["deals"].get(deal.id)
-    if this:
-        did = [t for t, yes in (("clicked this deal's email", this["ghl_clicked"]), ("opened its photos", this["sharp_clicked"]),
-                                ("opened its email", this["ghl_opened"] and not this["ghl_clicked"]),
-                                ("viewed its page", this["sharp_opened"] and not this["sharp_clicked"])) if yes]
-        if did:
-            lines.append("Already " + ", ".join(did))
-            strong = strong or this["ghl_clicked"] or this["sharp_clicked"]
-            weak = True
-    clicked, opened = [], []
-    for key, d in act["deals"].items():
-        if key == deal.id or not d["deal"] or not here:
+    """This deal's status for the buyer (GHL email, SharpREI page), and whether they
+    clicked it or a past deal within NEARBY_MILES - a click can make them suggested."""
+    this = (act or {}).get("deals", {}).get(deal.id)
+    status = {
+        "email": None if not this or not this["ghl_emails"] else
+                 "Clicked" if this["ghl_clicked"] else "Opened" if this["ghl_opened"] else "Not opened",
+        "page": None if not this or not this["sharp"] else
+                "Opened photos" if this["sharp_clicked"] else "Viewed" if this["sharp_opened"] else "Not opened",
+    }
+    clicked_this = bool(this and (this["ghl_clicked"] or this["sharp_clicked"]))
+    clicked_nearby = False
+    for key, d in (act or {}).get("deals", {}).items():
+        if key == deal.id or not d["deal"] or not here or not (d["ghl_clicked"] or d["sharp_clicked"]):
             continue
         z = deal_zip(d["deal"])
-        if not z or z not in zip_points() or miles(here, zip_points()[z]) > NEARBY_MILES:
-            continue
-        street = d["deal"].address.split(",")[0]
-        if d["ghl_clicked"] or d["sharp_clicked"]:
-            clicked.append(street)
-        elif d["ghl_opened"] or d["sharp_opened"]:
-            opened.append(street)
-    if clicked:
-        lines.append(f"Clicked {len(clicked)} past deal{'s' if len(clicked) != 1 else ''} nearby: " + ", ".join(clicked))
-        strong = True
-    if opened:
-        lines.append(f"Opened {len(opened)} past deal{'s' if len(opened) != 1 else ''} nearby: " + ", ".join(opened))
-        weak = True
-    return {"lines": lines, "strong": strong, "weak": weak}
+        if z and z in zip_points() and miles(here, zip_points()[z]) <= NEARBY_MILES:
+            clicked_nearby = True
+            break
+    return {"status": status, "clicked_this": clicked_this, "clicked_nearby": clicked_nearby}
 
 
 def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
-    """"suggested": fits their buybox, or clicked this or nearby past deals - and
-    misses nothing checked. "potential": nearby, or misses something. Opens are
-    shown as a reason but never bring a buyer in on their own. Each with why."""
+    """"suggested": fits their buybox, or clicked this or a nearby past deal - and
+    misses nothing checked. "potential": in their area but misses something
+    (group "miss"), or nearby (group "near"). Each with why, and this deal's
+    status for them (email / page)."""
     from app.buyer_activity import buyer_activity
 
     places = Places(db)
@@ -240,9 +228,8 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
         buyer_places = places.buyer_places(buyer)
         act = activity.get(buyer.id)
         engaged = _engagement(act, deal, here)
-        # Opens alone don't bring a buyer in (mail apps count some on their own) -
-        # they're shown for buyers who are listed for another reason.
-        if not buyer_places and not engaged["strong"]:
+        clicked = engaged["clicked_this"] or engaged["clicked_nearby"]
+        if not buyer_places and not clicked:
             no_buybox += 1
             continue
         inside = [label for label, zips in buyer_places if facts["zip"] in zips]
@@ -254,26 +241,36 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
                         d = miles(here, zip_points()[z])
                         if d <= NEARBY_MILES and (nearest is None or d < nearest[1]):
                             nearest = (label, d)
-        if not inside and not nearest and not engaged["strong"]:
+        if not inside and not nearest and not clicked:
             continue
         checks = buybox_checks(buyer, facts)
         if act and act["unsubscribed"]:
             checks.append((False, "Unsubscribed from GHL emails"))
         misses = sum(1 for fits, _ in checks if not fits)
-        where = ("In their area: " + ", ".join(inside)) if inside else (f"Nearby: {nearest[1]:.1f} mi from {nearest[0]}" if nearest else None)
+        # Why they're listed: where, then each buybox check; a click only when it's the reason.
+        why = []
+        if inside:
+            why.append(("fit", "In their area: " + ", ".join(inside[:2]) + (f" +{len(inside) - 2}" if len(inside) > 2 else "")))
+        elif nearest:
+            why.append(("near", f"{nearest[1]:.1f} mi from {nearest[0]}"))
+        if not inside and clicked:
+            why.append(("fit", "Clicked this deal" if engaged["clicked_this"] else "Clicked deals near here before"))
+        why += [("fit" if fits else "miss", text) for fits, text in checks]
         match = {
             "buyer": buyer,
-            "where": where,
+            "why": why,
             "inside": bool(inside),
             "distance": 0 if inside else (nearest[1] if nearest else NEARBY_MILES + 1),
-            "checks": checks,
             "misses": misses,
-            "engaged": engaged["lines"],
-            "strong": engaged["strong"],
-            "activity": act,
+            "clicked": clicked,
+            "status": engaged["status"],
             "on_deal": buyer.id in on_deal_ids or buyer.name.strip().lower() in on_deal_names,
         }
-        (suggested if (inside or engaged["strong"]) and not misses else potential).append(match)
-    suggested.sort(key=lambda m: (not m["strong"], not m["inside"], -len(m["checks"]), m["buyer"].name.lower()))
-    potential.sort(key=lambda m: (not m["inside"], m["misses"], not m["engaged"], m["distance"], m["buyer"].name.lower()))
+        if (inside or clicked) and not misses:
+            suggested.append(match)
+        else:
+            match["group"] = "miss" if (inside or clicked) else "near"
+            potential.append(match)
+    suggested.sort(key=lambda m: (not m["inside"], -len(m["why"]), m["buyer"].name.lower()))
+    potential.sort(key=lambda m: (m["group"] != "miss", m["misses"], m["distance"], m["buyer"].name.lower()))
     return {"facts": facts, "suggested": suggested, "potential": potential, "no_buybox": no_buybox}

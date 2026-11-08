@@ -391,4 +391,37 @@ document.addEventListener('htmx:afterSwap', function(e) {
 </script>
 {% endif %}
 
+<script>
+// Collapse any section by the arrow by its title. It stays as you left it - on every deal, on this device.
+(function() {
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem('deal.collapsed') || '{}'); } catch (e) {}
+  document.querySelectorAll('.card').forEach(function(card) {
+    var title = card.querySelector('h3');
+    if (!title) return;
+    var key = card.id || title.textContent.trim().split(/\s+/).slice(0, 2).join(' ');
+    var head = title;
+    while (head.parentNode !== card) head = head.parentNode;
+    head.classList.add('card-head-keep');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'card-toggle';
+    title.insertBefore(btn, title.firstChild);
+    function set(shut) {
+      card.classList.toggle('is-collapsed', shut);
+      btn.textContent = shut ? '▸' : '▾';
+      btn.setAttribute('aria-label', shut ? 'Open section' : 'Collapse section');
+      btn.setAttribute('aria-expanded', String(!shut));
+    }
+    set(!!saved[key]);
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();  // the Documents title has its own click
+      saved[key] = !card.classList.contains('is-collapsed');
+      if (!saved[key]) delete saved[key];
+      set(!!saved[key]);
+      try { localStorage.setItem('deal.collapsed', JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
 {% endblock %}

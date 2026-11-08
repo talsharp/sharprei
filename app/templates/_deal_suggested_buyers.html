@@ -1,20 +1,28 @@
-{# Suggested buyers (in their area, fit everything) and potential buyers (nearby, or miss something) - with why. #}
+{# Suggested buyers (fit their buybox) and potential buyers (miss something, or nearby): why, and this deal's status for them. #}
 {% set f = suggested.facts %}
-{% macro buyer_rows(matches) %}
+{% macro buyer_rows(matches, heading=None) %}
 <div style="overflow-x:auto;">
-<table class="suggested-table">
+<table class="buyer-match-table">
+  <thead><tr><th>Buyer</th><th>Why</th><th>This deal</th><th></th></tr></thead>
   <tbody>
     {% for m in matches %}
+    {% if heading and (loop.first or m.group != loop.previtem.group) %}
+    <tr class="match-group"><td colspan="4">{{ "In their area - something doesn't fit" if m.group == "miss" else "Nearby - within " ~ nearby_miles ~ " miles of their places" }} · {{ matches|selectattr("group", "equalto", m.group)|list|length }}</td></tr>
+    {% endif %}
     <tr>
-      <td class="who"><a class="zip-link" href="/dispo/buyers/{{ m.buyer.id }}"><strong>{{ m.buyer.name }}</strong></a>
-        <div>{% for c in m.buyer.channel_list %}<span class="badge contact-{{ c }}">{{ CONTACT_CHANNELS[c] }}</span> {% endfor %}</div>
-        <div class="buyer-contact">{% if m.buyer.email %}<div>{{ m.buyer.email }}</div>{% endif %}{% if m.buyer.phone %}<div class="muted">{{ m.buyer.phone }}</div>{% endif %}</div></td>
-      <td>
-        {% if m.where %}<div class="{{ 'match-area' if m.inside else 'match-nearby' }}">{{ "✓" if m.inside else "≈" }} {{ m.where }}</div>{% endif %}
-        {% for line in m.engaged %}<div class="match-engaged">★ {{ line }}</div>{% endfor %}
-        {% for fits, text in m.checks %}<div class="{{ 'match-fit' if fits else 'match-warn' }}">{{ "✓" if fits else "✗" }} {{ text }}</div>{% endfor %}
-        {% if m.buyer.notes %}<div class="match-notes">{{ m.buyer.notes|truncate(160) }}</div>{% endif %}
-        {% if m.activity %}{% set a = m.activity %}<div class="match-notes">GHL: {{ a.ghl.deals }} received · {{ a.ghl.opened }} opened · {{ a.ghl.clicked }} clicked{% if a.sharp.deals %} · SharpREI: {{ a.sharp.deals }} received · {{ a.sharp.opened }} opened · {{ a.sharp.clicked }} photos{% endif %}</div>{% endif %}
+      <td class="who">
+        <a class="zip-link" href="/dispo/buyers/{{ m.buyer.id }}"><strong>{{ m.buyer.name }}</strong></a>
+        {% for c in m.buyer.channel_list %}<span class="badge contact-{{ c }}">{{ CONTACT_CHANNELS[c] }}</span> {% endfor %}
+        <div class="contact-line">{{ m.buyer.email or "" }}{% if m.buyer.email and m.buyer.phone %} · {% endif %}{{ m.buyer.phone or "" }}</div>
+      </td>
+      <td class="why">
+        <div class="chips">{% for kind, text in m.why %}<span class="chip-{{ kind }}">{{ "✓" if kind == "fit" else "✗" if kind == "miss" else "≈" }} {{ text }}</span>{% endfor %}</div>
+        {% if m.buyer.notes %}<div class="match-notes" title="{{ m.buyer.notes }}">{{ m.buyer.notes|truncate(90) }}</div>{% endif %}
+      </td>
+      <td class="deal-status">
+        {% if m.status.email %}<div class="st-{{ m.status.email|lower|replace(' ', '-') }}">Email: {{ m.status.email }}</div>{% endif %}
+        {% if m.status.page %}<div class="st-{{ m.status.page|lower|replace(' ', '-') }}">Page: {{ m.status.page }}</div>{% endif %}
+        {% if not m.status.email and not m.status.page %}<span class="muted">Not sent</span>{% endif %}
       </td>
       <td style="text-align:right; white-space:nowrap;">
         {% if m.on_deal %}<span class="muted">On this deal</span>
@@ -28,19 +36,19 @@
 {% endmacro %}
 
 <div class="card" id="suggested">
-  <h3>Suggested buyers <span class="muted" style="font-weight:400; font-size:13px;">· {{ suggested.suggested|length }} · fit their buybox, or clicked this or nearby deals</span></h3>
+  <h3>Suggested buyers <span class="muted" style="font-weight:400; font-size:13px;">· {{ suggested.suggested|length }}</span></h3>
   <p class="muted deal-facts">
-    {% if f.zip %}<strong>{{ f.zip }}</strong>{% if f.region %} · {{ f.region }}{% endif %}{% if f.neighborhoods %} · {{ f.neighborhoods[:6]|join(", ") }}{% if f.neighborhoods|length > 6 %} +{{ f.neighborhoods|length - 6 }} more{% endif %}{% endif %}
+    {% if f.zip %}<strong>{{ f.zip }}</strong>{% if deal.neighborhood %} · {{ deal.neighborhood }}{% endif %}{% if f.region %} · {{ f.region }}{% endif %}
     {% else %}No zip in the address, so nothing can be matched - add the zip to the address.{% endif %}
     {% if f.price is not none %} · ${{ "{:,.0f}".format(f.price) }}{% endif %}{% if f.beds is not none %} · {{ "%g"|format(f.beds) }} beds{% endif %}{% if f.grade %} · {{ f.grade }} area{% endif %}{% if f.type %} · {{ f.type }}{% endif %}
     {% set missing = [] %}{% if f.price is none %}{% set _ = missing.append("price") %}{% endif %}{% if f.beds is none %}{% set _ = missing.append("bedrooms") %}{% endif %}{% if not f.grade %}{% set _ = missing.append("neighborhood grade") %}{% endif %}
     {% if missing %}<br><span class="match-hint">Add the {{ missing|join(", ") }} in Agreement below to check buyers against {{ "it" if missing|length == 1 else "them" }}.</span>{% endif %}
   </p>
-  {% if suggested.suggested %}{{ buyer_rows(suggested.suggested) }}{% else %}<p class="muted" style="margin:0;">No buyer's buybox fully covers this deal - see Potential buyers below.</p>{% endif %}
+  {% if suggested.suggested %}{{ buyer_rows(suggested.suggested) }}{% else %}<p class="muted" style="margin:0;">No buyer fits this deal fully - see Potential buyers below.</p>{% endif %}
   {% if suggested.no_buybox %}<p class="muted" style="font-size:12px; margin:8px 0 0;">{{ suggested.no_buybox }} buyers have no buybox and haven't clicked deals near here, so they aren't listed - see <a class="zip-link" href="/dispo/buyers">Buyers</a>.</p>{% endif %}
 </div>
 
 <div class="card" id="potential">
-  <h3>Potential buyers <span class="muted" style="font-weight:400; font-size:13px;">· {{ suggested.potential|length }} · nearby (within {{ nearby_miles }} miles), or something doesn't fit</span></h3>
-  {% if suggested.potential %}{{ buyer_rows(suggested.potential) }}{% else %}<p class="muted" style="margin:0;">None.</p>{% endif %}
+  <h3>Potential buyers <span class="muted" style="font-weight:400; font-size:13px;">· {{ suggested.potential|length }}</span></h3>
+  {% if suggested.potential %}{{ buyer_rows(suggested.potential, True) }}{% else %}<p class="muted" style="margin:0;">None.</p>{% endif %}
 </div>
