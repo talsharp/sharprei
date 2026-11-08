@@ -17,7 +17,7 @@
   <button type="button" class="filter-chip" data-label="">No label</button>
 </div>
 
-{% for key, name in days.items() %}
+{% for key, name in group_names.items() %}
 <section class="task-group" data-day="{{ key }}">
   <div class="task-group-header">
     <button type="button" class="task-group-toggle" aria-label="Collapse">▾</button>
@@ -30,9 +30,13 @@
     <div class="task-list" data-day="{{ key }}">
       {% for t in groups[key] %}{% include "_task_row.html" %}{% endfor %}
     </div>
+    {% if key == 'upcoming' %}
+    <p class="muted upcoming-note">Deal tasks dated after this week, by date. Each one moves into its day when its week starts.</p>
+    {% else %}
     <form class="task-add" data-day="{{ key }}" autocomplete="off">
       <input type="text" name="title" placeholder="+ Add task" maxlength="255">
     </form>
+    {% endif %}
   </div>
 </section>
 {% endfor %}
@@ -86,6 +90,7 @@
     <label class="muted drawer-day">Day
       <select id="drawer-day">
         {% for key, name in days.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+        <option value="upcoming" disabled>Upcoming - by its date</option>
       </select>
     </label>
     <div style="display:flex; gap:8px; align-items:center;">
@@ -179,6 +184,10 @@
     var days = isDeal && due && !row.classList.contains('is-done') && due < TODAY ? Math.round((new Date(TODAY) - new Date(due)) / 86400000) : 0;
     late.hidden = !days;
     late.textContent = days === 1 ? '1 day late' : days + ' days late';
+    // Outside the weekdays (Upcoming, Later) the date shows on the row: not for this week.
+    var dueTag = row.querySelector('.task-due'), list = row.closest('.task-list'), where = list ? list.dataset.day : '';
+    dueTag.hidden = !(isDeal && due && !days && (where === 'upcoming' || where === 'later'));
+    if (!dueTag.hidden) dueTag.textContent = new Date(due + 'T12:00:00').toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'});
   }
   // A deal task moved to another group gets that day's date (Later = no date).
   function movedTo(row, fromDay, toDay) {
@@ -351,6 +360,7 @@
   }
   document.querySelectorAll('.task-group').forEach(function(group) {
     var list = group.querySelector('.task-list');
+    if (group.dataset.day === 'upcoming') return;  // goes by date - nothing is dropped in
     group.addEventListener('dragover', function(e) {
       if (!dragging) return;
       e.preventDefault();

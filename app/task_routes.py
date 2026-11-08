@@ -36,6 +36,10 @@ DAYS = OrderedDict(
     ]
 )
 
+# The groups shown: the days, then Upcoming (deal tasks dated after this week -
+# they move into their day by themselves; nothing is dragged into it), then Later.
+GROUPS = OrderedDict(list(DAYS.items())[:-1] + [("upcoming", "Upcoming"), ("later", "Later")])
+
 OPTION_MODELS = {"status": TaskStatus, "label": TaskLabel}
 
 
@@ -95,13 +99,14 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         db.commit()
         today = local_today()
         statuses, labels = _options(db)
-        groups = OrderedDict((key, []) for key in DAYS)
+        groups = OrderedDict((key, []) for key in GROUPS)
         on_board = []
         for t in live_tasks(db).order_by(Task.position, Task.id).all():
             day = board_day(t, today)
             if day:
                 groups[day].append(t)
                 on_board.append(t)
+        groups["upcoming"].sort(key=lambda t: (t.due_date, t.position, t.id))
         deleted = db.query(Task).filter(Task.deleted_at.isnot(None)).order_by(Task.deleted_at.desc()).all()
         deals = db.query(WholesaleDeal).filter(WholesaleDeal.status == "under_contract").order_by(WholesaleDeal.address).all()
         return templates.TemplateResponse(
@@ -110,6 +115,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 "request": request,
                 "active": "tasks",
                 "days": DAYS,
+                "group_names": GROUPS,
                 "groups": groups,
                 "statuses": statuses,
                 "labels": labels,
@@ -215,7 +221,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
                 task.deal_id = deal.id
                 place_by_date(db, task)
             elif not deal and task.deal_id:  # back to a plain board task, on the same day
-                task.day = board_day(task, today) or "later"
+                day = board_day(task, today)
+                task.day = day if day in WEEK_KEYS else "later"
                 task.deal_id = None
                 task.due_date = None
                 task.board_hidden = False

@@ -83,8 +83,8 @@
       <tr class="clickable-row" onclick="window.location='/finance?channel={{ ch }}{{ '&' ~ kq if kq }}'">
         <td>{{ fm.channel_badge(ch) }}</td>
         <td>{{ fm.money(cs.expenses) }}</td>
-        <td>{{ cs.leads }}</td>
-        <td>{{ fm.cpl(cs.cpl) }}</td>
+        <td>{{ cs.leads }}{% if cs.outside %}<div class="relevant-sub">{{ cs.relevant_leads }} relevant</div>{% endif %}</td>
+        <td>{{ fm.cpl(cs.cpl) }}{% if cs.outside %}<div class="relevant-sub">{{ fm.cpl(cs.relevant_cpl) }} relevant</div>{% endif %}</td>
         <td>{{ cs.agreements }}</td>
         <td>{{ cs.closed_deals }}</td>
         <td>{{ fm.pct(cs.lead_to_agreement) }}</td>
@@ -200,6 +200,7 @@
   {% call kpi("Net profit", fm.money(cs.net), "teal", fm.signed_class(cs.net), "Revenue − spent on " ~ label ~ ".") %}{{ ICON_PROFIT }}{% endcall %}
   {% call kpi("ROI", fm.pct(cs.roi), "coral", fm.signed_class(cs.roi), "Net profit ÷ spent.") %}{{ ICON_ROI }}{% endcall %}
   {% call kpi("Leads · CPL", cs.leads ~ " · " ~ fm.cpl(cs.cpl), "blue", title="Spent ÷ leads.") %}{{ ICON_LEADS }}{% endcall %}
+  {% if cs.outside %}{% call kpi("Relevant leads · CPL", cs.relevant_leads ~ " · " ~ fm.cpl(cs.relevant_cpl), "blue", title=cs.outside ~ " leads outside the target area left out. Spent ÷ relevant leads.") %}{{ ICON_LEADS }}{% endcall %}{% endif %}
 </div>
 
 <div class="card">
@@ -221,8 +222,8 @@
       <tr>
         <td><a class="zip-link" href="/finance/month/{{ s.month.strftime('%Y-%m') }}">{{ s.month.strftime('%b %Y') }}</a></td>
         <td>{{ fm.money(m.expenses) }}</td>
-        <td>{{ m.leads }}</td>
-        <td>{{ fm.cpl(m.cpl) }}</td>
+        <td>{{ m.leads }}{% if m.outside %}<div class="relevant-sub">{{ m.relevant_leads }} relevant</div>{% endif %}</td>
+        <td>{{ fm.cpl(m.cpl) }}{% if m.outside %}<div class="relevant-sub">{{ fm.cpl(m.relevant_cpl) }} relevant</div>{% endif %}</td>
         <td title="{% for d in signed %}{{ d.address }}&#10;{% endfor %}">{{ m.agreements or "—" }}</td>
         <td title="{% for d in closed %}{{ d.address }}: {{ fm.money(d.profit) }}&#10;{% endfor %}">{{ m.closed_deals or "—" }}</td>
         <td>{{ fm.money(m.profit) if m.profit else "—" }}</td>
@@ -233,7 +234,7 @@
     </tbody>
     <tfoot>
       <tr style="font-weight:600;">
-        <td>Total</td><td>{{ fm.money(cs.expenses) }}</td><td>{{ cs.leads }}</td><td>{{ fm.cpl(cs.cpl) }}</td>
+        <td>Total</td><td>{{ fm.money(cs.expenses) }}</td><td>{{ cs.leads }}{% if cs.outside %}<div class="relevant-sub">{{ cs.relevant_leads }} relevant</div>{% endif %}</td><td>{{ fm.cpl(cs.cpl) }}{% if cs.outside %}<div class="relevant-sub">{{ fm.cpl(cs.relevant_cpl) }} relevant</div>{% endif %}</td>
         <td>{{ cs.agreements }}</td><td>{{ cs.closed_deals }}</td><td>{{ fm.money(cs.profit) }}</td>
         <td class="{{ fm.signed_class(cs.net) }}">{{ fm.money(cs.net) }}</td>
       </tr>

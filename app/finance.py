@@ -155,10 +155,20 @@ class ChannelStats:
     under_contract: int = 0
     dead: int = 0
     profit: float = 0.0      # profit of this channel's closed deals (its revenue)
+    outside: int = 0         # leads outside the target area (Facebook only, Tal enters it)
 
     @property
     def cpl(self) -> Optional[float]:
         return self.expenses / self.leads if self.leads else None
+
+    @property
+    def relevant_leads(self) -> int:
+        """Leads in the target area - the outside ones left out."""
+        return max(self.leads - self.outside, 0)
+
+    @property
+    def relevant_cpl(self) -> Optional[float]:
+        return self.expenses / self.relevant_leads if self.relevant_leads else None
 
     @property
     def net(self) -> float:
@@ -248,6 +258,7 @@ def build_month_summaries(db: Session, include_kept: bool = True) -> "OrderedDic
                 s.wholesale_expenses += amount
         for ch, n in _channel_leads(fm).items():
             s.channels[ch].leads = n
+        s.channels["facebook"].outside = fm.facebook_outside_leads or 0
         s.leads = fm.total_leads
 
     for d in deals:
@@ -322,6 +333,7 @@ def build_totals(db: Session, summaries: "OrderedDict[date, MonthSummary]", incl
         for ch, cs in s.channels.items():
             t.channels[ch].expenses += cs.expenses
             t.channels[ch].leads += cs.leads
+            t.channels[ch].outside += cs.outside
     deals = _deals(db, include_kept)
     t.signed_agreements = len(deals)
     t.closed_deals = sum(1 for d in deals if d.status in ("closed", "kept"))

@@ -870,6 +870,9 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .task-name-cell .task-open { flex: 1 1 auto; min-width: 0; }
 .task-deal-tag { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--accent); background: #E8F0FB; border-radius: 6px; padding: 2px 8px; white-space: nowrap; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
 .task-deal-tag:hover { background: #D7E6F8; text-decoration: none; }
+.task-due { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #0C447C; background: #E6F1FB; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+.upcoming-note { font-size: 12px; margin: 8px 0 0; }
+.task-group[data-day=upcoming] .task-group-header h3 { color: #0C447C; }
 .task-late { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #C0392B; background: #FBE7E7; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
 .task-deal-tag[hidden], .task-late[hidden] { display: none; }
 .drawer-deal select { width: 100%; }
@@ -955,3 +958,4 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .yes-no button:hover { background: var(--panel-soft); color: var(--text); }
 .yes-no button[data-value=yes].on { background: var(--green-bg); color: var(--green); }
 .yes-no button[data-value=no].on { background: var(--red-bg); color: var(--red); }
+.relevant-sub { font-size: 11px; color: #085041; font-weight: 600; white-space: nowrap; }

@@ -8,6 +8,7 @@
       <svg class="task-desc-icon" viewBox="0 0 24 24" aria-label="Has a description" {{ 'hidden' if not t.description }}><path d="M5 7h14M5 12h14M5 17h9"/></svg>
     </button>
     <span class="task-late" hidden></span>
+    <span class="task-due" hidden></span>
     <a class="task-deal-tag" href="/finance/deals/{{ t.deal_id or '' }}#tasks-card" title="Open the deal" {{ 'hidden' if not t.deal_id }}>{{ task_street(t.deal) }}</a>
     </div>
     <button type="button" class="task-pill status-pill" data-kind="status" data-value="{{ t.status_id or '' }}"

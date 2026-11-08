@@ -3,7 +3,8 @@ Rules shared by the Tasks board and the deal pages (Tal's spec, 2026-11-01).
 
 Deal tasks live on the board too:
 - their day on the board comes from their date within this Sun–Sat week;
-  later dates and no date = Later; late (not done) = today's column.
+  later dates = Upcoming (sorted by date, shown with the date), no date = Later;
+  late (not done) = today's column.
 - moving one to another day on the board sets its date to that day this week;
   moving it to Later removes the date.
 In the deal's own list Tal sets the order by dragging. A new task, or one whose
@@ -61,7 +62,7 @@ def board_day(task: Task, today: date) -> Optional[str]:
     if task.due_date < start:
         return None  # done in an earlier week
     if task.due_date > start + timedelta(days=6):
-        return "later"
+        return "upcoming"
     return day_key(task.due_date)
 
 
