@@ -87,6 +87,12 @@ document.addEventListener('htmx:afterSwap', function(e) {
     <div class="form-row"><label>Signed date</label><input type="date" data-live name="agreement_date" min="2000-01-01" max="2100-12-31" value="{{ deal.agreement_date.isoformat() if deal.agreement_date else '' }}"></div>
     <div class="form-row"><label>Price ($)</label><input type="number" step="any" data-live name="agreement_price" value="{{ '%g'|format(deal.agreement_price|float) if deal.agreement_price is not none else '' }}"></div>
     <div class="form-row"><label>Renegotiated price ($) <span class="muted" style="font-weight:400;">- leave empty if there was no renegotiation</span></label><input type="number" step="any" data-live name="renegotiated_price" value="{{ '%g'|format(deal.renegotiated_price|float) if deal.renegotiated_price is not none else '' }}"></div>
+    <div class="form-row-pair">
+      <div class="form-row"><label>Bedrooms</label><input type="number" step="0.5" min="0" max="50" name="bedrooms" value="{{ '%g'|format(deal.bedrooms|float) if deal.bedrooms is not none else '' }}" placeholder="for matching buyers"></div>
+      <div class="form-row"><label>Neighborhood grade</label>
+        <select name="neighborhood_grade"><option value="">Not set</option>{% for g in GRADES %}<option value="{{ g }}" {{ 'selected' if g == deal.neighborhood_grade }}>{{ g }}</option>{% endfor %}</select>
+      </div>
+    </div>
     <div class="form-row"><label>Inspection days <span class="muted" style="font-weight:400;">- business days from the signed date</span></label><input type="number" min="0" max="90" data-live name="inspection_days" value="{{ deal.inspection_days or '' }}" placeholder="e.g. 10"></div>
     <div class="form-row"><label>Closing days <span class="muted" style="font-weight:400;">- from the signed date, sets the closing date</span></label><input type="number" min="0" max="365" data-live name="closing_days" value="{{ deal.closing_days or '' }}" placeholder="e.g. 30"></div>
     <div class="form-row">

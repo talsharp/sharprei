@@ -457,6 +457,9 @@ class WholesaleDeal(Base):
     # Days until closing (calendar days), counted from the agreement date. They set
     # closed_date, which Tal can still change by hand (see finance.follow_expected_closing).
     closing_days: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # For matching buyers: bedrooms (else the landing page's) and Tal's A-D grade of the area.
+    bedrooms: Mapped[Optional[float]] = mapped_column(Numeric(4, 1), nullable=True)
+    neighborhood_grade: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
     # The end buyer once one is found. Their price is sell_price; closed_date
     # is the scheduled closing date until the deal closes.
     buyer_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
@@ -705,6 +708,12 @@ class Buyer(Base):
     areas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     max_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     property_types: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    min_beds: Mapped[Optional[int]] = mapped_column(nullable=True)
+    max_beds: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Neighborhood grades they buy in, e.g. "A,B" (empty = any).
+    grades: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    # Only deals in the places they named - never suggested as "nearby".
+    exact_area_only: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # The buyer's notes as they were in GHL, before being split into the buybox.
     original_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

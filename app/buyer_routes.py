@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.buyers import CONTACT_CHANNELS, PROPERTY_TYPES, Places, join_list, split_list
+from app.buyers import CONTACT_CHANNELS, GRADES, PROPERTY_TYPES, Places, bed_range, join_list, split_list
 from app.database import get_db
 from app.models import Buyer, DealBuyer, WholesaleDeal
 
@@ -25,6 +25,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     router = APIRouter()
     templates.env.globals["CONTACT_CHANNELS"] = CONTACT_CHANNELS
     templates.env.globals["split_list"] = split_list
+    templates.env.globals["GRADES"] = GRADES
+    templates.env.globals["bed_range"] = bed_range
 
     def _form(request: Request, db: Session, buyer: Optional[Buyer]):
         places = Places(db)
@@ -67,6 +69,10 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         areas: str = Form(""),
         max_price: str = Form(""),
         property_types: List[str] = Form([]),
+        min_beds: str = Form(""),
+        max_beds: str = Form(""),
+        grades: List[str] = Form([]),
+        exact_area_only: str = Form(""),
         notes: str = Form(""),
         db: Session = Depends(get_db),
     ):
@@ -85,6 +91,10 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         buyer.areas = join_list(split_list(areas))
         buyer.max_price = _price(max_price)
         buyer.property_types = join_list(t for t in PROPERTY_TYPES if t in property_types)
+        buyer.min_beds = int(min_beds) if min_beds.strip().isdigit() else None
+        buyer.max_beds = int(max_beds) if max_beds.strip().isdigit() else None
+        buyer.grades = ",".join(g for g in GRADES if g in grades) or None
+        buyer.exact_area_only = bool(exact_area_only)
         buyer.notes = notes.strip() or None
         db.commit()
         return RedirectResponse(f"/dispo/buyers/{buyer.id}?saved=1", status_code=303)

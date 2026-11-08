@@ -26,12 +26,19 @@
   </div>
 
   <h3>Buybox</h3>
-  <p class="muted" style="font-size:12px; margin:-4px 0 12px;">Separate with commas. Deals in these places show the buyer as <strong>In their area</strong>; deals within a few miles show them as <strong>Nearby</strong>.</p>
+  <p class="muted" style="font-size:12px; margin:-4px 0 12px;">Separate with commas. A deal in their places that fits everything below makes them a <strong>Suggested</strong> buyer; a deal nearby, or one that misses something, makes them a <strong>Potential</strong> buyer.</p>
   <div class="buyer-form-grid">
     <div class="form-row"><label for="b-zips">Zip codes</label><input id="b-zips" type="text" name="zip_codes" value="{{ buyer.zip_codes or '' if buyer else '' }}" placeholder="e.g. 15202, 15237"></div>
     <div class="form-row"><label for="b-nb">Neighborhoods</label><input id="b-nb" type="text" name="neighborhoods" value="{{ buyer.neighborhoods or '' if buyer else '' }}" placeholder="e.g. Ross, Bellevue" list="nb-names"></div>
     <div class="form-row"><label for="b-areas">Areas</label><input id="b-areas" type="text" name="areas" value="{{ buyer.areas or '' if buyer else '' }}" placeholder="e.g. North Pittsburgh, East End" list="area-names"></div>
     <div class="form-row"><label for="b-max">Max price ($)</label><input id="b-max" type="text" name="max_price" inputmode="decimal" value="{{ '{:,.0f}'.format(buyer.max_price|float) if buyer and buyer.max_price is not none else '' }}" placeholder="e.g. 100,000"></div>
+    <div class="form-row"><label>Bedrooms <span class="muted" style="font-weight:400;">- from / to, empty = any</span></label>
+      <div class="bed-range"><input type="number" min="0" max="20" name="min_beds" value="{{ buyer.min_beds or '' if buyer else '' }}" aria-label="Bedrooms from"> to <input type="number" min="0" max="20" name="max_beds" value="{{ buyer.max_beds or '' if buyer else '' }}" aria-label="Bedrooms to"></div>
+    </div>
+    <div class="form-row"><label>Neighborhood grades they buy <span class="muted" style="font-weight:400;">- none = any</span></label>
+      <div class="check-row">{% for g in GRADES %}<label><input type="checkbox" name="grades" value="{{ g }}" {{ 'checked' if buyer and g in split_list(buyer.grades) }}> {{ g }}</label>{% endfor %}</div>
+    </div>
+    <div class="form-row wide"><label class="check-inline"><input type="checkbox" name="exact_area_only" value="1" {{ 'checked' if buyer and buyer.exact_area_only }}> Only their exact places - never show them as "Nearby"</label></div>
     <div class="form-row wide"><label>Property types <span class="muted" style="font-weight:400;">- none = any</span></label>
       <div class="check-row">{% for t in property_types %}<label><input type="checkbox" name="property_types" value="{{ t }}" {{ 'checked' if buyer and t in split_list(buyer.property_types) }}> {{ t }}</label>{% endfor %}</div>
     </div>

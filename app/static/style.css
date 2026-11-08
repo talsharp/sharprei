@@ -880,11 +880,17 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .buyer-form-grid .wide { grid-column: 1 / -1; }
 .check-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 6px 0; }
 .check-row label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--text); }
+.bed-range { display: flex; gap: 8px; align-items: center; }
+.bed-range input { width: 80px; }
+.check-inline { display: flex !important; gap: 8px; align-items: center; color: var(--text) !important; font-size: 14px !important; }
 .saved-note { background: var(--green-bg); color: var(--green); padding: 10px 14px; }
 .suggested-table { width: 100%; border-collapse: collapse; }
 .suggested-table td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13px; }
-.suggested-table tr.is-warn td { opacity: .75; }
-.suggested-table tr.match-group td { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 14px; }
+.suggested-table td.who { width: 34%; }
+.match-fit { color: var(--green); font-size: 12px; }
+.match-notes { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.match-hint { color: var(--yellow); }
+.deal-facts { font-size: 13px; margin: -4px 0 10px; }
 .match-area { color: var(--green); font-weight: 600; }
 .match-nearby { color: var(--accent); font-weight: 600; }
 .match-warn { color: var(--red); font-size: 12px; }

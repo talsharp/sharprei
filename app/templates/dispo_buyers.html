@@ -36,6 +36,9 @@
         {% if b.areas %}<div><span class="muted">Areas</span> {{ b.areas }}</div>{% endif %}
         {% if b.max_price is not none %}<div><span class="muted">Max</span> ${{ "{:,.0f}".format(b.max_price|float) }}</div>{% endif %}
         {% if b.property_types %}<div><span class="muted">Types</span> {{ b.property_types }}</div>{% endif %}
+        {% if bed_range(b) %}<div><span class="muted">Beds</span> {{ bed_range(b) }}</div>{% endif %}
+        {% if b.grades %}<div><span class="muted">Grades</span> {{ b.grades|replace(",", "/") }}</div>{% endif %}
+        {% if b.exact_area_only %}<div class="muted">Exact places only</div>{% endif %}
         {% if unknown[b.id] %}<div class="buybox-unknown" title="SharpREI can't place these on the map, so they don't match deals">Not on the map: {{ unknown[b.id]|join(", ") }}</div>{% endif %}
         {% if not has_box %}<span class="muted">No buybox yet</span>{% endif %}
       </td>

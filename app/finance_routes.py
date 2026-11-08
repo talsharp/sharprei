@@ -38,7 +38,7 @@ from app.task_logic import (
 )
 from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
-from app.buyers import NEARBY_MILES, suggest_buyers
+from app.buyers import GRADES, NEARBY_MILES, suggest_buyers
 from app.models import Buyer, DealBuyer, DealFile, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
@@ -503,6 +503,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         renegotiated_price: str = Form(""),
         inspection_days: str = Form(""),
         closing_days: str = Form(""),
+        bedrooms: str = Form(""),
+        neighborhood_grade: str = Form(""),
         sell_price: str = Form(""),
         status: str = Form("under_contract"),
         closed_date: str = Form(""),
@@ -530,6 +532,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             deal.renegotiated_price = _optional_money(renegotiated_price)
             deal.inspection_days = _int(inspection_days) or None
             deal.closing_days = _int(closing_days) or None
+            deal.bedrooms = _optional_money(bedrooms)
+            deal.neighborhood_grade = neighborhood_grade if neighborhood_grade in GRADES else None
             deal.sell_price = _optional_money(sell_price)
             deal.status = status if status in DEAL_STATUSES else "under_contract"
             deal.closed_date = _optional_date(closed_date)

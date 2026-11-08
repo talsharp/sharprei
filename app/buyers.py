@@ -4,8 +4,10 @@ neighborhoods, areas, max price, property types), and which buyers to call
 about a deal.
 
 Buyers name places their own way ("North Pittsburgh", "Ross Twp"), so places
-are turned into zip codes and matched by distance, not by name: a deal in one
-of their zips is "In their area"; within NEARBY_MILES of one is "Nearby". Zip
+are turned into zip codes and matched by distance, not by name. A deal in their
+area that also fits their price, bedrooms, grade and type is "Suggested"; one in
+their area that misses something, or within NEARBY_MILES of their places, is
+"Potential" - with what fits and what doesn't, so Tal decides. Zip
 centre points come from the US Census 2020 zip file (app/data/zip_centroids.csv,
 western Pennsylvania only).
 """
@@ -23,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.models import Buyer, DealPage, Neighborhood, WholesaleDeal, ZipCode
 
 NEARBY_MILES = 3
+GRADES = ["A", "B", "C", "D"]
 PROPERTY_TYPES = ["Single Family", "Multi-Family", "Duplex", "Townhouse", "Condo", "Land"]
 CONTACT_CHANNELS = {"email": "Email", "sms": "SMS", "messenger": "Messenger"}
 
@@ -136,27 +139,62 @@ def deal_zip(deal: WholesaleDeal) -> Optional[str]:
 
 
 def deal_facts(db: Session, deal: WholesaleDeal, places: Places) -> dict:
-    """Where the deal is, and its asking price and type from the landing page."""
+    """What a buyer is matched on: where the deal is, its 1st agreement price
+    (Tal's choice for now), bedrooms (else the landing page's), grade, and type."""
     zip_code = deal_zip(deal)
     page = db.query(DealPage).filter(DealPage.deal_id == deal.id).first()
+    beds = deal.bedrooms if deal.bedrooms is not None else (page.bedrooms if page else None)
     return {
         "zip": zip_code,
         "region": places.region_of.get(zip_code) if zip_code else None,
         "neighborhoods": sorted(places.zip_neighborhoods.get(zip_code, [])) if zip_code else [],
-        "price": float(page.asking_price) if page and page.asking_price is not None else None,
+        "price": float(deal.agreement_price) if deal.agreement_price is not None else None,
+        "beds": float(beds) if beds is not None else None,
+        "grade": deal.neighborhood_grade,
         "type": page.property_type if page and page.property_type else None,
     }
 
 
+def bed_range(buyer: Buyer) -> Optional[str]:
+    lo, hi = buyer.min_beds, buyer.max_beds
+    if lo and hi:
+        return f"{lo}" if lo == hi else f"{lo}-{hi}"
+    return f"{lo}+" if lo else f"up to {hi}" if hi else None
+
+
+def buybox_checks(buyer: Buyer, facts: dict) -> List[tuple]:
+    """(fits, text) for each thing the buyer asked for that the deal has.
+    Anything the buyer didn't set, or the deal doesn't have yet, isn't checked."""
+    checks = []
+    if buyer.max_price is not None and facts["price"] is not None:
+        top = float(buyer.max_price)
+        checks.append((facts["price"] <= top, f"${facts['price']:,.0f}, they buy up to ${top:,.0f}" if facts["price"] <= top
+                       else f"They buy only up to ${top:,.0f} (this one is ${facts['price']:,.0f})"))
+    wanted = bed_range(buyer)
+    if wanted and facts["beds"] is not None:
+        fits = (buyer.min_beds or 0) <= facts["beds"] <= (buyer.max_beds or 99)
+        checks.append((fits, f"{facts['beds']:g} beds, they want {wanted}" if fits else f"They want {wanted} beds (this one has {facts['beds']:g})"))
+    grades = split_list(buyer.grades)
+    if grades and facts["grade"]:
+        fits = facts["grade"] in grades
+        checks.append((fits, f"{facts['grade']} area, they buy {'/'.join(grades)}" if fits
+                       else f"They buy only {'/'.join(grades)} areas (this one is {facts['grade']})"))
+    types = split_list(buyer.property_types)
+    if types and facts["type"]:
+        fits = facts["type"] in types
+        checks.append((fits, f"{facts['type']}" if fits else f"They want {', '.join(types)} (this one is {facts['type']})"))
+    return checks
+
+
 def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
-    """Buyers whose buybox covers the deal ("In their area") or is close to it
-    ("Nearby"), with the reasons and anything that doesn't fit (price, type)."""
+    """"suggested": in their area and fits everything checked. "potential": in their
+    area but misses something, or nearby. Each with the reasons."""
     places = Places(db)
     facts = deal_facts(db, deal, places)
     here = zip_points().get(facts["zip"]) if facts["zip"] else None
     on_deal_ids = {b.buyer_id for b in deal.buyers if b.buyer_id}
     on_deal_names = {b.name.strip().lower() for b in deal.buyers}
-    matches, no_buybox = [], 0
+    suggested, potential, no_buybox = [], [], 0
     for buyer in db.query(Buyer).order_by(Buyer.name).all():
         buyer_places = places.buyer_places(buyer)
         if not buyer_places:
@@ -164,7 +202,7 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
             continue
         inside = [label for label, zips in buyer_places if facts["zip"] in zips]
         nearest = None
-        if not inside and here:
+        if not inside and here and not buyer.exact_area_only:
             for label, zips in buyer_places:
                 for z in zips:
                     if z in zip_points():
@@ -173,20 +211,18 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
                             nearest = (label, d)
         if not inside and not nearest:
             continue
-        warnings = []
-        if buyer.max_price is not None and facts["price"] is not None and facts["price"] > float(buyer.max_price):
-            warnings.append(f"Over their max price (${float(buyer.max_price):,.0f})")
-        types = split_list(buyer.property_types)
-        if types and facts["type"] and facts["type"] not in types:
-            warnings.append("Wants " + ", ".join(types))
-        matches.append({
+        checks = buybox_checks(buyer, facts)
+        misses = sum(1 for fits, _ in checks if not fits)
+        match = {
             "buyer": buyer,
-            "level": "area" if inside else "nearby",
-            "reason": ("In their area: " + ", ".join(inside)) if inside
-                      else f"Nearby: {nearest[1]:.1f} mi from {nearest[0]}",
+            "where": ("In their area: " + ", ".join(inside)) if inside else f"Nearby: {nearest[1]:.1f} mi from {nearest[0]}",
+            "inside": bool(inside),
             "distance": 0 if inside else nearest[1],
-            "warnings": warnings,
+            "checks": checks,
+            "misses": misses,
             "on_deal": buyer.id in on_deal_ids or buyer.name.strip().lower() in on_deal_names,
-        })
-    matches.sort(key=lambda m: (m["level"] != "area", bool(m["warnings"]), m["distance"], m["buyer"].name.lower()))
-    return {"facts": facts, "matches": matches, "no_buybox": no_buybox}
+        }
+        (suggested if inside and not misses else potential).append(match)
+    suggested.sort(key=lambda m: (-len(m["checks"]), m["buyer"].name.lower()))
+    potential.sort(key=lambda m: (not m["inside"], m["misses"], m["distance"], m["buyer"].name.lower()))
+    return {"facts": facts, "suggested": suggested, "potential": potential, "no_buybox": no_buybox}
