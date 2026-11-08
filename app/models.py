@@ -931,3 +931,15 @@ class GhlEmailRecipient(Base):
     status: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # GHL's: Delivered, Opened, Clicked, Replied, Unsubscribed
 
     email: Mapped[GhlEmail] = relationship(back_populates="recipients")
+
+
+class DealBuyerContact(Base):
+    """Whether Tal contacted a suggested / potential buyer about a deal (Yes / No)."""
+    __tablename__ = "deal_buyer_contacts"
+    __table_args__ = (UniqueConstraint("deal_id", "buyer_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id", ondelete="CASCADE"), index=True)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("buyers.id", ondelete="CASCADE"), index=True)
+    contacted: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

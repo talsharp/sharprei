@@ -5,7 +5,7 @@ import io
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from app.buyer_activity import COLUMNS, buyer_activity, import_email_history, link_buyers_by_name
 from app.buyers import CONTACT_CHANNELS, GRADES, PROPERTY_TYPES, Places, bed_range, join_list, split_list
 from app.database import get_db
-from app.models import Buyer, DealBuyer, GhlEmail, GhlEmailRecipient, WholesaleDeal
+from app.models import Buyer, DealBuyer, DealBuyerContact, GhlEmail, GhlEmailRecipient, WholesaleDeal
 
 MAX_STATS_BYTES = 10 * 1024 * 1024
 
@@ -170,13 +170,20 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             db.commit()
         return RedirectResponse("/dispo/buyers", status_code=303)
 
-    @router.post("/finance/deals/{deal_id}/suggested/{buyer_id}")
-    def suggested_add(deal_id: int, buyer_id: int, db: Session = Depends(get_db)):
-        """Adds a suggested buyer to the deal's Buyers & walkthroughs."""
-        deal, buyer = db.get(WholesaleDeal, deal_id), db.get(Buyer, buyer_id)
-        if deal and buyer and not any(b.buyer_id == buyer.id for b in deal.buyers):
-            db.add(DealBuyer(deal_id=deal.id, name=buyer.name, buyer_id=buyer.id))
-            db.commit()
-        return RedirectResponse(f"/finance/deals/{deal_id}#suggested", status_code=303)
+    @router.post("/finance/deals/{deal_id}/contacted/{buyer_id}")
+    def contacted_set(deal_id: int, buyer_id: int, value: str = Form(""), db: Session = Depends(get_db)):
+        """Contacted Yes / No for a buyer on a deal; empty clears it."""
+        if not db.get(WholesaleDeal, deal_id) or not db.get(Buyer, buyer_id):
+            return Response(status_code=404)
+        row = db.query(DealBuyerContact).filter_by(deal_id=deal_id, buyer_id=buyer_id).first()
+        if value in ("yes", "no"):
+            if not row:
+                row = DealBuyerContact(deal_id=deal_id, buyer_id=buyer_id)
+                db.add(row)
+            row.contacted = value == "yes"
+        elif row:
+            db.delete(row)
+        db.commit()
+        return Response(status_code=204)
 
     return router

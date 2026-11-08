@@ -932,3 +932,10 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .card-toggle:hover { background: #EEF4FB; border-color: var(--accent); color: var(--accent); }
 .card.is-collapsed .card-toggle svg { transform: rotate(-90deg); }
 .card.is-collapsed .card-toggle { background: var(--navy); border-color: var(--navy); color: #fff; }
+.contacted-cell { white-space: nowrap; width: 100px; }
+.yes-no { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+.yes-no button { background: var(--panel); color: var(--muted); border: 0; border-radius: 0; box-shadow: none; padding: 5px 12px; font-size: 12px; font-weight: 600; width: auto; }
+.yes-no button + button { border-left: 1px solid var(--border-strong); }
+.yes-no button:hover { background: var(--panel-soft); color: var(--text); }
+.yes-no button[data-value=yes].on { background: var(--green-bg); color: var(--green); }
+.yes-no button[data-value=no].on { background: var(--red-bg); color: var(--red); }

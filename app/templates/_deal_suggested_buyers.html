@@ -3,7 +3,7 @@
 {% macro buyer_rows(matches, heading=None) %}
 <div style="overflow-x:auto;">
 <table class="buyer-match-table">
-  <thead><tr><th>Buyer</th><th>Why</th><th>This deal</th><th></th></tr></thead>
+  <thead><tr><th>Buyer</th><th>Why</th><th>This deal</th><th>Contacted</th></tr></thead>
   <tbody>
     {% for m in matches %}
     {% if heading and (loop.first or m.group != loop.previtem.group) %}
@@ -24,9 +24,11 @@
         {% if m.status.page %}<div class="st-{{ m.status.page|lower|replace(' ', '-') }}">Page: {{ m.status.page }}</div>{% endif %}
         {% if not m.status.email and not m.status.page %}<span class="muted">Not sent</span>{% endif %}
       </td>
-      <td style="text-align:right; white-space:nowrap;">
-        {% if m.on_deal %}<span class="muted">On this deal</span>
-        {% else %}<form method="post" action="/finance/deals/{{ deal.id }}/suggested/{{ m.buyer.id }}" style="margin:0;"><button type="submit" class="small secondary">+ Add to deal</button></form>{% endif %}
+      <td class="contacted-cell">
+        <div class="yes-no" data-url="/finance/deals/{{ deal.id }}/contacted/{{ m.buyer.id }}" role="group" aria-label="Contacted {{ m.buyer.name }}">
+          <button type="button" data-value="yes" class="{{ 'on' if m.contacted == true }}">Yes</button><button type="button" data-value="no" class="{{ 'on' if m.contacted == false }}">No</button>
+        </div>
+        {% if m.on_deal %}<div class="muted" style="font-size:11px; margin-top:3px;">On this deal</div>{% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -52,3 +54,17 @@
   <h3>Potential buyers <span class="muted" style="font-weight:400; font-size:13px;">· {{ suggested.potential|length }}</span></h3>
   {% if suggested.potential %}{{ buyer_rows(suggested.potential, True) }}{% else %}<p class="muted" style="margin:0;">None.</p>{% endif %}
 </div>
+<script>
+// Contacted Yes / No - saves on click; clicking the chosen one again clears it.
+document.querySelectorAll('.yes-no').forEach(function(group) {
+  group.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var value = btn.classList.contains('on') ? '' : btn.dataset.value;
+      fetch(group.dataset.url, {method: 'POST', body: new URLSearchParams({value: value})}).then(function(r) {
+        if (!r.ok) throw r;
+        group.querySelectorAll('button').forEach(function(b) { b.classList.toggle('on', b.dataset.value === value); });
+      }).catch(function() { alert('Could not save - check your connection and try again.'); });
+    });
+  });
+});
+</script>

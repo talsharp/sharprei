@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
-from app.models import Buyer, DealPage, Neighborhood, WholesaleDeal, ZipCode
+from app.models import Buyer, DealBuyerContact, DealPage, Neighborhood, WholesaleDeal, ZipCode
 
 NEARBY_MILES = 3
 GRADES = ["A", "B", "C", "D"]
@@ -221,6 +221,7 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
     facts = deal_facts(db, deal, places)
     here = zip_points().get(facts["zip"]) if facts["zip"] else None
     activity = buyer_activity(db)
+    contacted = {c.buyer_id: c.contacted for c in db.query(DealBuyerContact).filter(DealBuyerContact.deal_id == deal.id)}
     on_deal_ids = {b.buyer_id for b in deal.buyers if b.buyer_id}
     on_deal_names = {b.name.strip().lower() for b in deal.buyers}
     suggested, potential, no_buybox = [], [], 0
@@ -264,6 +265,7 @@ def suggest_buyers(db: Session, deal: WholesaleDeal) -> dict:
             "misses": misses,
             "clicked": clicked,
             "status": engaged["status"],
+            "contacted": contacted.get(buyer.id),
             "on_deal": buyer.id in on_deal_ids or buyer.name.strip().lower() in on_deal_names,
         }
         if (inside or clicked) and not misses:
