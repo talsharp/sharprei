@@ -327,7 +327,7 @@ class FinanceMonth(Base):
     sms_follow_up_leads: Mapped[int] = mapped_column(default=0)
     cold_call_leads: Mapped[int] = mapped_column(default=0)
     facebook_leads: Mapped[int] = mapped_column(default=0)
-    # Of the Facebook leads, how many were outside the target area (e.g. Baltimore).
+    # Of the Facebook leads, how many were outside the target area (e.g. Baltimore) or already listed.
     facebook_outside_leads: Mapped[int] = mapped_column(default=0, server_default="0")
     website_leads: Mapped[int] = mapped_column(default=0, server_default="0")
 

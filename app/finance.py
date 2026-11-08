@@ -155,7 +155,7 @@ class ChannelStats:
     under_contract: int = 0
     dead: int = 0
     profit: float = 0.0      # profit of this channel's closed deals (its revenue)
-    outside: int = 0         # leads outside the target area (Facebook only, Tal enters it)
+    outside: int = 0         # leads outside the target area or listed (Facebook only, Tal enters it)
 
     @property
     def cpl(self) -> Optional[float]:

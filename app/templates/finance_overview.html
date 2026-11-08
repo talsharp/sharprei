@@ -200,7 +200,7 @@
   {% call kpi("Net profit", fm.money(cs.net), "teal", fm.signed_class(cs.net), "Revenue − spent on " ~ label ~ ".") %}{{ ICON_PROFIT }}{% endcall %}
   {% call kpi("ROI", fm.pct(cs.roi), "coral", fm.signed_class(cs.roi), "Net profit ÷ spent.") %}{{ ICON_ROI }}{% endcall %}
   {% call kpi("Leads · CPL", cs.leads ~ " · " ~ fm.cpl(cs.cpl), "blue", title="Spent ÷ leads.") %}{{ ICON_LEADS }}{% endcall %}
-  {% if cs.outside %}{% call kpi("Relevant leads · CPL", cs.relevant_leads ~ " · " ~ fm.cpl(cs.relevant_cpl), "blue", title=cs.outside ~ " leads outside the target area left out. Spent ÷ relevant leads.") %}{{ ICON_LEADS }}{% endcall %}{% endif %}
+  {% if cs.outside %}{% call kpi("Relevant leads · CPL", cs.relevant_leads ~ " · " ~ fm.cpl(cs.relevant_cpl), "blue", title=cs.outside ~ " leads outside the target area or listed left out. Spent ÷ relevant leads.") %}{{ ICON_LEADS }}{% endcall %}{% endif %}
 </div>
 
 <div class="card">
