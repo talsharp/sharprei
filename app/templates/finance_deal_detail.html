@@ -409,7 +409,7 @@ document.addEventListener('htmx:afterSwap', function(e) {
     title.insertBefore(btn, title.firstChild);
     function set(shut) {
       card.classList.toggle('is-collapsed', shut);
-      btn.textContent = shut ? '▸' : '▾';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
       btn.setAttribute('aria-label', shut ? 'Open section' : 'Collapse section');
       btn.setAttribute('aria-expanded', String(!shut));
     }
