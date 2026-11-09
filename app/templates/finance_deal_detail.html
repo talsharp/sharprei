@@ -69,7 +69,7 @@ document.addEventListener('htmx:afterSwap', function(e) {
 </div>
 {% if suggested %}{% include "_deal_suggested_buyers.html" %}{% endif %}
 
-{% if reach.emails or reach.sharp %}{% include "_deal_reach.html" %}{% endif %}
+{% include "_deal_reach.html" %}
 
 <div class="card deal-page-card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">

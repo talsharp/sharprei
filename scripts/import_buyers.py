@@ -31,8 +31,8 @@ NEIGHBORHOOD_FIXES = {
     "mt washington": ["Mount Washington"], "mt. washington": ["Mount Washington"],
     "west miffin": ["West Mifflin"],
     "penn hils": ["Penn Hills"],
-    "lawrenceville": ["Lower Lawrenceville", "Central Lawrenceville", "Upper Lawrenceville"],
-    "squirrel hill": ["Squirrel Hill North", "Squirrel Hill South"],
+    "lawrenceville": ["Lawrenceville"],
+    "squirrel hill": ["Squirrel Hill"],
     "natrona": ["Harrison"],
 }
 # Written as neighborhoods, but they're areas.
@@ -75,6 +75,8 @@ def convert(row: dict) -> tuple:
         if not email:
             changes.append("sms" if phone else "messenger")
     types = [t for t in PROPERTY_TYPES if t.lower() in {p.lower() for p in split_list(text(row.get("Property types")))}]
+    if "Multi-Family" in types and "Single Family" not in types:  # buys SF too unless "only" (Tal, 2026-11-09)
+        types.insert(0, "Single Family")
     max_price = row.get("Max price")
     try:
         max_price = float(str(max_price).replace(",", "").replace("$", "")) if text(max_price) else None

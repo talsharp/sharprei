@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.buyer_activity import COLUMNS, buyer_activity, import_email_history, link_buyers_by_name
-from app.buyers import CONTACT_CHANNELS, GRADES, PROPERTY_TYPES, Places, bed_range, join_list, split_list
+from app.buyers import CONTACT_CHANNELS, GRADES, PROPERTY_TYPES, Places, bed_range, join_list, merge_neighborhoods, split_list
 from app.database import get_db
 from app.models import Buyer, DealBuyer, DealBuyerContact, GhlEmail, GhlEmailRecipient, WholesaleDeal
 
@@ -52,7 +52,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         places = Places(db)
         return templates.TemplateResponse("dispo_buyer_edit.html", {
             "request": request, "active": "buyers", "buyer": buyer, "property_types": PROPERTY_TYPES,
-            "regions": places.regions, "neighborhood_names": sorted(places.neighborhood_name.values()),
+            "tag_options": places.suggestions(),
             "unknown": places.unknown(buyer) if buyer else [],
             "activity": buyer_activity(db, {buyer.id}).get(buyer.id) if buyer else None,
         })
@@ -144,7 +144,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         buyer.phone = phone.strip()[:40] or None
         buyer.channels = ",".join(c for c in CONTACT_CHANNELS if c in channels) or "email"
         buyer.zip_codes = join_list(z for z in split_list(zip_codes))
-        buyer.neighborhoods = join_list(split_list(neighborhoods))
+        buyer.neighborhoods = join_list(merge_neighborhoods(split_list(neighborhoods)))
         buyer.areas = join_list(split_list(areas))
         buyer.max_price = _price(max_price)
         buyer.property_types = join_list(t for t in PROPERTY_TYPES if t in property_types)

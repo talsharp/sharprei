@@ -1,21 +1,43 @@
-{# How this deal was seen: GHL emails and the SharpREI landing page. #}
+{# Deal Views: GHL emails, the SharpREI landing page, and other platforms (views typed in by Tal). #}
 {% set g, sp = reach.ghl, reach.sharp %}
 <div class="card" id="reach">
-  <h3>Where it was seen</h3>
+  <h3>Deal Views</h3>
   <div style="overflow-x:auto;">
   <table class="suggested-table reach-table">
-    <thead><tr><th></th><th>Sent</th><th>Opened</th><th>Clicked</th></tr></thead>
+    <thead><tr><th></th><th>Sent</th><th>Opened / views</th><th>Clicked</th><th></th></tr></thead>
     <tbody>
       {% for e in reach.emails %}
       <tr><td>GHL email · {{ e.email.sent_on.strftime('%b %d') if e.email.sent_on else "" }} <span class="muted">{{ e.email.subject|truncate(60) }}</span></td>
-        <td>{{ e.sent }}</td><td>{{ e.opened }} <span class="muted">{{ (100 * e.opened / e.sent)|round|int if e.sent else 0 }}%</span></td><td>{{ e.clicked }} <span class="muted">{{ (100 * e.clicked / e.sent)|round|int if e.sent else 0 }}%</span></td></tr>
+        <td>{{ e.sent }}</td><td>{{ e.opened }} <span class="muted">{{ (100 * e.opened / e.sent)|round|int if e.sent else 0 }}%</span></td><td>{{ e.clicked }} <span class="muted">{{ (100 * e.clicked / e.sent)|round|int if e.sent else 0 }}%</span></td><td></td></tr>
       {% endfor %}
-      {% if reach.emails|length > 1 %}<tr class="reach-sub"><td>GHL, all emails <span class="muted">(each buyer once)</span></td><td>{{ g.sent }}</td><td>{{ g.opened }}</td><td>{{ g.clicked }}</td></tr>{% endif %}
+      {% if reach.emails|length > 1 %}<tr class="reach-sub"><td>GHL, all emails <span class="muted">(each buyer once)</span></td><td>{{ g.sent }}</td><td>{{ g.opened }}</td><td>{{ g.clicked }}</td><td></td></tr>{% endif %}
       {% if sp %}<tr><td>SharpREI page <span class="muted">· {{ reach.links }} personal link{{ "s" if reach.links != 1 }} + general link</span></td>
-        <td class="muted">-</td><td>{{ sp.people }} <span class="muted">people · {{ sp.views }} views</span></td><td>{{ sp.photo_people }} <span class="muted">opened photos</span></td></tr>{% endif %}
-      <tr class="reach-total"><td>Total <span class="muted">(a buyer can be counted in both)</span></td><td>{{ g.sent }}</td><td>{{ g.opened + (sp.people if sp else 0) }}</td><td>{{ g.clicked + (sp.photo_people if sp else 0) }}</td></tr>
+        <td class="muted">-</td><td>{{ sp.people }} <span class="muted">people · {{ sp.views }} views</span></td><td>{{ sp.photo_people }} <span class="muted">opened photos</span></td><td></td></tr>{% endif %}
+      {% for p in reach.platforms %}
+      <tr><td>{{ p.name }}</td><td class="muted">-</td>
+        <td><input type="number" min="0" step="1" class="platform-views" data-url="/finance/deals/platforms/{{ p.id }}" value="{{ p.views }}" aria-label="{{ p.name }} views"> <span class="muted">views</span></td>
+        <td class="muted">-</td>
+        <td style="text-align:right;"><form method="post" action="/finance/deals/platforms/{{ p.id }}/delete" style="margin:0;" data-undo="{{ p.name }} removed" data-undo-hide="closest tr" data-undo-after="reload"><button type="submit" class="showing-x" title="Remove">×</button></form></td></tr>
+      {% endfor %}
+      <tr class="reach-total"><td>Total <span class="muted">(a buyer can be counted more than once)</span></td><td>{{ g.sent }}</td><td>{{ g.opened + (sp.people if sp else 0) + reach.platform_views }}</td><td>{{ g.clicked + (sp.photo_people if sp else 0) }}</td><td></td></tr>
     </tbody>
   </table>
   </div>
+  <form method="post" action="/finance/deals/{{ deal.id }}/platforms" class="platform-add">
+    <input type="text" name="name" list="platform-names" placeholder="Other platform, e.g. InvestorBase" maxlength="80" required>
+    <input type="number" name="views" min="0" step="1" placeholder="Views" required>
+    <button type="submit" class="small">+ Add platform</button>
+  </form>
+  <datalist id="platform-names"><option value="InvestorBase"></option></datalist>
   {% if reach.clicked %}<p class="muted" style="font-size:12px; margin:8px 0 0;">Clicked the GHL email: {% for r in reach.clicked %}{% if r.buyer_id %}<a class="zip-link" href="/dispo/buyers/{{ r.buyer_id }}">{{ r.name or r.address }}</a>{% else %}{{ r.name or r.address }}{% endif %}{{ ", " if not loop.last }}{% endfor %}</p>{% endif %}
 </div>
+<script>
+// A platform's views save as soon as they change.
+document.querySelectorAll('.platform-views').forEach(function(input) {
+  input.addEventListener('change', function() {
+    fetch(input.dataset.url, {method: 'POST', body: new URLSearchParams({views: input.value})})
+      .then(function(r) { if (!r.ok) throw r; input.classList.add('saved'); setTimeout(function() { input.classList.remove('saved'); }, 800); })
+      .catch(function() { alert('Could not save - check your connection and try again.'); });
+  });
+});
+</script>

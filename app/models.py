@@ -958,3 +958,14 @@ class DealShowing(Base):
     deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id", ondelete="CASCADE"), index=True)
     at: Mapped[datetime] = mapped_column(DateTime)
     task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+
+
+class DealPlatformView(Base):
+    """Views of a deal on another platform Tal promotes it on (e.g. InvestorBase), entered by hand."""
+    __tablename__ = "deal_platform_views"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("wholesale_deals.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    views: Mapped[int] = mapped_column(default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

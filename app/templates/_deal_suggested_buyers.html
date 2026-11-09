@@ -19,11 +19,7 @@
         <div class="chips">{% for kind, text in m.why %}<span class="chip-{{ kind }}">{{ "✓" if kind == "fit" else "✗" if kind == "miss" else "≈" }} {{ text }}</span>{% endfor %}</div>
         {% if m.buyer.notes %}<div class="match-notes" title="{{ m.buyer.notes }}">{{ m.buyer.notes|truncate(90) }}</div>{% endif %}
       </td>
-      <td class="deal-status">
-        {% if m.status.email %}<div class="st-{{ m.status.email|lower|replace(' ', '-') }}">Email: {{ m.status.email }}</div>{% endif %}
-        {% if m.status.page %}<div class="st-{{ m.status.page|lower|replace(' ', '-') }}">Page: {{ m.status.page }}</div>{% endif %}
-        {% if not m.status.email and not m.status.page %}<span class="muted">Not sent</span>{% endif %}
-      </td>
+      <td class="deal-status"><span class="st-{{ m.status|lower|replace(' ', '-') }}">{{ m.status }}</span></td>
       <td class="contacted-cell">
         <div class="yes-no" data-url="/finance/deals/{{ deal.id }}/contacted/{{ m.buyer.id }}" role="group" aria-label="Contacted {{ m.buyer.name }}">
           <button type="button" data-value="yes" class="{{ 'on' if m.contacted == true }}">Yes</button><button type="button" data-value="no" class="{{ 'on' if m.contacted == false }}">No</button>

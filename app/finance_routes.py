@@ -41,7 +41,7 @@ from app.models import Task, TaskStatus
 from app.deal_pages import public_base, view_stats
 from app.buyer_activity import deal_reach
 from app.buyers import GRADES, NEARBY_MILES, suggest_buyers
-from app.models import Buyer, DealBuyer, DealFile, DealShowing, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
+from app.models import Buyer, DealBuyer, DealFile, DealPlatformView, DealShowing, DealPage, FinanceExpense, FinanceMonth, Property, Vendor, WholesaleDeal, ZipCode
 
 
 def _is_htmx(request: Request) -> bool:
@@ -494,6 +494,40 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             buyer.note = form["note"].strip() or None
         db.commit()
         return Response(status_code=204)
+
+    # ---------- Deal Views: other platforms ----------
+
+    @router.post("/deals/{deal_id}/platforms")
+    def finance_platform_add(deal_id: int, name: str = Form(""), views: str = Form("0"), db: Session = Depends(get_db)):
+        """Adds a platform's views, or updates them if the deal already has that platform."""
+        deal = db.get(WholesaleDeal, deal_id)
+        if deal and name.strip():
+            row = next((p for p in db.query(DealPlatformView).filter(DealPlatformView.deal_id == deal.id)
+                        if p.name.lower() == name.strip().lower()), None)
+            if not row:
+                row = DealPlatformView(deal_id=deal.id, name=name.strip()[:80])
+                db.add(row)
+            row.views = _int(views)
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}#reach", status_code=303)
+
+    @router.post("/deals/platforms/{row_id}")
+    def finance_platform_update(row_id: int, views: str = Form("0"), db: Session = Depends(get_db)):
+        row = db.get(DealPlatformView, row_id)
+        if not row:
+            return Response(status_code=404)
+        row.views = _int(views)
+        db.commit()
+        return Response(status_code=204)
+
+    @router.post("/deals/platforms/{row_id}/delete")
+    def finance_platform_delete(row_id: int, db: Session = Depends(get_db)):
+        row = db.get(DealPlatformView, row_id)
+        deal_id = row.deal_id if row else None
+        if row:
+            db.delete(row)
+            db.commit()
+        return RedirectResponse(f"/finance/deals/{deal_id}#reach" if deal_id else "/finance/deals", status_code=303)
 
     # ---------- Showings ----------
 

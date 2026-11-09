@@ -61,6 +61,24 @@ OUTSIDE_PLACES = {
     "beaver county": ["15001", "15003", "15009", "15010", "15061", "15066"],
 }
 
+# Neighborhoods SharpREI has in parts, shown and saved as one name (Tal, 2026-11-09).
+# A merged name matches every part's zips; old part names on a buyer still work.
+NEIGHBORHOOD_GROUPS = {
+    "Lawrenceville": ["Lower Lawrenceville", "Central Lawrenceville", "Upper Lawrenceville"],
+    "Squirrel Hill": ["Squirrel Hill North", "Squirrel Hill South"],
+    "Oakland": ["North Oakland", "South Oakland", "West Oakland", "Central Oakland"],
+    "Homewood": ["Homewood North", "Homewood South"],
+    "Perry": ["Perry North", "Perry South"],
+    "South Side": ["South Side Flats", "South Side Slopes"],
+}
+PART_TO_GROUP = {part.lower(): group for group, parts in NEIGHBORHOOD_GROUPS.items() for part in parts}
+
+
+def merge_neighborhoods(names: List[str]) -> List[str]:
+    """Part names -> their merged name, without repeats ("Upper Lawrenceville" -> "Lawrenceville")."""
+    return list(dict.fromkeys(PART_TO_GROUP.get(n.lower(), n) for n in names))
+
+
 ZIP_AT_END = re.compile(r"\b(\d{5})(?:-\d{4})?\s*$")
 
 
@@ -105,9 +123,24 @@ class Places:
         for n in db.query(Neighborhood).all():
             zips = {link.zip_code.zip_code for link in n.zip_links}
             self.neighborhood_zips[n.name.lower()] = zips
-            self.neighborhood_name[n.name.lower()] = n.name
+            group = PART_TO_GROUP.get(n.name.lower())
+            if group:  # listed under its merged name only
+                self.neighborhood_zips.setdefault(group.lower(), set()).update(zips)
+                self.neighborhood_name[group.lower()] = group
+            else:
+                self.neighborhood_name[n.name.lower()] = n.name
             for z in zips:
-                self.zip_neighborhoods[z].append(n.name)
+                if (group or n.name) not in self.zip_neighborhoods[z]:
+                    self.zip_neighborhoods[z].append(group or n.name)
+
+    def suggestions(self) -> dict:
+        """What the buyer form's tag boxes offer while typing."""
+        outside = sorted(p.title() for p in OUTSIDE_PLACES)
+        return {
+            "zip_codes": sorted(self.region_of),
+            "neighborhoods": sorted(set(self.neighborhood_name.values()) | set(outside)),
+            "areas": sorted(set(self.regions) | {a.title() for a in AREA_REGIONS} | {"Greater Pittsburgh"} | set(outside)),
+        }
 
     def neighborhood_zips_for(self, name: str) -> Set[str]:
         key = name.lower()
@@ -192,12 +225,16 @@ def _engagement(act: Optional[dict], deal: WholesaleDeal, here: Optional[tuple])
     """This deal's status for the buyer (GHL email, SharpREI page), and whether they
     clicked it or a past deal within NEARBY_MILES - a click can make them suggested."""
     this = (act or {}).get("deals", {}).get(deal.id)
-    status = {
-        "email": None if not this or not this["ghl_emails"] else
-                 "Clicked" if this["ghl_clicked"] else "Opened" if this["ghl_opened"] else "Not opened",
-        "page": None if not this or not this["sharp"] else
-                "Opened photos" if this["sharp_clicked"] else "Viewed" if this["sharp_opened"] else "Not opened",
-    }
+    # One status for the GHL email and the SharpREI page together (Tal doesn't mind which):
+    # clicked the email or opened the page's photos = Clicked; opened either = Opened.
+    if not this or not (this["ghl_emails"] or this["sharp"]):
+        status = "Not sent"
+    elif this["ghl_clicked"] or this["sharp_clicked"]:
+        status = "Clicked"
+    elif this["ghl_opened"] or this["sharp_opened"]:
+        status = "Opened"
+    else:
+        status = "Not opened"
     clicked_this = bool(this and (this["ghl_clicked"] or this["sharp_clicked"]))
     clicked_nearby = False
     for key, d in (act or {}).get("deals", {}).items():

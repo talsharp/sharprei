@@ -17,7 +17,7 @@ from typing import Dict, Iterable, Optional
 from sqlalchemy.orm import Session
 
 from app.deal_pages import is_real, view_stats
-from app.models import Buyer, DealPage, DealPageLink, GhlEmail, GhlEmailRecipient, WholesaleDeal
+from app.models import Buyer, DealPage, DealPageLink, DealPlatformView, GhlEmail, GhlEmailRecipient, WholesaleDeal
 
 COLUMNS = ["Deal address", "Email subject", "Date sent", "Buyer name", "Buyer email", "Opened", "Clicked"]
 
@@ -153,7 +153,7 @@ def buyer_activity(db: Session, buyer_ids: Optional[set] = None) -> Dict[int, di
 
 
 def deal_reach(db: Session, deal: WholesaleDeal) -> dict:
-    """How a deal was seen: each GHL email, and the landing page."""
+    """How a deal was seen: each GHL email, the landing page, and other platforms (views typed in by Tal)."""
     emails = []
     clicked_buyers = {}
     for e in db.query(GhlEmail).filter(GhlEmail.deal_id == deal.id).order_by(GhlEmail.sent_on, GhlEmail.id).all():
@@ -165,7 +165,10 @@ def deal_reach(db: Session, deal: WholesaleDeal) -> dict:
     page = db.query(DealPage).filter(DealPage.deal_id == deal.id).first()
     stats = view_stats(page.views) if page else None
     all_recipients = {r.address for e in emails for r in e["email"].recipients}
+    platforms = db.query(DealPlatformView).filter(DealPlatformView.deal_id == deal.id).order_by(DealPlatformView.id).all()
     return {
+        "platforms": platforms,
+        "platform_views": sum(p.views for p in platforms),
         "emails": emails,
         "ghl": {"sent": len(all_recipients),
                 "opened": len({r.address for e in emails for r in e["email"].recipients if r.opened}),
