@@ -20,6 +20,8 @@
     <label>Facebook<input type="text" name="facebook" maxlength="255" placeholder="Profile link or name"></label>
     <label>Section<select name="section" id="new-section">{% for k, label in sections.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
     <label class="only-worked">Worked together on<input type="date" name="worked_on" value="{{ today }}" min="2000-01-01" max="2100-12-31"></label>
+    <label class="only-worked grow2">What was the work<input type="text" name="work" maxlength="255" placeholder="e.g. Replaced water heater"></label>
+    <label class="only-worked">Charged ($)<input type="text" name="amount" inputmode="decimal" placeholder="e.g. 1,200"></label>
     <label class="only-worked">How was it<select name="rating"><option value="">-</option>{% for k, label in PROVIDER_RATINGS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
     <label class="only-recommended" hidden>Recommended by<input type="text" name="recommended_by" maxlength="120"></label>
     <label class="wide">Note<input type="text" name="notes" placeholder="e.g. good with roofs, fast, a bit pricey"></label>
@@ -60,6 +62,28 @@
   </div>
 </div>
 {% endfor %}
+
+<div class="card" id="all-jobs">
+  <h3>All jobs <span class="muted provider-count" style="font-weight:400; font-size:13px;"></span></h3>
+  <p class="muted" style="font-size:12px; margin:-4px 0 10px;">Every job by every provider, newest first - pick a type above to compare what each one charged.</p>
+  <div style="overflow-x:auto;">
+  <table class="providers-table">
+    <thead><tr><th>Date</th><th>Provider</th><th>Work</th><th style="text-align:right;">Charged</th><th>How it went</th></tr></thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr data-types="{{ j.provider.type_list|map('lower')|join('|') }}">
+        <td style="white-space:nowrap;">{{ j.worked_on.strftime('%b %d, %Y') }}</td>
+        <td><a class="zip-link" href="/tools/providers/{{ j.provider_id }}">{{ j.provider.name }}</a></td>
+        <td>{{ j.work or "" }}{% if j.note %} <span class="muted">· {{ j.note }}</span>{% endif %}</td>
+        <td style="text-align:right; white-space:nowrap;">{{ "${:,.0f}".format(j.amount|float) if j.amount is not none else "" }}</td>
+        <td>{% if j.rating %}<span class="rating-{{ j.rating }}">{{ PROVIDER_RATINGS[j.rating] }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      <tr class="providers-empty" {{ 'hidden' if jobs }}><td colspan="5" class="muted">No jobs yet.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
 
 <details class="card" id="types">
   <summary><strong>Types</strong> <span class="muted">· {{ types|map(attribute='name')|join(', ') }}</span></summary>

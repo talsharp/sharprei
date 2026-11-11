@@ -17,11 +17,13 @@
   <h3>{{ "Jobs" if p.jobs else "Worked with them?" }}</h3>
   {% if p.jobs %}
   <table class="providers-table">
-    <thead><tr><th>Date</th><th>How it went</th><th>Note</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Work</th><th style="text-align:right;">Charged</th><th>How it went</th><th>Note</th><th></th></tr></thead>
     <tbody>
       {% for j in p.jobs %}
       <tr>
         <td style="white-space:nowrap;">{{ j.worked_on.strftime('%b %d, %Y') }}</td>
+        <td>{{ j.work or "" }}</td>
+        <td style="text-align:right; white-space:nowrap;">{{ "${:,.0f}".format(j.amount|float) if j.amount is not none else "" }}</td>
         <td>{% if j.rating %}<span class="rating-{{ j.rating }}">{{ PROVIDER_RATINGS[j.rating] }}</span>{% endif %}</td>
         <td>{{ j.note or "" }}</td>
         <td style="text-align:right;"><form method="post" action="/tools/providers/jobs/{{ j.id }}/delete" data-undo="Job removed" data-undo-after="reload" style="margin:0;"><button type="submit" class="showing-x" title="Remove">×</button></form></td>
@@ -32,8 +34,10 @@
   {% endif %}
   <form method="post" action="/tools/providers/{{ p.id }}/jobs" class="provider-form" style="margin-top:12px;">
     <label>Worked together on<input type="date" name="worked_on" value="{{ today }}" min="2000-01-01" max="2100-12-31" required></label>
+    <label class="grow2">What was the work<input type="text" name="work" maxlength="255" placeholder="e.g. Replaced water heater - 1710 High St"></label>
+    <label>Charged ($)<input type="text" name="amount" inputmode="decimal" placeholder="e.g. 1,200"></label>
     <label>How was it<select name="rating"><option value="">-</option>{% for k, label in PROVIDER_RATINGS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
-    <label class="wide">Note<input type="text" name="note" placeholder="e.g. fixed the water heater, on time"></label>
+    <label class="wide">Note<input type="text" name="note" placeholder="e.g. on time, clean work"></label>
     <button type="submit">{{ "Add job" if p.jobs else "Worked with them" }}</button>
   </form>
   {% if p.section == 'recommended' %}<p class="muted" style="font-size:12px; margin:8px 0 0;">Adding a job moves them to <strong>Worked with</strong>.</p>{% endif %}

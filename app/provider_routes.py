@@ -36,6 +36,13 @@ def _type_names(db: Session, value: str) -> Optional[str]:
     return ", ".join(names) or None
 
 
+def _money(value: str) -> Optional[float]:
+    try:
+        return float(value.replace(",", "").replace("$", "").strip()) if value.strip() else None
+    except ValueError:
+        return None
+
+
 def _date(value: str) -> date:
     try:
         return date.fromisoformat(value)
@@ -56,6 +63,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         return templates.TemplateResponse("tools_providers.html", {
             "request": request, "active": "providers", "types": _types(db), "sections": SECTIONS,
             "groups": {key: [p for p in providers if p.section == key] for key in SECTIONS},
+            "jobs": db.query(ProviderJob).order_by(ProviderJob.worked_on.desc(), ProviderJob.id.desc()).all(),
             "today": date.today().isoformat(),
         })
 
@@ -63,7 +71,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     def provider_new(
         name: str = Form(""), types: str = Form(""), section: str = Form("worked"), phone: str = Form(""),
         email: str = Form(""), facebook: str = Form(""), recommended_by: str = Form(""), notes: str = Form(""),
-        worked_on: str = Form(""), rating: str = Form(""), db: Session = Depends(get_db),
+        worked_on: str = Form(""), rating: str = Form(""), work: str = Form(""), amount: str = Form(""),
+        db: Session = Depends(get_db),
     ):
         if not name.strip():
             return RedirectResponse("/tools/providers", status_code=303)
@@ -74,8 +83,9 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             recommended_by=recommended_by.strip()[:120] or None, notes=notes.strip() or None,
         )
         db.add(provider)
-        if provider.section == "worked" and (worked_on or rating):
-            provider.jobs.append(ProviderJob(worked_on=_date(worked_on), rating=rating if rating in RATINGS else None))
+        if provider.section == "worked" and (worked_on or rating or work.strip() or amount.strip()):
+            provider.jobs.append(ProviderJob(worked_on=_date(worked_on), rating=rating if rating in RATINGS else None,
+                                             work=work.strip()[:255] or None, amount=_money(amount)))
         db.commit()
         return RedirectResponse(f"/tools/providers#{provider.section}", status_code=303)
 
@@ -110,12 +120,12 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/{provider_id}/jobs")
     def job_add(provider_id: int, worked_on: str = Form(""), rating: str = Form(""), note: str = Form(""),
-                db: Session = Depends(get_db)):
+                work: str = Form(""), amount: str = Form(""), db: Session = Depends(get_db)):
         """A time Tal worked with them. Someone from Recommended moves to Worked with."""
         provider = db.get(ServiceProvider, provider_id)
         if provider:
             provider.jobs.append(ProviderJob(worked_on=_date(worked_on), rating=rating if rating in RATINGS else None,
-                                             note=note.strip() or None))
+                                             work=work.strip()[:255] or None, amount=_money(amount), note=note.strip() or None))
             provider.section = "worked"
             db.commit()
         return RedirectResponse(f"/tools/providers/{provider_id}#jobs", status_code=303)

@@ -1018,7 +1018,7 @@ class ServiceProvider(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     jobs: Mapped[list["ProviderJob"]] = relationship(
-        cascade="all, delete-orphan", order_by="(ProviderJob.worked_on.desc(), ProviderJob.id.desc())"
+        back_populates="provider", cascade="all, delete-orphan", order_by="(ProviderJob.worked_on.desc(), ProviderJob.id.desc())"
     )
 
     @property
@@ -1031,11 +1031,15 @@ class ServiceProvider(Base):
 
 
 class ProviderJob(Base):
-    """One time Tal worked with a provider: when, how it went (good / not good), and a note."""
+    """One time Tal worked with a provider: when, what the work was, what they charged,
+    how it went (good / not good), and a note - so prices can be compared."""
     __tablename__ = "provider_jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     provider_id: Mapped[int] = mapped_column(ForeignKey("service_providers.id", ondelete="CASCADE"), index=True)
+    provider: Mapped["ServiceProvider"] = relationship(back_populates="jobs")
     worked_on: Mapped[date] = mapped_column(Date)
+    work: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # what they did
+    amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)  # what they charged
     rating: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # good / bad
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
