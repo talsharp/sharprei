@@ -130,6 +130,21 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             db.commit()
         return RedirectResponse(f"/tools/providers/{provider_id}#jobs", status_code=303)
 
+    @router.post("/jobs/{job_id}")
+    def job_save(job_id: int, worked_on: str = Form(""), rating: str = Form(""), note: str = Form(""),
+                 work: str = Form(""), amount: str = Form(""), db: Session = Depends(get_db)):
+        """Fixes a job: date, work, price, how it went, note."""
+        job = db.get(ProviderJob, job_id)
+        if not job:
+            return RedirectResponse("/tools/providers", status_code=303)
+        job.worked_on = _date(worked_on) if worked_on else job.worked_on
+        job.work = work.strip()[:255] or None
+        job.amount = _money(amount)
+        job.rating = rating if rating in RATINGS else None
+        job.note = note.strip() or None
+        db.commit()
+        return RedirectResponse(f"/tools/providers/{job.provider_id}#jobs", status_code=303)
+
     @router.post("/jobs/{job_id}/delete")
     def job_delete(job_id: int, db: Session = Depends(get_db)):
         job = db.get(ProviderJob, job_id)
