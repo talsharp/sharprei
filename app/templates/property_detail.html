@@ -97,7 +97,8 @@
 </div>
 
 {% import "_files_macros.html" as fl %}
-{{ fl.files_card(prop.files, "/rentals/" ~ prop.id ~ "/files", too_big, max_mb, "No files yet. Upload the purchase documents, deed, insurance, leases, management agreement - anything for this property.", collapsible=True) }}
+{{ fl.files_card(prop.files, "/rentals/" ~ prop.id ~ "/files", too_big, max_mb, "No closing files yet. Upload the settlement statement, deed, title, insurance - everything from the closing.", collapsible=True, title="Closing files") }}
+{% include "_property_invoices.html" %}
 
 <script>
 function toggleRowEdit(prefix, id) {

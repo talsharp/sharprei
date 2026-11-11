@@ -977,3 +977,24 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .platform-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .platform-add input[name=name] { flex: 1 1 200px; }
 .platform-add input[name=views] { width: 100px; }
+
+/* Portfolio: invoices & expenses */
+.invoice-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.invoice-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.invoice-form label.grow { flex: 1 1 200px; }
+.invoice-form input[name=amount] { width: 120px; }
+
+/* Tools > Service Providers */
+.provider-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.provider-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); flex: 1 1 170px; }
+.provider-form label.wide { flex-basis: 100%; }
+.provider-form label[hidden] { display: none; }
+.provider-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+.chip-filter { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 600; box-shadow: none; width: auto; }
+.chip-filter:hover { background: var(--panel-soft); }
+.chip-filter.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.providers-table { width: 100%; }
+.providers-table td { vertical-align: top; font-size: 13px; }
+.provider-contact div { line-height: 1.5; overflow-wrap: anywhere; }
+.rating-good { color: var(--green); font-weight: 700; }
+.rating-bad { color: var(--red); font-weight: 700; }

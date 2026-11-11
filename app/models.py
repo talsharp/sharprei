@@ -197,6 +197,9 @@ class Property(Base):
     files: Mapped[list["PropertyFile"]] = relationship(
         back_populates="property_ref", cascade="all, delete-orphan", order_by="PropertyFile.uploaded_at.desc()"
     )
+    invoices: Mapped[list["PropertyInvoice"]] = relationship(
+        cascade="all, delete-orphan", order_by="(PropertyInvoice.invoice_date.desc(), PropertyInvoice.id.desc())"
+    )
 
     @property
     def total_owner_percentage(self) -> float:
@@ -969,3 +972,64 @@ class DealPlatformView(Base):
     name: Mapped[str] = mapped_column(String(80))
     views: Mapped[int] = mapped_column(default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PropertyInvoice(Base):
+    """An invoice or expense for a portfolio property: its date, amount, note and the file
+    (optional). Shown under "Invoices & expenses"; the property's other files are its closing files."""
+    __tablename__ = "property_invoices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("properties.id", ondelete="CASCADE"), index=True)
+    invoice_date: Mapped[date] = mapped_column(Date)
+    amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    original_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stored_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    size_bytes: Mapped[int] = mapped_column(default=0)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ProviderType(Base):
+    """A kind of service provider (Contractor, Boots, Plumbing...) - Tal adds more as needed."""
+    __tablename__ = "provider_types"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True)
+    position: Mapped[int] = mapped_column(default=0)
+
+
+class ServiceProvider(Base):
+    """Someone Tal worked with (section "worked") or was told about ("recommended")."""
+    __tablename__ = "service_providers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("provider_types.id", ondelete="SET NULL"), nullable=True)
+    section: Mapped[str] = mapped_column(String(20), default="worked")  # worked / recommended
+    phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    facebook: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    recommended_by: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    type: Mapped[Optional[ProviderType]] = relationship()
+    jobs: Mapped[list["ProviderJob"]] = relationship(
+        cascade="all, delete-orphan", order_by="(ProviderJob.worked_on.desc(), ProviderJob.id.desc())"
+    )
+
+    @property
+    def last_job(self) -> Optional["ProviderJob"]:
+        return self.jobs[0] if self.jobs else None
+
+
+class ProviderJob(Base):
+    """One time Tal worked with a provider: when, how it went (good / not good), and a note."""
+    __tablename__ = "provider_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(ForeignKey("service_providers.id", ondelete="CASCADE"), index=True)
+    worked_on: Mapped[date] = mapped_column(Date)
+    rating: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # good / bad
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

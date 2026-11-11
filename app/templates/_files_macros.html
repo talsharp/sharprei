@@ -1,13 +1,13 @@
-{% macro files_card(files, base_url, too_big, max_mb, empty_text, collapsible=False) %}
+{% macro files_card(files, base_url, too_big, max_mb, empty_text, collapsible=False, title="Files") %}
 <div class="card" id="files">
   {% if collapsible %}
   <h3 style="cursor:pointer; user-select:none;" onclick="toggleFiles()">
-    <span id="files-arrow" class="section-toggle">▸</span> Files
+    <span id="files-arrow" class="section-toggle">▸</span> {{ title }}
     <span class="muted" style="font-size:13px; font-weight:400;">({{ files|length }} file{{ "s" if files|length != 1 else "" }})</span>
   </h3>
   <div id="files-body" style="display:none;">
   {% else %}
-  <h3>Files <span class="muted" style="font-weight:400;">· {{ files|length }}</span></h3>
+  <h3>{{ title }} <span class="muted" style="font-weight:400;">· {{ files|length }}</span></h3>
   <div>
   {% endif %}
   {% if too_big %}<div class="login-error">Not uploaded - over {{ max_mb }} MB: {{ too_big|join(", ") }}</div>{% endif %}

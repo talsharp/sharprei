@@ -1,0 +1,52 @@
+{# Invoices & expenses for a portfolio property: date, amount, note and the file - newest first, with the total. #}
+{% set invoices = prop.invoices %}
+{% set total = invoices|selectattr("amount")|map(attribute="amount")|map("float")|sum %}
+<div class="card" id="invoices">
+  <h3 style="cursor:pointer; user-select:none;" onclick="toggleInvoices()">
+    <span id="invoices-arrow" class="section-toggle">▸</span> Invoices &amp; expenses
+    <span class="muted" style="font-size:13px; font-weight:400;">({{ invoices|length }} · ${{ "{:,.2f}".format(total) }})</span>
+  </h3>
+  <div id="invoices-body" style="display:none;">
+    {% if too_big %}<div class="login-error">Not added - over {{ max_mb }} MB: {{ too_big|join(", ") }}</div>{% endif %}
+    <form method="post" action="/rentals/{{ prop.id }}/invoices" enctype="multipart/form-data" class="invoice-form">
+      <label>Date<input type="date" name="invoice_date" value="{{ today }}" required min="2000-01-01" max="2100-12-31"></label>
+      <label>Amount ($)<input type="text" name="amount" inputmode="decimal" placeholder="e.g. 1,250"></label>
+      <label class="grow">Note<input type="text" name="note" maxlength="255" placeholder="e.g. Plumber - water heater"></label>
+      <label class="grow">Invoice file<input type="file" name="file"></label>
+      <button type="submit">Add invoice</button>
+    </form>
+    {% if invoices %}
+    <div style="overflow-x:auto;">
+    <table style="margin-top:14px;">
+      <thead><tr><th>Date</th><th style="text-align:right;">Amount</th><th>Note</th><th>File</th><th></th></tr></thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td style="white-space:nowrap;">{{ inv.invoice_date.strftime('%b %d, %Y') }}</td>
+          <td style="text-align:right; white-space:nowrap;">{{ "${:,.2f}".format(inv.amount|float) if inv.amount is not none else "" }}</td>
+          <td>{{ inv.note or "" }}</td>
+          <td>{% if inv.stored_name %}<a class="zip-link" href="/rentals/{{ prop.id }}/invoices/{{ inv.id }}" target="_blank" rel="noopener">{{ inv.original_name }}</a>{% else %}<span class="muted">No file</span>{% endif %}</td>
+          <td style="text-align:right;">
+            <form method="post" action="/rentals/{{ prop.id }}/invoices/{{ inv.id }}/delete" data-undo="Invoice deleted" data-undo-after="reload" style="margin:0;"><button type="submit" class="danger small">Delete</button></form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr style="font-weight:700;"><td>Total</td><td style="text-align:right;">${{ "{:,.2f}".format(total) }}</td><td colspan="3"></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}
+    <p class="muted" style="margin:12px 0 0;">No invoices yet. Add each invoice or expense with its date and amount, and attach the file so you can download it later. Max {{ max_mb }} MB per file.</p>
+    {% endif %}
+  </div>
+</div>
+<script>
+function toggleInvoices(forceOpen) {
+  var body = document.getElementById('invoices-body');
+  var open = forceOpen === true ? false : body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  document.getElementById('invoices-arrow').textContent = open ? '▸' : '▾';
+}
+// Right after adding or deleting the page returns to #invoices - show the list.
+if (location.hash === '#invoices') toggleInvoices(true);
+</script>

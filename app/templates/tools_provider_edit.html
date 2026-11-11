@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name }} · Service Providers{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">{{ p.name }}</h2>
+    <p class="page-subtitle">{{ p.type.name if p.type else "No type" }} · {{ sections[p.section] }}</p>
+  </div>
+  <a class="btn secondary" href="/tools/providers">Back to providers</a>
+</div>
+
+{% if request.query_params.get('saved') %}<div class="card saved-note">✓ Saved</div>{% endif %}
+
+<div class="card" id="jobs">
+  <h3>{{ "Jobs" if p.jobs else "Worked with them?" }}</h3>
+  {% if p.jobs %}
+  <table class="providers-table">
+    <thead><tr><th>Date</th><th>How it went</th><th>Note</th><th></th></tr></thead>
+    <tbody>
+      {% for j in p.jobs %}
+      <tr>
+        <td style="white-space:nowrap;">{{ j.worked_on.strftime('%b %d, %Y') }}</td>
+        <td>{% if j.rating %}<span class="rating-{{ j.rating }}">{{ PROVIDER_RATINGS[j.rating] }}</span>{% endif %}</td>
+        <td>{{ j.note or "" }}</td>
+        <td style="text-align:right;"><form method="post" action="/tools/providers/jobs/{{ j.id }}/delete" data-undo="Job removed" data-undo-after="reload" style="margin:0;"><button type="submit" class="showing-x" title="Remove">×</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <form method="post" action="/tools/providers/{{ p.id }}/jobs" class="provider-form" style="margin-top:12px;">
+    <label>Worked together on<input type="date" name="worked_on" value="{{ today }}" min="2000-01-01" max="2100-12-31" required></label>
+    <label>How was it<select name="rating"><option value="">-</option>{% for k, label in PROVIDER_RATINGS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+    <label class="wide">Note<input type="text" name="note" placeholder="e.g. fixed the water heater, on time"></label>
+    <button type="submit">{{ "Add job" if p.jobs else "Worked with them" }}</button>
+  </form>
+  {% if p.section == 'recommended' %}<p class="muted" style="font-size:12px; margin:8px 0 0;">Adding a job moves them to <strong>Worked with</strong>.</p>{% endif %}
+</div>
+
+<form method="post" action="/tools/providers/{{ p.id }}" class="card">
+  <h3>Details</h3>
+  <div class="provider-form">
+    <label>Name<input type="text" name="name" value="{{ p.name }}" required maxlength="120"></label>
+    <label>Type<select name="type_id"><option value="">-</option>{% for t in types %}<option value="{{ t.id }}" {{ 'selected' if t.id == p.type_id }}>{{ t.name }}</option>{% endfor %}</select></label>
+    <label>Section<select name="section">{% for k, label in sections.items() %}<option value="{{ k }}" {{ 'selected' if k == p.section }}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Phone<input type="text" name="phone" value="{{ p.phone or '' }}" maxlength="40"></label>
+    <label>Email<input type="email" name="email" value="{{ p.email or '' }}" maxlength="200"></label>
+    <label>Facebook<input type="text" name="facebook" value="{{ p.facebook or '' }}" maxlength="255"></label>
+    <label>Recommended by<input type="text" name="recommended_by" value="{{ p.recommended_by or '' }}" maxlength="120"></label>
+    <label class="wide">Notes<textarea name="notes" rows="3">{{ p.notes or '' }}</textarea></label>
+  </div>
+  <button type="submit" style="margin-top:8px;">Save</button>
+</form>
+
+<form method="post" action="/tools/providers/{{ p.id }}/delete" data-undo="Provider deleted" data-undo-hide="all:.card" data-undo-after="follow">
+  <button type="submit" class="danger small">Delete provider</button>
+</form>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Service Providers{% endblock %}
+{% block content %}
+
+<div class="top-actions">
+  <div>
+    <h2 class="page-title">Service Providers</h2>
+    <p class="page-subtitle">Everyone you worked with, and who was recommended to you - by type</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Add a provider</h3>
+  <form method="post" action="/tools/providers/new" class="provider-form">
+    <label>Name<input type="text" name="name" required maxlength="120"></label>
+    <label>Type<select name="type_id"><option value="">-</option>{% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></label>
+    <label>Phone<input type="text" name="phone" maxlength="40"></label>
+    <label>Email<input type="email" name="email" maxlength="200"></label>
+    <label>Facebook<input type="text" name="facebook" maxlength="255" placeholder="Profile link or name"></label>
+    <label>Section<select name="section" id="new-section">{% for k, label in sections.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+    <label class="only-worked">Worked together on<input type="date" name="worked_on" value="{{ today }}" min="2000-01-01" max="2100-12-31"></label>
+    <label class="only-worked">How was it<select name="rating"><option value="">-</option>{% for k, label in PROVIDER_RATINGS.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+    <label class="only-recommended" hidden>Recommended by<input type="text" name="recommended_by" maxlength="120"></label>
+    <label class="wide">Note<input type="text" name="notes" placeholder="e.g. good with roofs, fast, a bit pricey"></label>
+    <button type="submit">Add provider</button>
+  </form>
+</div>
+
+<div class="provider-filter" role="group" aria-label="Filter by type">
+  <button type="button" class="chip-filter on" data-type="">All</button>
+  {% for t in types %}<button type="button" class="chip-filter" data-type="{{ t.id }}">{{ t.name }}</button>{% endfor %}
+</div>
+
+{% for key, label in sections.items() %}
+<div class="card" id="{{ key }}">
+  <h3>{{ label }} <span class="muted provider-count" style="font-weight:400; font-size:13px;"></span></h3>
+  <div style="overflow-x:auto;">
+  <table class="providers-table">
+    <thead><tr><th>Name</th><th>Type</th><th>Contact</th>{% if key == 'worked' %}<th>Last worked</th><th>How it went</th>{% else %}<th>Recommended by</th>{% endif %}<th>Note</th></tr></thead>
+    <tbody>
+      {% for p in groups[key] %}
+      {% set j = p.last_job %}
+      <tr data-type="{{ p.type_id or '' }}">
+        <td><a class="zip-link" href="/tools/providers/{{ p.id }}"><strong>{{ p.name }}</strong></a></td>
+        <td>{{ p.type.name if p.type else "" }}</td>
+        <td class="provider-contact">{% if p.phone %}<div>{{ p.phone }}</div>{% endif %}{% if p.email %}<div>{{ p.email }}</div>{% endif %}{% if p.facebook %}<div>{% if p.facebook.startswith('http') %}<a class="zip-link" href="{{ p.facebook }}" target="_blank" rel="noopener">Facebook</a>{% else %}Facebook: {{ p.facebook }}{% endif %}</div>{% endif %}</td>
+        {% if key == 'worked' %}
+        <td style="white-space:nowrap;">{{ j.worked_on.strftime('%b %d, %Y') if j else "" }}{% if p.jobs|length > 1 %} <span class="muted">· {{ p.jobs|length }} jobs</span>{% endif %}</td>
+        <td>{% if j and j.rating %}<span class="rating-{{ j.rating }}">{{ PROVIDER_RATINGS[j.rating] }}</span>{% endif %}</td>
+        {% else %}
+        <td>{{ p.recommended_by or "" }}</td>
+        {% endif %}
+        <td class="muted">{{ (j.note if j and j.note else p.notes) or "" }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="providers-empty" {{ 'hidden' if groups[key] }}><td colspan="6" class="muted">Nobody here yet.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endfor %}
+
+<details class="card" id="types">
+  <summary><strong>Types</strong> <span class="muted">· {{ types|map(attribute='name')|join(', ') }}</span></summary>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center;">
+    {% for t in types %}
+    <span class="showing-chip">{{ t.name }}
+      <form method="post" action="/tools/providers/types/{{ t.id }}/delete" style="display:inline; margin:0;"><button type="submit" class="showing-x" title="Remove (only if nobody uses it)">×</button></form>
+    </span>
+    {% endfor %}
+    <form method="post" action="/tools/providers/types/new" style="display:inline-flex; gap:6px; margin:0;">
+      <input type="text" name="name" placeholder="New type, e.g. Electrician" maxlength="60" required>
+      <button type="submit" class="small">+ Add type</button>
+    </form>
+  </div>
+  <p class="muted" style="font-size:12px; margin:8px 0 0;">A type can only be removed when no provider uses it.</p>
+</details>
+
+<script>
+(function() {
+  // The add form: "worked with" asks when and how; "recommended" asks who recommended them.
+  var section = document.getElementById('new-section');
+  function sync() {
+    document.querySelectorAll('.only-worked').forEach(function(el) { el.hidden = section.value !== 'worked'; });
+    document.querySelectorAll('.only-recommended').forEach(function(el) { el.hidden = section.value !== 'recommended'; });
+  }
+  section.addEventListener('change', sync); sync();
+  // Filter both sections by type.
+  var chips = document.querySelectorAll('.chip-filter');
+  function filter(type) {
+    document.querySelectorAll('.providers-table').forEach(function(table) {
+      var shown = 0;
+      table.querySelectorAll('tbody tr[data-type]').forEach(function(tr) {
+        var ok = !type || tr.dataset.type === type;
+        tr.hidden = !ok;
+        if (ok) shown++;
+      });
+      table.querySelector('.providers-empty').hidden = shown > 0;
+      table.closest('.card').querySelector('.provider-count').textContent = '· ' + shown;
+    });
+  }
+  chips.forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      chips.forEach(function(c) { c.classList.toggle('on', c === chip); });
+      filter(chip.dataset.type);
+    });
+  });
+  filter('');
+})();
+</script>
+{% endblock %}

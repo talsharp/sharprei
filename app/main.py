@@ -2,7 +2,7 @@ import json
 import os
 from datetime import date, datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
@@ -25,6 +25,7 @@ from app.comp_routes import build_router as build_comp_router
 from app.deal_page_routes import build_router as build_deal_page_router
 from app.project_routes import build_router as build_project_router
 from app.buyer_routes import build_router as build_buyer_router
+from app.provider_routes import build_router as build_provider_router
 from app.followups import get_follow_up_summaries, get_rounds_overview
 from app.weekly_import import (
     METRIC_FIELDS,
@@ -48,6 +49,7 @@ from app.models import (
     Neighborhood,
     Property,
     PropertyFile,
+    PropertyInvoice,
     PropertyOwner,
     RenovationExpense,
     RunType,
@@ -153,6 +155,7 @@ app.include_router(build_comp_router(templates))
 app.include_router(build_deal_page_router(templates))
 app.include_router(build_project_router(templates))
 app.include_router(build_buyer_router(templates))
+app.include_router(build_provider_router(templates))
 auth.install(app, templates)
 monitor.install(app)
 
@@ -802,6 +805,55 @@ def property_file_delete(property_id: int, file_id: int, db: Session = Depends(g
         db.delete(f)
         db.commit()
     return RedirectResponse(f"/rentals/{property_id}#files", status_code=303)
+
+
+@app.post("/rentals/{property_id}/invoices")
+async def property_invoice_add(
+    property_id: int,
+    invoice_date: str = Form(""),
+    amount: str = Form(""),
+    note: str = Form(""),
+    file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
+    """An invoice or expense: date, amount, note, and the file if one was attached."""
+    prop = db.get(Property, property_id)
+    if not prop:
+        return RedirectResponse("/rentals", status_code=303)
+    try:
+        when = date.fromisoformat(invoice_date)
+    except ValueError:
+        when = date.today()
+    try:
+        money = float(amount.replace(",", "").replace("$", "").strip()) if amount.strip() else None
+    except ValueError:
+        money = None
+    saved, too_big = await save_uploads(folder_for("properties", property_id), [file] if file and file.filename else [])
+    if too_big:
+        return RedirectResponse(f"/rentals/{property_id}{too_big_suffix(too_big)}#invoices", status_code=303)
+    db.add(PropertyInvoice(property_id=property_id, invoice_date=when, amount=money,
+                           note=note.strip()[:255] or None, **(saved[0] if saved else {})))
+    db.commit()
+    return RedirectResponse(f"/rentals/{property_id}#invoices", status_code=303)
+
+
+@app.get("/rentals/{property_id}/invoices/{invoice_id}")
+def property_invoice_file(property_id: int, invoice_id: int, db: Session = Depends(get_db)):
+    inv = db.get(PropertyInvoice, invoice_id)
+    if not inv or inv.property_id != property_id or not inv.stored_name:
+        return Response("File not found", status_code=404)
+    return serve(folder_for("properties", property_id), inv.stored_name, inv.original_name)
+
+
+@app.post("/rentals/{property_id}/invoices/{invoice_id}/delete")
+def property_invoice_delete(property_id: int, invoice_id: int, db: Session = Depends(get_db)):
+    inv = db.get(PropertyInvoice, invoice_id)
+    if inv and inv.property_id == property_id:
+        if inv.stored_name:
+            (folder_for("properties", property_id) / inv.stored_name).unlink(missing_ok=True)
+        db.delete(inv)
+        db.commit()
+    return RedirectResponse(f"/rentals/{property_id}#invoices", status_code=303)
 
 
 @app.get("/rentals/{property_id}/report")
