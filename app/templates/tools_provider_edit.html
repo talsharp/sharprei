@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ p.name }} · Service Providers{% endblock %}
 {% block content %}
+{% from "_tag_box.html" import tag_box %}
 
 <div class="top-actions">
   <div>
     <h2 class="page-title">{{ p.name }}</h2>
-    <p class="page-subtitle">{{ p.type.name if p.type else "No type" }} · {{ sections[p.section] }}</p>
+    <p class="page-subtitle">{{ p.type_list|join(", ") or "No type" }} · {{ sections[p.section] }}</p>
   </div>
   <a class="btn secondary" href="/tools/providers">Back to providers</a>
 </div>
@@ -42,7 +43,7 @@
   <h3>Details</h3>
   <div class="provider-form">
     <label>Name<input type="text" name="name" value="{{ p.name }}" required maxlength="120"></label>
-    <label>Type<select name="type_id"><option value="">-</option>{% for t in types %}<option value="{{ t.id }}" {{ 'selected' if t.id == p.type_id }}>{{ t.name }}</option>{% endfor %}</select></label>
+    <label class="types-field">Types<span class="label-hint">pick or type your own, Enter adds</span>{{ tag_box("types", "edit-types", p.types, "e.g. Plumbing", types|map(attribute='name')|list) }}</label>
     <label>Section<select name="section">{% for k, label in sections.items() %}<option value="{{ k }}" {{ 'selected' if k == p.section }}>{{ label }}</option>{% endfor %}</select></label>
     <label>Phone<input type="text" name="phone" value="{{ p.phone or '' }}" maxlength="40"></label>
     <label>Email<input type="email" name="email" value="{{ p.email or '' }}" maxlength="200"></label>
@@ -56,4 +57,5 @@
 <form method="post" action="/tools/providers/{{ p.id }}/delete" data-undo="Provider deleted" data-undo-hide="all:.card" data-undo-after="follow">
   <button type="submit" class="danger small">Delete provider</button>
 </form>
+<script src="/static/tag_box.js?v={{ STATIC_VERSION }}"></script>
 {% endblock %}

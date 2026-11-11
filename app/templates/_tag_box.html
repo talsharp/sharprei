@@ -1,0 +1,9 @@
+{# A tag box: pick from the list while typing, or type your own and press Enter. The hidden input keeps "a, b, c". #}
+{% macro tag_box(name, id, value, placeholder, options) %}
+<div class="tag-box" data-options="{{ options|tojson|forceescape }}">
+  <input type="hidden" name="{{ name }}" value="{{ value or '' }}">
+  <span class="tag-list"></span>
+  <input type="text" id="{{ id }}" class="tag-input" placeholder="{{ placeholder }}" autocomplete="off">
+  <div class="tag-menu" role="listbox" hidden></div>
+</div>
+{% endmacro %}

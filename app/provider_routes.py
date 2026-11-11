@@ -17,6 +17,25 @@ SECTIONS = {"worked": "Worked with", "recommended": "Recommended / to try"}
 RATINGS = {"good": "Good", "bad": "Not good"}
 
 
+def _type_names(db: Session, value: str) -> Optional[str]:
+    """ "Contractor, plumbing, Roofing" -> the names as the type list has them; a new
+    name becomes a type (so it's offered next time and gets a filter)."""
+    existing = {t.name.lower(): t.name for t in db.query(ProviderType).all()}
+    names = []
+    for raw in value.split(","):
+        name = raw.strip()[:60]
+        if not name:
+            continue
+        if name.lower() not in existing:
+            last = db.query(func.max(ProviderType.position)).scalar() or 0
+            db.add(ProviderType(name=name, position=last + 1))
+            db.flush()
+            existing[name.lower()] = name
+        if existing[name.lower()] not in names:
+            names.append(existing[name.lower()])
+    return ", ".join(names) or None
+
+
 def _date(value: str) -> date:
     try:
         return date.fromisoformat(value)
@@ -42,14 +61,14 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/new")
     def provider_new(
-        name: str = Form(""), type_id: str = Form(""), section: str = Form("worked"), phone: str = Form(""),
+        name: str = Form(""), types: str = Form(""), section: str = Form("worked"), phone: str = Form(""),
         email: str = Form(""), facebook: str = Form(""), recommended_by: str = Form(""), notes: str = Form(""),
         worked_on: str = Form(""), rating: str = Form(""), db: Session = Depends(get_db),
     ):
         if not name.strip():
             return RedirectResponse("/tools/providers", status_code=303)
         provider = ServiceProvider(
-            name=name.strip()[:120], type_id=int(type_id) if type_id.isdigit() else None,
+            name=name.strip()[:120], types=_type_names(db, types),
             section=section if section in SECTIONS else "worked", phone=phone.strip()[:40] or None,
             email=email.strip()[:200] or None, facebook=facebook.strip()[:255] or None,
             recommended_by=recommended_by.strip()[:120] or None, notes=notes.strip() or None,
@@ -72,14 +91,14 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/{provider_id}")
     def provider_save(
-        provider_id: int, name: str = Form(""), type_id: str = Form(""), section: str = Form("worked"),
+        provider_id: int, name: str = Form(""), types: str = Form(""), section: str = Form("worked"),
         phone: str = Form(""), email: str = Form(""), facebook: str = Form(""), recommended_by: str = Form(""),
         notes: str = Form(""), db: Session = Depends(get_db),
     ):
         provider = db.get(ServiceProvider, provider_id)
         if provider and name.strip():
             provider.name = name.strip()[:120]
-            provider.type_id = int(type_id) if type_id.isdigit() else None
+            provider.types = _type_names(db, types)
             provider.section = section if section in SECTIONS else provider.section
             provider.phone = phone.strip()[:40] or None
             provider.email = email.strip()[:200] or None
@@ -131,7 +150,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
     def type_delete(type_id: int, db: Session = Depends(get_db)):
         """Only a type nobody uses can be removed."""
         kind = db.get(ProviderType, type_id)
-        if kind and not db.query(ServiceProvider).filter(ServiceProvider.type_id == type_id).first():
+        if kind and not any(kind.name.lower() in (t.lower() for t in p.type_list) for p in db.query(ServiceProvider).all()):
             db.delete(kind)
             db.commit()
         return RedirectResponse("/tools/providers#types", status_code=303)

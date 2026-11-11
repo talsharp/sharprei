@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Service Providers{% endblock %}
 {% block content %}
+{% from "_tag_box.html" import tag_box %}
 
 <div class="top-actions">
   <div>
@@ -13,7 +14,7 @@
   <h3>Add a provider</h3>
   <form method="post" action="/tools/providers/new" class="provider-form">
     <label>Name<input type="text" name="name" required maxlength="120"></label>
-    <label>Type<select name="type_id"><option value="">-</option>{% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></label>
+    <label class="types-field">Types<span class="label-hint">pick or type your own, Enter adds</span>{{ tag_box("types", "new-types", "", "e.g. Plumbing", types|map(attribute='name')|list) }}</label>
     <label>Phone<input type="text" name="phone" maxlength="40"></label>
     <label>Email<input type="email" name="email" maxlength="200"></label>
     <label>Facebook<input type="text" name="facebook" maxlength="255" placeholder="Profile link or name"></label>
@@ -28,7 +29,7 @@
 
 <div class="provider-filter" role="group" aria-label="Filter by type">
   <button type="button" class="chip-filter on" data-type="">All</button>
-  {% for t in types %}<button type="button" class="chip-filter" data-type="{{ t.id }}">{{ t.name }}</button>{% endfor %}
+  {% for t in types %}<button type="button" class="chip-filter" data-type="{{ t.name|lower }}">{{ t.name }}</button>{% endfor %}
 </div>
 
 {% for key, label in sections.items() %}
@@ -36,13 +37,13 @@
   <h3>{{ label }} <span class="muted provider-count" style="font-weight:400; font-size:13px;"></span></h3>
   <div style="overflow-x:auto;">
   <table class="providers-table">
-    <thead><tr><th>Name</th><th>Type</th><th>Contact</th>{% if key == 'worked' %}<th>Last worked</th><th>How it went</th>{% else %}<th>Recommended by</th>{% endif %}<th>Note</th></tr></thead>
+    <thead><tr><th>Name</th><th>Types</th><th>Contact</th>{% if key == 'worked' %}<th>Last worked</th><th>How it went</th>{% else %}<th>Recommended by</th>{% endif %}<th>Note</th></tr></thead>
     <tbody>
       {% for p in groups[key] %}
       {% set j = p.last_job %}
-      <tr data-type="{{ p.type_id or '' }}">
+      <tr data-types="{{ p.type_list|map('lower')|join('|') }}">
         <td><a class="zip-link" href="/tools/providers/{{ p.id }}"><strong>{{ p.name }}</strong></a></td>
-        <td>{{ p.type.name if p.type else "" }}</td>
+        <td>{% for t in p.type_list %}<span class="type-chip">{{ t }}</span>{% endfor %}</td>
         <td class="provider-contact">{% if p.phone %}<div>{{ p.phone }}</div>{% endif %}{% if p.email %}<div>{{ p.email }}</div>{% endif %}{% if p.facebook %}<div>{% if p.facebook.startswith('http') %}<a class="zip-link" href="{{ p.facebook }}" target="_blank" rel="noopener">Facebook</a>{% else %}Facebook: {{ p.facebook }}{% endif %}</div>{% endif %}</td>
         {% if key == 'worked' %}
         <td style="white-space:nowrap;">{{ j.worked_on.strftime('%b %d, %Y') if j else "" }}{% if p.jobs|length > 1 %} <span class="muted">· {{ p.jobs|length }} jobs</span>{% endif %}</td>
@@ -76,6 +77,7 @@
   <p class="muted" style="font-size:12px; margin:8px 0 0;">A type can only be removed when no provider uses it.</p>
 </details>
 
+<script src="/static/tag_box.js?v={{ STATIC_VERSION }}"></script>
 <script>
 (function() {
   // The add form: "worked with" asks when and how; "recommended" asks who recommended them.
@@ -90,8 +92,8 @@
   function filter(type) {
     document.querySelectorAll('.providers-table').forEach(function(table) {
       var shown = 0;
-      table.querySelectorAll('tbody tr[data-type]').forEach(function(tr) {
-        var ok = !type || tr.dataset.type === type;
+      table.querySelectorAll('tbody tr[data-types]').forEach(function(tr) {
+        var ok = !type || tr.dataset.types.split('|').indexOf(type) >= 0;
         tr.hidden = !ok;
         if (ok) shown++;
       });

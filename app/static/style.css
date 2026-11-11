@@ -998,3 +998,7 @@ button.nav-group.nav-toggle:hover { background: var(--panel-soft); }
 .provider-contact div { line-height: 1.5; overflow-wrap: anywhere; }
 .rating-good { color: var(--green); font-weight: 700; }
 .rating-bad { color: var(--red); font-weight: 700; }
+.provider-form label.types-field { flex: 2 1 300px; position: relative; }
+.label-hint { font-weight: 400; font-size: 11px; color: var(--muted); margin-left: 6px; }
+.provider-form .tag-box { font-weight: 400; color: var(--text); }
+.type-chip { display: inline-block; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; margin: 0 4px 3px 0; font-size: 12px; white-space: nowrap; }

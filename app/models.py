@@ -1005,7 +1005,10 @@ class ServiceProvider(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
+    # Not used since 2026-11-11 (a provider can have several types: see types).
     type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("provider_types.id", ondelete="SET NULL"), nullable=True)
+    # The services they provide, comma-separated, e.g. "Contractor, Plumbing".
+    types: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     section: Mapped[str] = mapped_column(String(20), default="worked")  # worked / recommended
     phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
@@ -1014,10 +1017,13 @@ class ServiceProvider(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    type: Mapped[Optional[ProviderType]] = relationship()
     jobs: Mapped[list["ProviderJob"]] = relationship(
         cascade="all, delete-orphan", order_by="(ProviderJob.worked_on.desc(), ProviderJob.id.desc())"
     )
+
+    @property
+    def type_list(self) -> list:
+        return [t.strip() for t in (self.types or "").split(",") if t.strip()]
 
     @property
     def last_job(self) -> Optional["ProviderJob"]:

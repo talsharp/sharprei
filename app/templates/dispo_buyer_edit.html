@@ -1,15 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ buyer.name if buyer else "New buyer" }} · Buyers{% endblock %}
 {% block content %}
-{# A tag box: pick from the list while typing, or type your own and press Enter. The hidden input keeps "a, b, c". #}
-{% macro tag_box(name, id, value, placeholder) %}
-<div class="tag-box" data-options="{{ tag_options[name]|tojson|forceescape }}">
-  <input type="hidden" name="{{ name }}" value="{{ value or '' }}">
-  <span class="tag-list"></span>
-  <input type="text" id="{{ id }}" class="tag-input" placeholder="{{ placeholder }}" autocomplete="off">
-  <div class="tag-menu" role="listbox" hidden></div>
-</div>
-{% endmacro %}
+{% from "_tag_box.html" import tag_box %}
 
 <div class="top-actions">
   <div>
@@ -63,9 +55,9 @@
   <h3>Buybox</h3>
   <p class="muted" style="font-size:12px; margin:-4px 0 12px;">Separate with commas. A deal in their places that fits everything below makes them a <strong>Suggested</strong> buyer; a deal nearby, or one that misses something, makes them a <strong>Potential</strong> buyer.</p>
   <div class="buyer-form-grid">
-    <div class="form-row"><label for="b-zips">Zip codes</label>{{ tag_box("zip_codes", "b-zips", buyer.zip_codes if buyer else "", "Type a zip, e.g. 15202") }}</div>
-    <div class="form-row"><label for="b-nb">Neighborhoods</label>{{ tag_box("neighborhoods", "b-nb", buyer.neighborhoods if buyer else "", "Type a neighborhood, e.g. Ross") }}</div>
-    <div class="form-row"><label for="b-areas">Areas</label>{{ tag_box("areas", "b-areas", buyer.areas if buyer else "", "Type an area, e.g. North Pittsburgh") }}</div>
+    <div class="form-row"><label for="b-zips">Zip codes</label>{{ tag_box("zip_codes", "b-zips", buyer.zip_codes if buyer else "", "Type a zip, e.g. 15202", tag_options.zip_codes) }}</div>
+    <div class="form-row"><label for="b-nb">Neighborhoods</label>{{ tag_box("neighborhoods", "b-nb", buyer.neighborhoods if buyer else "", "Type a neighborhood, e.g. Ross", tag_options.neighborhoods) }}</div>
+    <div class="form-row"><label for="b-areas">Areas</label>{{ tag_box("areas", "b-areas", buyer.areas if buyer else "", "Type an area, e.g. North Pittsburgh", tag_options.areas) }}</div>
     <div class="form-row"><label for="b-max">Max price ($)</label><input id="b-max" type="text" name="max_price" inputmode="decimal" value="{{ '{:,.0f}'.format(buyer.max_price|float) if buyer and buyer.max_price is not none else '' }}" placeholder="e.g. 100,000"></div>
     <div class="form-row"><label>Bedrooms <span class="muted" style="font-weight:400;">- from / to, empty = any</span></label>
       <div class="bed-range"><input type="number" min="0" max="20" name="min_beds" value="{{ buyer.min_beds or '' if buyer else '' }}" aria-label="Bedrooms from"> to <input type="number" min="0" max="20" name="max_beds" value="{{ buyer.max_beds or '' if buyer else '' }}" aria-label="Bedrooms to"></div>
@@ -90,80 +82,9 @@
   <button type="submit" class="danger small">Delete buyer</button>
 </form>
 {% endif %}
+<script src="/static/tag_box.js?v={{ STATIC_VERSION }}"></script>
 <script>
 (function() {
-  // ----- tag boxes: Zip codes, Neighborhoods, Areas -----
-  document.querySelectorAll('.tag-box').forEach(function(box) {
-    var hidden = box.querySelector('input[type=hidden]'), input = box.querySelector('.tag-input');
-    var list = box.querySelector('.tag-list'), menu = box.querySelector('.tag-menu');
-    var options = JSON.parse(box.dataset.options || '[]'), active = -1;
-    var tags = hidden.value.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-    function same(a, b) { return a.toLowerCase() === b.toLowerCase(); }
-    function render() {
-      list.innerHTML = '';
-      tags.forEach(function(t, i) {
-        var tag = document.createElement('span');
-        tag.className = 'tag';
-        tag.textContent = t;
-        var x = document.createElement('button');
-        x.type = 'button'; x.className = 'tag-x'; x.textContent = '×'; x.setAttribute('aria-label', 'Remove ' + t);
-        x.addEventListener('click', function() { tags.splice(i, 1); render(); input.focus(); });
-        tag.appendChild(x);
-        list.appendChild(tag);
-      });
-      hidden.value = tags.join(', ');
-    }
-    function add(value) {
-      value = value.trim();
-      if (!value) return;
-      var known = options.filter(function(o) { return same(o, value); })[0];
-      if (!tags.some(function(t) { return same(t, value); })) tags.push(known || value);
-      input.value = '';
-      render(); closeMenu();
-    }
-    function closeMenu() { menu.hidden = true; active = -1; }
-    function showMenu() {
-      var q = input.value.trim().toLowerCase();
-      if (!q) { closeMenu(); return; }
-      var matches = options.filter(function(o) { return o.toLowerCase().indexOf(q) >= 0 && !tags.some(function(t) { return same(t, o); }); });
-      matches.sort(function(a, b) { return (a.toLowerCase().indexOf(q) !== 0) - (b.toLowerCase().indexOf(q) !== 0) || a.localeCompare(b); });
-      matches = matches.slice(0, 8);
-      menu.innerHTML = '';
-      matches.forEach(function(o) {
-        var item = document.createElement('div');
-        item.className = 'tag-option'; item.textContent = o; item.setAttribute('role', 'option');
-        item.addEventListener('mousedown', function(e) { e.preventDefault(); add(o); });
-        menu.appendChild(item);
-      });
-      var hint = document.createElement('div');
-      hint.className = 'tag-hint';
-      hint.textContent = matches.length ? 'Click one, or press Enter to add "' + input.value.trim() + '" as typed' : 'Not in the list - press Enter to add "' + input.value.trim() + '"';
-      menu.appendChild(hint);
-      active = -1;  // Enter adds what was typed, unless one was picked with the arrow keys
-      paint();
-      menu.hidden = false;
-    }
-    function paint() { menu.querySelectorAll('.tag-option').forEach(function(el, i) { el.classList.toggle('active', i === active); }); }
-    input.addEventListener('input', showMenu);
-    input.addEventListener('keydown', function(e) {
-      var items = menu.querySelectorAll('.tag-option');
-      if (e.key === 'ArrowDown' && items.length) { e.preventDefault(); active = (active + 1) % items.length; paint(); }
-      else if (e.key === 'ArrowUp' && items.length) { e.preventDefault(); active = (active - 1 + items.length) % items.length; paint(); }
-      else if (e.key === 'Enter' || e.key === ',') {
-        if (!input.value.trim()) { if (e.key === ',') e.preventDefault(); return; }  // empty Enter submits as usual
-        e.preventDefault();
-        add(!menu.hidden && active >= 0 && items[active] ? items[active].textContent : input.value);
-      }
-      else if (e.key === 'Backspace' && !input.value && tags.length) { tags.pop(); render(); }
-      else if (e.key === 'Escape') { closeMenu(); }
-    });
-    input.addEventListener('blur', function() { closeMenu(); });
-    box.addEventListener('click', function(e) { if (e.target === box || e.target === list) input.focus(); });
-    // Something typed but not added yet is kept when saving.
-    box.closest('form').addEventListener('submit', function() { if (input.value.trim()) add(input.value); });
-    render();
-  });
-
   // ----- Multi-Family buyers buy Single Family too, unless untick it -----
   var mf = document.querySelector('input[name=property_types][value="Multi-Family"]'), sf = document.querySelector('input[name=property_types][value="Single Family"]');
   if (mf && sf) mf.addEventListener('change', function() { if (mf.checked) sf.checked = true; });
